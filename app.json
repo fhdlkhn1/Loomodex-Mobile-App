@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "Loomodex",
+    "slug": "loomodex",
+    "scheme": "loomodex",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.loomodex.app"
+    },
+    "android": {
+      "package": "com.loomodex.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#0A1426",
+        "foregroundImage": "./assets/android-icon-foreground.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-splash-screen",
+        {
+        "image": "./assets/splash-icon.png",
+        "imageWidth": 200,
+        "resizeMode": "contain",
+        "backgroundColor": "#0A1426"
+        }
+      ]
+    ]
+  }
+}
