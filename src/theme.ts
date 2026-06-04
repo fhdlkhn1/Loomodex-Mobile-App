@@ -1,44 +1,62 @@
-// Loomodex design tokens — ported from the web prototype to React Native.
+// Loomodex design tokens — matched to loomodex.com WordPress theme
 
 export const LMX = {
-  bg: '#FFFFFF',
+  // Backgrounds
+  bg: '#F5F7FA',
   surface: '#FFFFFF',
-  surfaceAlt: '#F4F6FA',
+  surfaceAlt: '#F0F4FF',
   surfaceMuted: '#FAFBFD',
-  ink: '#0F1620',
-  ink70: 'rgba(15,22,32,0.66)',
-  ink50: 'rgba(15,22,32,0.46)',
-  ink30: 'rgba(15,22,32,0.26)',
-  ink10: 'rgba(15,22,32,0.08)',
-  hairline: 'rgba(15,22,32,0.07)',
-  border: '#E3E8EF',
-  accent: '#F37524',
+
+  // Text
+  ink: '#0B1F3A',
+  ink70: 'rgba(11,31,58,0.70)',
+  ink50: 'rgba(11,31,58,0.50)',
+  ink30: 'rgba(11,31,58,0.30)',
+  ink10: 'rgba(11,31,58,0.08)',
+
+  // Lines
+  hairline: 'rgba(11,31,58,0.07)',
+  border: '#DDE3EE',
+
+  // Brand
+  brand: '#1E6BFF',         // primary blue
+  brandDeep: '#1554CC',     // primary hover
+  brandSoft: '#E8EFFE',     // light blue bg
+
+  // Accent
+  accent: '#FF7A00',        // orange
   accentInk: '#FFFFFF',
-  accentSoft: '#FFEBDC',
-  brand: '#0EA5E9',
-  brandDeep: '#0B7FB5',
-  brandSoft: '#DCF1FB',
-  emerald: '#0E8A57',
-  emeraldSoft: '#DAF1E6',
-  amber: '#D38A1A',
-  rose: '#C42458',
-  r: { sm: 8, md: 12, lg: 18, xl: 24, pill: 999 },
+  accentSoft: '#FFF0E5',
+
+  // Dark navy (header/footer)
+  navy: '#0B1F3A',
+
+  // Gold
+  gold: '#FFC300',
+
+  // Status
+  emerald: '#10B981',
+  emeraldSoft: '#D1FAE5',
+  amber: '#F59E0B',
+  rose: '#EF4444',
+
+  // Radius
+  r: { sm: 8, md: 12, lg: 16, xl: 22, pill: 999 },
 };
 
-// Font family names registered via @expo-google-fonts (see App.tsx).
+// Inter font family (matches loomodex.com)
 export const FONT = {
-  sans: 'Geist_400Regular',
-  sansMed: 'Geist_500Medium',
-  sansSemi: 'Geist_600SemiBold',
-  sansBold: 'Geist_700Bold',
-  mono: 'GeistMono_400Regular',
-  monoMed: 'GeistMono_500Medium',
-  monoSemi: 'GeistMono_600SemiBold',
-  display: 'InstrumentSerif_400Regular',
-  displayItalic: 'InstrumentSerif_400Regular_Italic',
+  sans: 'Inter_400Regular',
+  sansMed: 'Inter_500Medium',
+  sansSemi: 'Inter_600SemiBold',
+  sansBold: 'Inter_700Bold',
+  mono: 'Inter_500Medium',
+  monoMed: 'Inter_500Medium',
+  monoSemi: 'Inter_600SemiBold',
+  display: 'Inter_700Bold',
+  displayItalic: 'Inter_400Regular',
 };
 
-// Resolve a Geist family for a numeric/keyword weight.
 export const sans = (weight: number | string = 400): string => {
   const w = Number(weight);
   if (w >= 700) return FONT.sansBold;
@@ -54,9 +72,9 @@ export const mono = (weight: number | string = 400): string => {
   return FONT.mono;
 };
 
-// Format Guinean Franc: "175 000"
+// Format Guinean Franc: "175 000 GNF"
 export const fr = (n: number): string =>
-  Math.round(n).toLocaleString('fr-FR').replace(/[\u00A0,]/g, ' ');
+  Math.round(n).toLocaleString('fr-FR').replace(/[ ,]/g, ' ');
 
 export const gnf = (n: number): string => fr(n) + ' GNF';
 
@@ -66,12 +84,11 @@ export const gnfShort = (n: number): string => {
   return String(n);
 };
 
-// Soft card shadow approximation used across the app.
 export const shadow = (level: 'sm' | 'md' | 'lg' = 'sm') => {
   const map = {
-    sm: { shadowOpacity: 0.06, shadowRadius: 6, elevation: 1, y: 2 },
-    md: { shadowOpacity: 0.1, shadowRadius: 16, elevation: 4, y: 8 },
-    lg: { shadowOpacity: 0.16, shadowRadius: 30, elevation: 10, y: 16 },
+    sm: { shadowOpacity: 0.06, shadowRadius: 6, elevation: 2, y: 2 },
+    md: { shadowOpacity: 0.10, shadowRadius: 16, elevation: 4, y: 6 },
+    lg: { shadowOpacity: 0.16, shadowRadius: 30, elevation: 10, y: 12 },
   }[level];
   return {
     shadowColor: '#000',

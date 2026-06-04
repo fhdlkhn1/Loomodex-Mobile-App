@@ -6,24 +6,38 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import * as SplashScreen from 'expo-splash-screen';
-import { useFonts as useGeist, Geist_400Regular, Geist_500Medium, Geist_600SemiBold, Geist_700Bold } from '@expo-google-fonts/geist';
-import { GeistMono_400Regular, GeistMono_500Medium, GeistMono_600SemiBold } from '@expo-google-fonts/geist-mono';
-import { InstrumentSerif_400Regular, InstrumentSerif_400Regular_Italic } from '@expo-google-fonts/instrument-serif';
+import {
+  useFonts,
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+} from '@expo-google-fonts/inter';
 import { RootNavigator } from './src/navigation';
 import { LMX } from './src/theme';
+import { AuthProvider } from './src/context/AuthContext';
+import { CartProvider } from './src/context/CartContext';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 const navTheme = {
   ...DefaultTheme,
-  colors: { ...DefaultTheme.colors, background: LMX.bg, card: LMX.bg, text: LMX.ink, primary: LMX.accent, border: LMX.hairline },
+  colors: {
+    ...DefaultTheme.colors,
+    background: LMX.bg,
+    card: LMX.surface,
+    text: LMX.ink,
+    primary: LMX.brand,
+    border: LMX.hairline,
+  },
 };
 
 export default function App() {
-  const [loaded] = useGeist({
-    Geist_400Regular, Geist_500Medium, Geist_600SemiBold, Geist_700Bold,
-    GeistMono_400Regular, GeistMono_500Medium, GeistMono_600SemiBold,
-    InstrumentSerif_400Regular, InstrumentSerif_400Regular_Italic,
+  const [loaded] = useFonts({
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
   });
 
   const onReady = useCallback(() => {
@@ -35,10 +49,14 @@ export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <NavigationContainer theme={navTheme} onReady={onReady}>
-          <StatusBar style="dark" />
-          <RootNavigator />
-        </NavigationContainer>
+        <AuthProvider>
+          <CartProvider>
+            <NavigationContainer theme={navTheme} onReady={onReady}>
+              <StatusBar style="dark" />
+              <RootNavigator />
+            </NavigationContainer>
+          </CartProvider>
+        </AuthProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

@@ -95,6 +95,10 @@ export function CategoryGlyph({ id, size = 28 }: { id: string; size?: number }) 
       return <Svg {...svg}><Path {...s} d="M5 8h14l-1 12H6zM9 8V4h6v4" /></Svg>;
     case 'laptops':
       return <Svg {...svg}><Rect {...s} x="4" y="5" width="16" height="11" rx="1.5" /><Path {...s} d="M2 19h20" /></Svg>;
+    case 'baby':
+      return <Svg {...svg}><Circle {...s} cx="12" cy="8" r="4" /><Path {...s} d="M8 14c-3 1-4 4-4 6h16c0-2-1-5-4-6" /></Svg>;
+    case 'sports':
+      return <Svg {...svg}><Circle {...s} cx="12" cy="12" r="9" /><Path {...s} d="M12 3c2 3 2 6 0 9s-2 6 0 9M3 12c3-2 6-2 9 0s6 2 9 0" /></Svg>;
     default:
       return null;
   }

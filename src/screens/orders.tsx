@@ -1,10 +1,12 @@
-import React from 'react';
-import { View, Text, Image, Pressable } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, Image, Pressable, ActivityIndicator, Alert } from 'react-native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { LMX, FONT, sans, mono, fr } from '../theme';
 import { IMG, PRODUCTS } from '../data';
 import { Icon } from '../Icon';
 import { Screen, AppBar, IconBtn, Button, Price, Chip, SummaryRow, SettingRow, MapVisual, Field } from '../components';
+import { ordersApi, Order } from '../api/orders';
+import { useAuth } from '../context/AuthContext';
 
 function HelpTile({ icon, title, onPress }: { icon: any; title: string; onPress?: () => void }) {
   return (
@@ -17,44 +19,50 @@ function HelpTile({ icon, title, onPress }: { icon: any; title: string; onPress?
 }
 
 export function ScreenOrderSuccess() {
-  const nav = useNavigation<any>();
+  const nav   = useNavigation<any>();
+  const route = useRoute<any>();
+  const orderId: number | undefined     = route.params?.orderId;
+  const orderNumber: string | undefined = route.params?.orderNumber;
+
   return (
     <Screen footer={
       <View style={{ flexDirection: 'row', gap: 10 }}>
-        <Button variant="ghost" size="lg" style={{ flex: 1 }} onPress={() => nav.navigate('Main')}>Continue shopping</Button>
-        <Button variant="accent" size="lg" style={{ flex: 1 }} onPress={() => nav.navigate('OrderDetails')}>View order</Button>
+        <Button variant="ghost" size="lg" style={{ flex: 1 }} onPress={() => nav.navigate('Main')}>Continuer</Button>
+        <Button variant="accent" size="lg" style={{ flex: 1 }} onPress={() => nav.navigate('OrderDetails', { orderId })}>Voir la commande</Button>
       </View>
     }>
       <AppBar left={<IconBtn icon="close" onPress={() => nav.navigate('Main')} />} />
       <View style={{ paddingHorizontal: 28, paddingTop: 30, alignItems: 'center' }}>
         <View style={{ width: 96, height: 96, borderRadius: 48, backgroundColor: LMX.emeraldSoft, alignItems: 'center', justifyContent: 'center' }}>
-          <Icon name="check" size={42} color={LMX.emerald} strokeWidth={2.2} />
+          <Icon name="check" size={42} color={LMX.emerald} />
         </View>
-        <Text style={{ fontFamily: FONT.display, fontSize: 34, marginTop: 24, color: LMX.ink }}>Order placed!</Text>
-        <Text style={{ marginTop: 12, fontSize: 14, lineHeight: 21, color: LMX.ink70, textAlign: 'center', maxWidth: 280 }}>Your order is being prepared by the seller. We'll notify you when it's on the way.</Text>
+        <Text style={{ fontFamily: FONT.display, fontSize: 34, marginTop: 24, color: LMX.ink }}>Commande passée !</Text>
+        <Text style={{ marginTop: 12, fontSize: 14, lineHeight: 21, color: LMX.ink70, textAlign: 'center', maxWidth: 280 }}>
+          Votre commande est en cours de préparation. Nous vous notifierons dès qu'elle est en route.
+        </Text>
       </View>
       <View style={{ paddingHorizontal: 16, paddingTop: 28 }}>
         <View style={{ backgroundColor: LMX.surface, borderRadius: LMX.r.lg, padding: 18, borderWidth: 1, borderColor: LMX.border }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <View>
-              <Text style={{ fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600) }}>Order number</Text>
-              <Text style={{ fontFamily: mono(600), fontSize: 15, marginTop: 4 }}>LMX-204-882</Text>
+              <Text style={{ fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600) }}>Numéro de commande</Text>
+              <Text style={{ fontFamily: mono(600), fontSize: 15, marginTop: 4 }}>{orderNumber ?? `#${orderId}`}</Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
-              <Text style={{ fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600) }}>Estimated</Text>
-              <Text style={{ fontSize: 13, fontFamily: sans(600), marginTop: 4 }}>Tomorrow · 14–18h</Text>
+              <Text style={{ fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600) }}>Livraison</Text>
+              <Text style={{ fontSize: 13, fontFamily: sans(600), marginTop: 4 }}>24–48h · Conakry</Text>
             </View>
           </View>
           <View style={{ borderTopWidth: 1, borderColor: LMX.border, borderStyle: 'dashed', paddingTop: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <Icon name="money" size={16} color={LMX.emerald} />
-            <Text style={{ flex: 1, fontSize: 12.5 }}>Pay <Text style={{ fontFamily: mono(600) }}>665 000 GNF</Text> on delivery</Text>
+            <Text style={{ flex: 1, fontSize: 12.5 }}>Paiement à la livraison · Inspectez avant de payer</Text>
             <Icon name="shield" size={16} color={LMX.ink50} />
           </View>
         </View>
       </View>
       <View style={{ paddingHorizontal: 16, paddingTop: 20, flexDirection: 'row', gap: 10 }}>
-        <HelpTile icon="truck" title="Track order" onPress={() => nav.navigate('Tracking')} />
-        <HelpTile icon="headset" title="Need help?" onPress={() => nav.navigate('Help')} />
+        <HelpTile icon="truck" title="Suivre" onPress={() => nav.navigate('Tracking', { orderId })} />
+        <HelpTile icon="headset" title="Aide" onPress={() => nav.navigate('Help')} />
       </View>
     </Screen>
   );
@@ -229,28 +237,82 @@ function OrderCard({ order, onPress }: { order: any; onPress?: () => void }) {
   );
 }
 
+function statusVariant(status: string) {
+  if (['out-delivery', 'assigned-driver', 'driver-arrived', 'otp-pending'].includes(status)) return 'active';
+  if (['processing', 'ready-dispatch', 'on-hold'].includes(status)) return 'prep';
+  if (['completed', 'otp-verified'].includes(status)) return 'done';
+  if (['cancelled', 'refunded', 'delivery-failed'].includes(status)) return 'refund';
+  return 'prep';
+}
+
 export function ScreenOrdersList() {
   const nav = useNavigation<any>();
-  const orders = [
-    { id: 'LMX-204-882', date: 'Today · 09:42', total: 665000, items: [PRODUCTS[1], PRODUCTS[12], PRODUCTS[8]], count: 3, status: 'On the way', variant: 'active', eta: 'ETA 11:38' },
-    { id: 'LMX-204-431', date: 'Yesterday', total: 380000, items: [PRODUCTS[11]], count: 1, status: 'Preparing', variant: 'prep' },
-    { id: 'LMX-203-770', date: 'Apr 28 · 16:20', total: 245000, items: [PRODUCTS[1]], count: 1, status: 'Delivered', variant: 'done' },
-    { id: 'LMX-203-114', date: 'Apr 21', total: 1535000, items: [PRODUCTS[5], PRODUCTS[3]], count: 2, status: 'Delivered', variant: 'done' },
-    { id: 'LMX-202-902', date: 'Apr 12', total: 95000, items: [PRODUCTS[12]], count: 1, status: 'Refunded', variant: 'refund' },
-  ];
+  const { isLoggedIn } = useAuth();
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('all');
+
+  useEffect(() => {
+    if (!isLoggedIn) { setLoading(false); return; }
+    (async () => {
+      try {
+        const res = await ordersApi.list({ per_page: 20 });
+        setOrders(res.orders ?? []);
+      } catch {}
+      finally { setLoading(false); }
+    })();
+  }, [isLoggedIn]);
+
+  const filters = ['all', 'pending', 'processing', 'out-delivery', 'completed', 'cancelled'];
+
+  // Map API order to local OrderCard shape
+  const toCard = (o: Order) => ({
+    id: o.number,
+    date: o.date ? new Date(o.date).toLocaleDateString('fr-FR') : '',
+    total: o.total,
+    items: o.items.map(i => ({ slug: '', image: i.image, name: i.name })),
+    count: o.item_count,
+    status: o.status_label,
+    variant: statusVariant(o.status),
+    orderId: o.id,
+  });
+
   return (
     <Screen>
-      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title="My orders" right={<IconBtn icon="search" />} />
-      <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: 16, paddingBottom: 14, flexWrap: 'wrap' }}>
-        <Chip active>All · 14</Chip><Chip>To pay</Chip><Chip>Preparing</Chip><Chip>On the way</Chip><Chip>Delivered</Chip><Chip>Returns</Chip>
-      </View>
-      <View style={{ paddingHorizontal: 16, gap: 10 }}>
-        {orders.map(o => <OrderCard key={o.id} order={o} onPress={() => nav.navigate('OrderDetails')} />)}
-      </View>
-      <View style={{ margin: 16, padding: 16, backgroundColor: LMX.surfaceAlt, borderRadius: LMX.r.lg, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderColor: LMX.hairline }}>
-        <Icon name="receipt" size={18} color={LMX.ink70} />
-        <Text style={{ flex: 1, fontSize: 12.5, color: LMX.ink70, lineHeight: 17 }}>Need a receipt? Tap any delivered order to download an invoice.</Text>
-      </View>
+      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title="Mes commandes" right={<IconBtn icon="search" />} />
+
+      {!isLoggedIn ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 16 }}>
+          <Icon name="package" size={48} color={LMX.ink30} />
+          <Text style={{ fontSize: 18, fontFamily: sans(600), color: LMX.ink, textAlign: 'center' }}>Connectez-vous pour voir vos commandes</Text>
+          <Button variant="accent" onPress={() => nav.navigate('SignIn')}>Se connecter</Button>
+        </View>
+      ) : loading ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color={LMX.brand} size="large" />
+        </View>
+      ) : orders.length === 0 ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 16 }}>
+          <Icon name="package" size={48} color={LMX.ink30} />
+          <Text style={{ fontSize: 18, fontFamily: sans(600), color: LMX.ink, textAlign: 'center' }}>Aucune commande pour l'instant</Text>
+          <Button variant="accent" onPress={() => nav.navigate('Main')}>Commencer vos achats</Button>
+        </View>
+      ) : (
+        <>
+          <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: 16, paddingBottom: 14, flexWrap: 'wrap' }}>
+            <Chip active={filter === 'all'} onPress={() => setFilter('all')}>Tout · {orders.length}</Chip>
+            <Chip active={filter === 'processing'} onPress={() => setFilter('processing')}>En prépa.</Chip>
+            <Chip active={filter === 'out-delivery'} onPress={() => setFilter('out-delivery')}>En route</Chip>
+            <Chip active={filter === 'completed'} onPress={() => setFilter('completed')}>Livré</Chip>
+          </View>
+          <View style={{ paddingHorizontal: 16, gap: 10 }}>
+            {orders
+              .filter(o => filter === 'all' || o.status === filter)
+              .map(o => <OrderCard key={o.id} order={toCard(o)} onPress={() => nav.navigate('OrderDetails', { orderId: o.id })} />)
+            }
+          </View>
+        </>
+      )}
     </Screen>
   );
 }
@@ -265,62 +327,156 @@ function QuickActionTile({ icon, label, accent, onPress }: { icon: any; label: s
 }
 
 export function ScreenOrderDetails() {
-  const nav = useNavigation<any>();
-  const items = [
-    { p: PRODUCTS[1], qty: 1, color: 'Matte black' },
-    { p: PRODUCTS[12], qty: 2, color: 'Black' },
-    { p: PRODUCTS[8], qty: 1, color: 'Original' },
-  ];
+  const nav   = useNavigation<any>();
+  const route = useRoute<any>();
+  const orderId: number | undefined = route.params?.orderId;
+
+  const [order, setOrder]   = useState<Order | null>(null);
+  const [loading, setLoad]  = useState(true);
+  const [cancelling, setC]  = useState(false);
+
+  useEffect(() => {
+    if (!orderId) { setLoad(false); return; }
+    (async () => {
+      try {
+        const data = await ordersApi.get(orderId);
+        setOrder(data);
+      } catch {}
+      finally { setLoad(false); }
+    })();
+  }, [orderId]);
+
+  const handleCancel = () => {
+    if (!order) return;
+    Alert.alert('Annuler la commande', 'Êtes-vous sûr de vouloir annuler ?', [
+      { text: 'Non', style: 'cancel' },
+      { text: 'Oui, annuler', style: 'destructive', onPress: async () => {
+        setC(true);
+        try {
+          const res = await ordersApi.cancel(order.id, 'Annulation client via app');
+          setOrder(res.order);
+        } catch (e: any) {
+          Alert.alert('Erreur', e.message ?? 'Annulation impossible à ce stade.');
+        } finally { setC(false); }
+      }}
+    ]);
+  };
+
+  const canCancel = order && ['pending','processing','on-hold'].includes(order.status);
+  const isActive  = order && ['out-delivery','assigned-driver','driver-arrived'].includes(order.status);
+
+  const statusColor = (s: string) => {
+    if (['completed','otp-verified'].includes(s)) return LMX.emerald;
+    if (['out-delivery','assigned-driver'].includes(s)) return LMX.brand;
+    if (['cancelled','delivery-failed'].includes(s)) return LMX.rose;
+    return LMX.amber;
+  };
+
+  if (loading) return (
+    <Screen>
+      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} />
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={LMX.brand} size="large" /></View>
+    </Screen>
+  );
+
+  if (!order) return (
+    <Screen>
+      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title="Commande" />
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+        <Icon name="package" size={48} color={LMX.ink30} />
+        <Text style={{ fontSize: 15, color: LMX.ink70 }}>Commande introuvable</Text>
+      </View>
+    </Screen>
+  );
+
   return (
     <Screen footer={
       <View style={{ flexDirection: 'row', gap: 10 }}>
-        <Button variant="ghost" size="md" style={{ flex: 1 }}>Cancel order</Button>
-        <Button variant="primary" size="md" style={{ flex: 1 }} icon="truck" onPress={() => nav.navigate('Tracking')}>Track live</Button>
+        {canCancel && (
+          <Button variant="ghost" size="md" style={{ flex: 1 }} onPress={handleCancel} disabled={cancelling}>
+            {cancelling ? 'Annulation...' : 'Annuler'}
+          </Button>
+        )}
+        {isActive && (
+          <Button variant="primary" size="md" style={{ flex: 1 }} icon="truck" onPress={() => nav.navigate('Tracking', { orderId: order.id })}>Suivre</Button>
+        )}
+        {!canCancel && !isActive && (
+          <Button full variant="ghost" size="md" onPress={() => nav.navigate('Help')}>Besoin d'aide ?</Button>
+        )}
       </View>
     }>
       <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} right={<IconBtn icon="share" />} />
+
+      {/* Header */}
       <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
-        <Text style={{ fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600) }}>Order</Text>
+        <Text style={{ fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600) }}>Commande</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
-          <Text style={{ fontFamily: mono(600), fontSize: 22 }}>LMX-204-882</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, backgroundColor: LMX.emeraldSoft }}>
-            <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: LMX.emerald }} />
-            <Text style={{ color: LMX.emerald, fontSize: 11, fontFamily: sans(700), textTransform: 'uppercase' }}>On the way</Text>
+          <Text style={{ fontFamily: mono(600), fontSize: 20 }}>{order.number}</Text>
+          <View style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, backgroundColor: statusColor(order.status) + '22' }}>
+            <Text style={{ color: statusColor(order.status), fontSize: 11, fontFamily: sans(700), textTransform: 'uppercase' }}>{order.status_label}</Text>
           </View>
         </View>
-        <Text style={{ fontSize: 12, color: LMX.ink50, marginTop: 6 }}>Placed today at 09:42 · ETA <Text style={{ color: LMX.ink, fontFamily: sans(600) }}>11:38</Text></Text>
+        {order.date && (
+          <Text style={{ fontSize: 12, color: LMX.ink50, marginTop: 6 }}>
+            {new Date(order.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+          </Text>
+        )}
       </View>
+
+      {/* Quick actions */}
       <View style={{ paddingHorizontal: 16, paddingBottom: 16, flexDirection: 'row', gap: 8 }}>
-        <QuickActionTile icon="truck" label="Track" accent onPress={() => nav.navigate('Tracking')} />
-        <QuickActionTile icon="headset" label="Contact" />
-        <QuickActionTile icon="receipt" label="Invoice" />
+        {isActive && <QuickActionTile icon="truck" label="Suivre" accent onPress={() => nav.navigate('Tracking', { orderId: order.id })} />}
+        <QuickActionTile icon="headset" label="Contact" onPress={() => nav.navigate('Help')} />
+        <QuickActionTile icon="receipt" label="Facture" />
       </View>
-      <Text style={{ paddingHorizontal: 16, fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600) }}>Items · 3</Text>
+
+      {/* Items */}
+      <Text style={{ paddingHorizontal: 16, fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600) }}>
+        Articles · {order.item_count}
+      </Text>
       <View style={{ margin: 16, marginTop: 8, borderRadius: LMX.r.lg, backgroundColor: LMX.surface, borderWidth: 1, borderColor: LMX.border, overflow: 'hidden' }}>
-        {items.map((it, i) => (
-          <View key={i} style={{ flexDirection: 'row', gap: 12, padding: 12, alignItems: 'center', borderBottomWidth: i < items.length - 1 ? 1 : 0, borderBottomColor: LMX.hairline }}>
-            <Image source={{ uri: IMG(it.p.slug) }} style={{ width: 56, height: 56, borderRadius: 10, backgroundColor: LMX.surfaceAlt }} />
+        {order.items.map((it, i) => (
+          <View key={it.id} style={{ flexDirection: 'row', gap: 12, padding: 12, alignItems: 'center', borderBottomWidth: i < order.items.length - 1 ? 1 : 0, borderBottomColor: LMX.hairline }}>
+            {it.image
+              ? <Image source={{ uri: it.image }} style={{ width: 56, height: 56, borderRadius: 10, backgroundColor: LMX.surfaceAlt }} />
+              : <View style={{ width: 56, height: 56, borderRadius: 10, backgroundColor: LMX.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}><Icon name="bag" size={20} color={LMX.ink30} /></View>
+            }
             <View style={{ flex: 1 }}>
-              <Text numberOfLines={1} style={{ fontSize: 12.5, fontFamily: sans(500) }}>{it.p.name}</Text>
-              <Text style={{ fontSize: 11, color: LMX.ink50, marginTop: 3 }}>{it.color} · {it.p.seller}</Text>
-              <Text style={{ fontFamily: mono(600), fontSize: 12, marginTop: 4 }}>×{it.qty} · {fr(it.p.price * it.qty)} <Text style={{ fontSize: 9, color: LMX.ink50 }}>GNF</Text></Text>
+              <Text numberOfLines={1} style={{ fontSize: 12.5, fontFamily: sans(500) }}>{it.name}</Text>
+              <Text style={{ fontFamily: mono(600), fontSize: 12, marginTop: 4 }}>
+                ×{it.qty} · {fr(it.total)} <Text style={{ fontSize: 9, color: LMX.ink50 }}>GNF</Text>
+              </Text>
             </View>
           </View>
         ))}
       </View>
-      <Text style={{ paddingHorizontal: 16, fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600) }}>Delivery & payment</Text>
+
+      {/* Delivery & payment */}
+      <Text style={{ paddingHorizontal: 16, fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600) }}>Livraison & paiement</Text>
       <View style={{ margin: 16, marginTop: 8, borderRadius: LMX.r.lg, backgroundColor: LMX.surface, borderWidth: 1, borderColor: LMX.border, overflow: 'hidden' }}>
-        <SettingRow icon="pin" label="Boulbinet, Kaloum" sub="Aïssata Diallo · +224 ••• 5109" />
-        <SettingRow icon="money" label="Cash on delivery" sub="665 000 GNF · Pay at door" last />
+        <SettingRow icon="pin" label={`${order.billing.city || 'Conakry'}`} sub={`${order.billing.first_name} ${order.billing.last_name} · ${order.billing.phone || ''}`} />
+        <SettingRow icon="money" label={order.payment_method} sub={`${fr(order.total)} GNF`} last />
       </View>
-      <Text style={{ paddingHorizontal: 16, fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600) }}>Payment summary</Text>
+
+      {/* Driver info */}
+      {order.driver && (
+        <>
+          <Text style={{ paddingHorizontal: 16, fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600) }}>Livreur</Text>
+          <View style={{ margin: 16, marginTop: 8, borderRadius: LMX.r.lg, backgroundColor: LMX.surface, borderWidth: 1, borderColor: LMX.border, overflow: 'hidden' }}>
+            <SettingRow icon="bike" label={order.driver.name} sub={order.driver.phone} last />
+          </View>
+        </>
+      )}
+
+      {/* Summary */}
+      <Text style={{ paddingHorizontal: 16, fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600) }}>Récapitulatif</Text>
       <View style={{ margin: 16, marginTop: 8, padding: 16, borderRadius: LMX.r.lg, backgroundColor: LMX.surface, borderWidth: 1, borderColor: LMX.border }}>
-        <SummaryRow label="Subtotal (3 items)" value={680000} />
-        <SummaryRow label="Delivery" value={25000} />
-        <SummaryRow label="Promo · NEW10" value={-40000} accent />
+        <SummaryRow label={`Sous-total (${order.item_count} articles)`} value={order.total - order.shipping_total} />
+        <SummaryRow label="Livraison" value={order.shipping_total} />
         <View style={{ height: 1, backgroundColor: LMX.hairline, marginVertical: 10 }} />
         <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
-          <Text style={{ fontSize: 13, fontFamily: sans(600) }}>Total</Text><Price value={665000} size="md" />
+          <Text style={{ fontSize: 13, fontFamily: sans(600) }}>Total</Text>
+          <Price value={order.total} size="md" />
         </View>
       </View>
     </Screen>

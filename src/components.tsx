@@ -132,7 +132,7 @@ export function Price({
   value, was, size = 'md', color = LMX.ink,
 }: { value: number; was?: number | null; size?: 'sm' | 'md' | 'lg' | 'xl'; color?: string }) {
   const sz = { sm: 13, md: 15, lg: 22, xl: 28 }[size];
-  const f = (n: number) => n.toLocaleString('fr-FR').replace(/[\u00A0,]/g, ' ');
+  const f = (n: number) => Math.round(n).toLocaleString('fr-FR').replace(/[\u00A0\s,]/g, ' ');
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6 }}>
       <Text style={{ fontFamily: mono(600), fontSize: sz, color }}>
@@ -176,6 +176,7 @@ export function ProductCard({
       </Pressable>
     );
   }
+  const isNew = product.reviews === 0 || product.reviews < 3;
   return (
     <Pressable onPress={onPress} style={{
       backgroundColor: LMX.surface, borderRadius: LMX.r.lg, overflow: 'hidden',
@@ -183,7 +184,11 @@ export function ProductCard({
     }}>
       <View style={{ aspectRatio: 1, backgroundColor: LMX.surfaceAlt }}>
         <Image source={{ uri: IMG(product.slug) }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-        {product.off > 0 && <View style={{ position: 'absolute', top: 10, left: 10 }}><Discount off={product.off} /></View>}
+        {product.off > 0 && (
+          <View style={{ position: 'absolute', top: 8, left: 8, backgroundColor: '#FF7A00', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 }}>
+            <Text style={{ color: '#fff', fontSize: 10, fontFamily: mono(700) }}>−{product.off}%</Text>
+          </View>
+        )}
         <View style={{
           position: 'absolute', top: 8, right: 8, width: 32, height: 32, borderRadius: 999,
           backgroundColor: 'rgba(255,255,255,0.9)', alignItems: 'center', justifyContent: 'center',
@@ -191,14 +196,25 @@ export function ProductCard({
           <Icon name="heart" size={16} color={LMX.ink} />
         </View>
       </View>
-      <View style={{ paddingHorizontal: 12, paddingTop: 10, paddingBottom: 14 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 }}>
-          <Icon name="star" size={11} color={LMX.amber} />
-          <Text style={{ fontSize: 11, fontFamily: mono(400), color: LMX.ink70 }}>{product.rating}</Text>
-          <Text style={{ fontSize: 11, color: LMX.ink50 }}>· {product.reviews}</Text>
+      <View style={{ paddingHorizontal: 10, paddingTop: 9, paddingBottom: 10 }}>
+        {/* Verified / New badge */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 5 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: isNew ? '#EEF4FF' : '#DAF1E6', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5 }}>
+            <Icon name={isNew ? 'sparkle' : 'shield'} size={9} color={isNew ? '#1E6BFF' : '#0E8A57'} />
+            <Text style={{ fontSize: 9, fontFamily: sans(600), color: isNew ? '#1E6BFF' : '#0E8A57' }}>{isNew ? 'New Product' : 'Verified'}</Text>
+          </View>
         </View>
-        <Text numberOfLines={2} style={{ fontSize: 13, fontFamily: sans(500), color: LMX.ink, lineHeight: 17, marginBottom: 8, minHeight: 34 }}>{product.name}</Text>
+        <Text numberOfLines={2} style={{ fontSize: 12.5, fontFamily: sans(500), color: LMX.ink, lineHeight: 17, marginBottom: 6, minHeight: 34 }}>{product.name}</Text>
         <Price value={product.price} was={product.was} size="md" />
+        {/* Delivery info */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 }}>
+          <Icon name="truck" size={10} color="#1E6BFF" />
+          <Text style={{ fontSize: 9.5, color: '#1E6BFF', fontFamily: sans(500) }}>24–48h Conakry</Text>
+        </View>
+        {/* Buy Now button */}
+        <Pressable onPress={onPress} style={{ marginTop: 8, backgroundColor: '#1E6BFF', borderRadius: 8, paddingVertical: 7, alignItems: 'center' }}>
+          <Text style={{ color: '#fff', fontSize: 11.5, fontFamily: sans(700) }}>Buy Now</Text>
+        </Pressable>
       </View>
     </Pressable>
   );
@@ -257,9 +273,24 @@ export function Chip({ children, active, icon, onPress }: { children: React.Reac
 
 // ── Form field ─────────────────────────────────────────────────
 export function Field({
-  label, value, prefix, trailingIcon, secure,
-}: { label: string; value?: string; prefix?: string; trailingIcon?: IconName; secure?: boolean }) {
-  const [val, setVal] = React.useState(value || '');
+  label, value, onChangeText, prefix, trailingIcon, onTrailingPress,
+  secure, keyboardType, autoCapitalize, placeholder,
+}: {
+  label: string;
+  value?: string;
+  onChangeText?: (v: string) => void;
+  prefix?: string;
+  trailingIcon?: IconName;
+  onTrailingPress?: () => void;
+  secure?: boolean;
+  keyboardType?: any;
+  autoCapitalize?: any;
+  placeholder?: string;
+}) {
+  const [internal, setInternal] = React.useState(value || '');
+  const controlled = onChangeText !== undefined;
+  const displayVal = controlled ? (value ?? '') : internal;
+
   return (
     <View>
       <Text style={{ fontSize: 12, color: LMX.ink70, fontFamily: sans(500), marginBottom: 8 }}>{label}</Text>
@@ -274,13 +305,20 @@ export function Field({
           </>
         )}
         <TextInput
-          value={val}
-          onChangeText={setVal}
+          value={displayVal}
+          onChangeText={controlled ? onChangeText : setInternal}
           secureTextEntry={secure}
-          style={{ flex: 1, fontFamily: secure ? sans(400) : mono(400), fontSize: 15, color: LMX.ink, padding: 0 }}
+          keyboardType={keyboardType}
+          autoCapitalize={autoCapitalize ?? 'sentences'}
+          placeholder={placeholder}
           placeholderTextColor={LMX.ink50}
+          style={{ flex: 1, fontFamily: sans(400), fontSize: 15, color: LMX.ink, padding: 0 }}
         />
-        {trailingIcon && <Icon name={trailingIcon} size={18} color={LMX.ink50} />}
+        {trailingIcon && (
+          <Pressable onPress={onTrailingPress}>
+            <Icon name={trailingIcon} size={18} color={LMX.ink50} />
+          </Pressable>
+        )}
       </View>
     </View>
   );

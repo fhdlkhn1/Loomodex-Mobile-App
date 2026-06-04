@@ -46,12 +46,14 @@ export const IMG = (slug: string, w = 600): string => {
 };
 
 export const CATEGORIES: Category[] = [
-  { id: 'phones', label: 'Phones', sub: 'Mobile & accessories', count: 2, hue: '#F3DDD2' },
-  { id: 'fashion', label: 'Fashion', sub: 'Men & women', count: 3, hue: '#E5DDF0' },
-  { id: 'electronics', label: 'Electronics', sub: 'Gadgets & audio', count: 5, hue: '#DCE7E0' },
-  { id: 'beauty', label: 'Beauty', sub: 'Skincare & perfume', count: 2, hue: '#F0DAD8' },
-  { id: 'home', label: 'Home', sub: 'Kitchen & living', count: 2, hue: '#E7E0CF' },
-  { id: 'laptops', label: 'Laptops', sub: 'Computers', count: 1, hue: '#D8DDE5' },
+  { id: 'beauty',      label: 'Beauté &\nSoins',           sub: 'Skincare & parfum',    count: 2,  hue: '#FFF0E5' },
+  { id: 'laptops',    label: 'Ordinateurs\n& Laptops',     sub: 'PC & accessoires',     count: 1,  hue: '#E8EFFE' },
+  { id: 'electronics',label: 'Électronique\n& Gadgets',    sub: 'Audio, TV, gadgets',   count: 5,  hue: '#E5F5FF' },
+  { id: 'fashion',    label: 'Mode &\nChaussures',         sub: 'Homme & femme',        count: 3,  hue: '#F0E8FF' },
+  { id: 'home',       label: 'Maison &\nCuisine',          sub: 'Décor & ustensiles',   count: 2,  hue: '#FFF8E1' },
+  { id: 'phones',     label: 'Téléphones\n& Accessoires',  sub: 'Mobiles & recharges',  count: 2,  hue: '#E8EFFE' },
+  { id: 'baby',       label: 'Bébé &\nEnfants',            sub: 'Jouets & vêtements',   count: 0,  hue: '#FEF3C7' },
+  { id: 'sports',     label: 'Sports &\nPlein Air',        sub: 'Fitness & outdoor',    count: 0,  hue: '#D1FAE5' },
 ];
 
 export const PRODUCTS: Product[] = [

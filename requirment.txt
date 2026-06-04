@@ -1,0 +1,131 @@
+Hello, thank you for the work you have already done on the app. I really appreciate the progress. The app is already looking good, but I want to make it more professional, more attractive, and closer to the Loomodex website.
+
+For now, I want to focus only on these 3 urgent improvements.
+
+1. Hero Banner Improvement
+
+Please replace the current generic banner “Up to 50% off electronics” with a more professional Loomodex trust-focused banner, similar to the website.
+
+The banner should highlight the main Loomodex message:
+
+Order with confidence
+Pay on delivery after inspection
+Verified products from trusted sellers
+
+The design should use the same Loomodex website style: dark blue background, orange button, white text, premium and trustworthy look.
+
+Button: Shop Now
+
+⸻
+
+2. Trust Badges Section
+
+Please add a separate section with 4 trust badges near the top of the home page, right under the hero banner.
+
+The 4 badges should be:
+	•	24–48h Delivery in Conakry
+	•	Pay on Delivery
+	•	Verified Products
+	•	Secure OTP Delivery
+
+These badges should be clean, modern, and professional, with simple icons and the same blue/orange Loomodex branding.
+
+This section is very important because customers in Guinea need to feel safe before ordering.
+
+⸻
+
+3. Product Card Improvement
+
+Please improve the product cards to make them more professional, attractive, and trustworthy.
+
+Each product card should show:
+	•	Clean product image
+	•	Product name
+	•	Price in GNF
+	•	Old price crossed out
+	•	Discount percentage
+	•	Delivery time: 24–48h Conakry
+	•	Badge: Verified Product or Verified Seller
+	•	Button: Buy Now
+	•	Favorite icon
+
+Also, please avoid showing too many “0 reviews / 0 sold” labels. For new products, show:
+
+New Product
+or
+Verified Product
+
+The goal is to make the products look more attractive and give customers more confidence.
+
+Please make these 3 changes first so the app looks closer to the Loomodex website and feels more premium, professional, and trustworthy.
+
+
+
+Hi Fahad,
+
+I would like to use the delivery image as the homepage banner.
+
+I have sent you:
+	1.	The original image without any text.
+	2.	The banner example with text and icons.
+	3.	The app screenshot showing the position where I want the banner to appear.
+
+For the banner, please do not simply use the original image as it is.
+
+I would like you to create a professional banner similar to the example by adding the text, icons, badges, and design elements directly on the image.
+
+The example banner is only a reference to show the style and layout I want.
+
+You can create your own design, but it should include trust-building elements such as:
+	•	Fast Delivery
+	•	Secure Payment
+	•	Reliable Service
+	•	Customer Satisfaction
+	•	Order Tracking
+	•	Support
+
+The goal is to make the banner look premium, professional, and trustworthy while matching the Loomodex branding.
+
+Please place this banner below the search bar exactly as shown in the app screenshot example.
+
+
+
+
+Hi Fahad,
+
+I would also like to make some improvements to the category section.
+
+I have attached a reference image showing the category layout and category types I would like to use on both the website and the mobile app.
+
+Please use these categories:
+
+* Beauty & Personal Care
+* Computers & Laptops
+* Electronics & Gadgets
+* Fashion & Footwear
+* Home & Kitchen
+* Phones & Accessories
+* Baby & Kids
+* Sports & Outdoors
+
+I really like this category style because it looks clean, modern, professional, and easy for customers to understand.
+
+Please review the category icons, colors, spacing, and overall design to make them feel more premium and consistent with the Loomodex brand.
+
+The categories should remain simple and easy to browse, especially for first-time users.
+
+After the category section, I would like the homepage sections to be organized in the following order:
+
+🔥 Flash Deals
+
+🆕 New Arrivals
+
+💎 Premium Selection
+
+🚀 Trending Now
+
+⭐ Recommended Products
+
+I believe this structure will improve the shopping experience, make the homepage look more professional, and help customers discover products more easily.
+
+Thank you.

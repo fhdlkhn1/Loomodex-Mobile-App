@@ -1,10 +1,12 @@
-import React from 'react';
-import { View, Text, Pressable } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, Pressable, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { LMX, FONT, sans, mono, fr } from '../theme';
 import { Icon } from '../Icon';
 import { Screen, AppBar, IconBtn, Toggle } from '../components';
+import { get } from '../api/client';
+import { useAuth } from '../context/AuthContext';
 
 function WalletAction({ icon, label, highlight }: { icon: any; label: string; highlight?: boolean }) {
   return (
@@ -48,50 +50,85 @@ function WalletTx({ tx, last }: any) {
 
 export function ScreenWallet() {
   const nav = useNavigation<any>();
-  const tx = [
-    { kind: 'refund', label: 'Refund · LMX-202-902', sub: 'Premium Perfume — quality', amt: 95000, date: 'May 12' },
-    { kind: 'topup', label: 'Top up · Orange Money', sub: '+224 623 84 51 09', amt: 200000, date: 'May 09' },
-    { kind: 'cashback', label: 'Cashback · Flash deal', sub: '5% on Bluetooth Headphones Pro', amt: 12250, date: 'May 02' },
-    { kind: 'spend', label: 'Order · LMX-203-770', sub: 'Paid from wallet', amt: -50000, date: 'Apr 28' },
-    { kind: 'topup', label: 'Top up · MTN MoMo', sub: 'MoMo wallet', amt: 150000, date: 'Apr 21' },
-  ];
+  const { user, isLoggedIn } = useAuth();
+  const [walletData, setWallet] = useState<{ balance: number; transactions: any[] } | null>(null);
+  const [loading, setLoad]      = useState(true);
+
+  useEffect(() => {
+    if (!isLoggedIn) { setLoad(false); return; }
+    (async () => {
+      try {
+        const data = await get<{ balance: number; currency: string; transactions: any[] }>('/profile/wallet', true);
+        setWallet({ balance: data.balance, transactions: data.transactions ?? [] });
+      } catch {}
+      finally { setLoad(false); }
+    })();
+  }, [isLoggedIn]);
+
+  const balance = walletData?.balance ?? user?.wallet ?? 0;
+  const tx      = walletData?.transactions ?? [];
+
+  if (!isLoggedIn) return (
+    <Screen>
+      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title="Mon portefeuille" />
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+        <Icon name="wallet" size={48} color={LMX.ink30} />
+        <Text style={{ fontSize: 15, color: LMX.ink70 }}>Connectez-vous pour voir votre solde</Text>
+      </View>
+    </Screen>
+  );
+
   return (
     <Screen>
-      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title="My wallet" right={<IconBtn icon="receipt" />} />
+      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title="Mon portefeuille" right={<IconBtn icon="receipt" />} />
       <View style={{ paddingHorizontal: 16 }}>
-        <LinearGradient colors={['#0F1620', '#102A43', '#0B7FB5']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ borderRadius: 22, padding: 22, overflow: 'hidden' }}>
+        <LinearGradient colors={['#0B1F3A', '#1E6BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ borderRadius: 22, padding: 22, overflow: 'hidden' }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Text style={{ fontSize: 11, color: '#fff', opacity: 0.65, textTransform: 'uppercase', fontFamily: sans(600) }}>Available balance</Text>
+            <Text style={{ fontSize: 11, color: '#fff', opacity: 0.65, textTransform: 'uppercase', fontFamily: sans(600) }}>Solde disponible</Text>
             <Icon name="eye" size={16} color="#fff" />
           </View>
-          <Text style={{ fontFamily: FONT.display, fontSize: 44, color: '#fff', marginTop: 10 }}>407 250<Text style={{ fontSize: 13, opacity: 0.7, fontFamily: sans(400) }}> GNF</Text></Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6 }}>
-            <Icon name="arrowU" size={11} color="#fff" />
-            <Text style={{ color: '#7BE0AE', fontFamily: mono(600), fontSize: 11 }}>+18%</Text>
-            <Text style={{ fontSize: 11, color: '#fff', opacity: 0.65 }}>this month</Text>
+          {loading
+            ? <ActivityIndicator color="#fff" style={{ marginTop: 16 }} />
+            : <Text style={{ fontFamily: FONT.display, fontSize: 40, color: '#fff', marginTop: 10 }}>
+                {fr(balance)}<Text style={{ fontSize: 13, opacity: 0.7, fontFamily: sans(400) }}> GNF</Text>
+              </Text>
+          }
+          <View style={{ position: 'absolute', right: 18, top: 18, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.14)' }}>
+            <Text style={{ fontSize: 9, fontFamily: sans(700), color: '#fff', textTransform: 'uppercase' }}>Loomodex Pay</Text>
           </View>
-          <View style={{ position: 'absolute', right: 18, top: 18, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.14)' }}><Text style={{ fontSize: 9, fontFamily: sans(700), color: '#fff', textTransform: 'uppercase' }}>Loomodex Pay</Text></View>
         </LinearGradient>
       </View>
       <View style={{ paddingHorizontal: 16, paddingTop: 14, flexDirection: 'row', gap: 8 }}>
-        <WalletAction icon="plus" label="Top up" highlight /><WalletAction icon="arrowR" label="Send" /><WalletAction icon="qr" label="Pay QR" /><WalletAction icon="download" label="Withdraw" />
+        <WalletAction icon="plus" label="Recharger" highlight />
+        <WalletAction icon="arrowR" label="Envoyer" />
+        <WalletAction icon="qr" label="QR Pay" />
+        <WalletAction icon="download" label="Retirer" />
       </View>
       <View style={{ paddingHorizontal: 16, paddingTop: 20 }}>
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 10 }}>
-          <Text style={{ fontSize: 13, fontFamily: sans(600) }}>Linked wallets</Text><Text style={{ fontSize: 12, color: LMX.ink70 }}>Manage</Text>
+          <Text style={{ fontSize: 13, fontFamily: sans(600) }}>Portefeuilles liés</Text>
+          <Text style={{ fontSize: 12, color: LMX.ink70 }}>Gérer</Text>
         </View>
         <View style={{ backgroundColor: LMX.surface, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.border, overflow: 'hidden' }}>
-          <LinkedWallet name="Orange Money" bg="#FF7900" code="OM" balance="+224 623 84 51 09" primary />
-          <LinkedWallet name="MTN MoMo" bg="#FFCC00" code="MoMo" balance="+224 612 09 73 22" dark last />
+          <LinkedWallet name="Orange Money" bg="#FF7900" code="OM" balance="+224 ••• •••" primary />
+          <LinkedWallet name="MTN MoMo" bg="#FFCC00" code="MoMo" balance="+224 ••• •••" dark last />
         </View>
       </View>
       <View style={{ paddingHorizontal: 16, paddingTop: 20 }}>
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 10 }}>
-          <Text style={{ fontSize: 13, fontFamily: sans(600) }}>Recent activity</Text><Text style={{ fontSize: 12, color: LMX.ink70 }}>View all</Text>
+          <Text style={{ fontSize: 13, fontFamily: sans(600) }}>Activité récente</Text>
+          <Text style={{ fontSize: 12, color: LMX.ink70 }}>Tout voir</Text>
         </View>
-        <View style={{ backgroundColor: LMX.surface, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.border, overflow: 'hidden' }}>
-          {tx.map((t, i) => <WalletTx key={i} tx={t} last={i === tx.length - 1} />)}
-        </View>
+        {tx.length === 0 ? (
+          <View style={{ alignItems: 'center', paddingVertical: 32, gap: 8 }}>
+            <Icon name="receipt" size={32} color={LMX.ink30} />
+            <Text style={{ fontSize: 13, color: LMX.ink50 }}>Aucune transaction</Text>
+          </View>
+        ) : (
+          <View style={{ backgroundColor: LMX.surface, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.border, overflow: 'hidden' }}>
+            {tx.map((t: any, i: number) => <WalletTx key={i} tx={t} last={i === tx.length - 1} />)}
+          </View>
+        )}
       </View>
     </Screen>
   );

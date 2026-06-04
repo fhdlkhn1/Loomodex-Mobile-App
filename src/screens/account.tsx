@@ -1,11 +1,12 @@
-import React from 'react';
-import { View, Text, Image, Pressable, ScrollView } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, Image, Pressable, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { LMX, FONT, sans, mono } from '../theme';
 import { IMG, PRODUCTS } from '../data';
 import { Icon } from '../Icon';
 import { Screen, AppBar, IconBtn, Button, Price, Discount, ProductCard, SettingRow, Field, Toggle, MapVisual, Chip } from '../components';
+import { useAuth } from '../context/AuthContext';
 
 // ── Wishlist (Saved collections) ───────────────────────────────
 function CollectionCard({ label, count, slug, bg, active }: { label: string; count: number; slug?: string; bg?: string; active?: boolean }) {
@@ -155,88 +156,140 @@ function OrderTab({ icon, label, count, dot }: { icon: any; label: string; count
 
 export function ScreenAccount() {
   const nav = useNavigation<any>();
+  const { user, isLoggedIn, logout, isVendor, isDriver } = useAuth();
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  const handleLogout = () => {
+    Alert.alert('Déconnexion', 'Êtes-vous sûr de vouloir vous déconnecter ?', [
+      { text: 'Annuler', style: 'cancel' },
+      {
+        text: 'Déconnexion', style: 'destructive',
+        onPress: async () => {
+          setLoggingOut(true);
+          await logout();
+          nav.reset({ index: 0, routes: [{ name: 'SignIn' }] });
+        }
+      }
+    ]);
+  };
+
+  // Not logged in — show login prompt
+  if (!isLoggedIn) {
+    return (
+      <Screen>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
+          <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: LMX.surfaceAlt, alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
+            <Icon name="user" size={36} color={LMX.ink30} />
+          </View>
+          <Text style={{ fontFamily: FONT.display, fontSize: 26, color: LMX.ink, textAlign: 'center' }}>Connectez-vous</Text>
+          <Text style={{ fontSize: 13, color: LMX.ink70, textAlign: 'center', marginTop: 10, lineHeight: 20 }}>
+            Connectez-vous pour suivre vos commandes, gérer votre compte et bien plus.
+          </Text>
+          <View style={{ marginTop: 24, gap: 12, width: '100%' }}>
+            <Button full variant="accent" size="lg" onPress={() => nav.navigate('SignIn')}>Se connecter</Button>
+            <Button full variant="ghost" size="lg" onPress={() => nav.navigate('SignUp')}>Créer un compte</Button>
+          </View>
+        </View>
+      </Screen>
+    );
+  }
+
+  const initials = `${user?.first_name?.[0] ?? ''}${user?.last_name?.[0] ?? ''}`.toUpperCase() || '?';
+  const fullName = `${user?.first_name ?? ''} ${user?.last_name ?? ''}`.trim() || user?.username || 'Utilisateur';
+  const walletDisplay = user?.wallet ? `${Math.round(user.wallet).toLocaleString('fr-FR')} GNF` : '0 GNF';
+
   return (
     <Screen>
       <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 14 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-          <Text style={{ fontFamily: FONT.display, fontSize: 20, color: LMX.ink }}>Loomo<Text style={{ color: LMX.accent }}>dex</Text></Text>
+          <Image source={require('../../assets/logo.png')} style={{ width: 110, height: 30 }} resizeMode="contain" />
           <View style={{ flexDirection: 'row' }}>
             <IconBtn icon="bell" onPress={() => nav.navigate('Notifications')} />
             <IconBtn icon="settings" onPress={() => nav.navigate('AccountDetails')} />
           </View>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-          <LinearGradient colors={['#F37524', '#0EA5E9']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center' }}>
-            <Text style={{ fontFamily: FONT.display, fontSize: 26, color: '#fff' }}>A</Text>
+          <LinearGradient colors={['#FF7A00', '#1E6BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center' }}>
+            {user?.avatar
+              ? <Image source={{ uri: user.avatar }} style={{ width: 56, height: 56, borderRadius: 28 }} />
+              : <Text style={{ fontFamily: FONT.display, fontSize: 24, color: '#fff' }}>{initials}</Text>
+            }
           </LinearGradient>
           <View style={{ flex: 1 }}>
-            <Text style={{ fontFamily: FONT.display, fontSize: 22, color: LMX.ink }}>Aïssata Diallo</Text>
-            <Text style={{ fontSize: 12, color: LMX.ink50, marginTop: 4, fontFamily: mono(400) }}>+224 623 84 51 09</Text>
+            <Text style={{ fontFamily: FONT.display, fontSize: 20, color: LMX.ink }}>{fullName}</Text>
+            <Text style={{ fontSize: 12, color: LMX.ink50, marginTop: 3, fontFamily: mono(400) }}>{user?.email}</Text>
+            {user?.phone ? <Text style={{ fontSize: 11.5, color: LMX.ink50, fontFamily: mono(400) }}>{user.phone}</Text> : null}
           </View>
           <Pressable onPress={() => nav.navigate('AccountDetails')} style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: LMX.border, backgroundColor: LMX.surface }}>
-            <Text style={{ fontSize: 11.5, fontFamily: sans(600) }}>Edit</Text>
+            <Text style={{ fontSize: 11.5, fontFamily: sans(600) }}>Modifier</Text>
           </Pressable>
         </View>
         <View style={{ flexDirection: 'row', gap: 1, marginTop: 18, backgroundColor: LMX.hairline, borderRadius: 14, overflow: 'hidden' }}>
-          <Stat label="Orders" value="14" /><Stat label="Saved" value="12" /><Stat label="Reviews" value="6" />
+          <Stat label="Commandes" value="—" /><Stat label="Favoris" value="—" /><Stat label="Avis" value="—" />
         </View>
       </View>
+
+      {/* Order quick tabs */}
       <View style={{ paddingHorizontal: 16, paddingBottom: 14 }}>
         <View style={{ backgroundColor: LMX.surface, borderRadius: LMX.r.lg, padding: 4, borderWidth: 1, borderColor: LMX.border, flexDirection: 'row' }}>
-          <OrderTab icon="package" label="To pay" count={1} />
-          <OrderTab icon="refresh" label="Preparing" count={2} />
-          <OrderTab icon="truck" label="On the way" count={1} dot />
-          <OrderTab icon="checkCircle" label="Review" count={3} />
+          <OrderTab icon="package" label="À payer" count={0} />
+          <OrderTab icon="refresh" label="Préparation" count={0} />
+          <OrderTab icon="truck" label="En route" count={0} />
+          <OrderTab icon="checkCircle" label="Avis" count={0} />
         </View>
       </View>
-      <View style={{ paddingHorizontal: 16, paddingBottom: 14 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 10 }}>
-          <Text style={{ fontSize: 13, fontFamily: sans(600) }}>Active order</Text>
-          <Pressable onPress={() => nav.navigate('OrdersList')}><Text style={{ fontSize: 12, color: LMX.ink70 }}>All orders</Text></Pressable>
-        </View>
-        <View style={{ backgroundColor: LMX.surface, borderRadius: LMX.r.lg, padding: 12, borderWidth: 1, borderColor: LMX.border, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <View style={{ flexDirection: 'row' }}>
-            {[PRODUCTS[1], PRODUCTS[12], PRODUCTS[8]].map((p, i) => <Image key={p.id} source={{ uri: IMG(p.slug) }} style={{ width: 38, height: 38, borderRadius: 10, marginLeft: i > 0 ? -10 : 0, borderWidth: 2, borderColor: LMX.surface }} />)}
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 13, fontFamily: sans(600) }}>3 items · LMX-204-882</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
-              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: LMX.emerald }} />
-              <Text style={{ fontSize: 11, color: LMX.emerald, fontFamily: sans(600) }}>On the way · ETA 11:38</Text>
+
+      {/* Sell on Loomodex CTA */}
+      {!isVendor && (
+        <View style={{ paddingHorizontal: 16, paddingBottom: 14 }}>
+          <Pressable onPress={() => nav.navigate('Seller')} style={{ backgroundColor: LMX.navy, borderRadius: LMX.r.lg, padding: 18, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+            <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: LMX.accent, alignItems: 'center', justifyContent: 'center' }}><Icon name="storefront" size={22} color="#fff" /></View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontFamily: FONT.display, fontSize: 17, color: '#fff' }}>Vendre sur Loomodex</Text>
+              <Text style={{ fontSize: 11, color: '#fff', opacity: 0.7, marginTop: 3 }}>500+ vendeurs · ouvrir une boutique en 5 min</Text>
             </View>
-          </View>
-          <Button variant="ghost" size="sm" onPress={() => nav.navigate('Tracking')}>Track</Button>
+            <Icon name="chevR" size={16} color="#fff" />
+          </Pressable>
         </View>
-      </View>
-      <View style={{ paddingHorizontal: 16, paddingBottom: 14 }}>
-        <Pressable onPress={() => nav.navigate('Seller')} style={{ backgroundColor: LMX.surfaceAlt, borderRadius: LMX.r.lg, padding: 18, borderWidth: 1, borderColor: LMX.border, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-          <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: LMX.ink, alignItems: 'center', justifyContent: 'center' }}><Icon name="storefront" size={22} color="#fff" /></View>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontFamily: FONT.display, fontSize: 18, color: LMX.ink }}>Sell on Loomodex</Text>
-            <Text style={{ fontSize: 11.5, color: LMX.ink70, marginTop: 3 }}>500+ sellers · open a store in 5 minutes</Text>
-          </View>
-          <Icon name="chevR" size={16} color={LMX.ink50} />
-        </Pressable>
-      </View>
+      )}
+
+      {/* Settings */}
       <View style={{ paddingHorizontal: 16 }}>
         <View style={{ backgroundColor: LMX.surface, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.border, overflow: 'hidden' }}>
-          <SettingRow icon="pin" label="Addresses" sub="2 saved" onPress={() => nav.navigate('Addresses')} />
-          <SettingRow icon="money" label="Payment methods" sub="Orange · MTN" onPress={() => nav.navigate('PaymentMethods')} />
-          <SettingRow icon="wallet" label="My wallet" sub="407 250 GNF" onPress={() => nav.navigate('Wallet')} />
-          <SettingRow icon="heart" label="Wishlist" sub="12 items" onPress={() => nav.navigate('Wishlist')} />
-          <SettingRow icon="bell" label="Notifications" sub="Push, SMS" onPress={() => nav.navigate('Notifications')} />
-          <SettingRow icon="package" label="Track an order" onPress={() => nav.navigate('TrackEntry')} />
-          <SettingRow icon="refresh" label="Request a return" onPress={() => nav.navigate('ReturnRequest')} />
-          <SettingRow icon="headset" label="Help center" onPress={() => nav.navigate('Help')} last />
+          <SettingRow icon="pin"         label="Adresses"         sub="Gérer mes adresses"     onPress={() => nav.navigate('Addresses')} />
+          <SettingRow icon="money"       label="Paiement"         sub="Orange · MTN · Cash"    onPress={() => nav.navigate('PaymentMethods')} />
+          <SettingRow icon="wallet"      label="Mon portefeuille"  sub={walletDisplay}          onPress={() => nav.navigate('Wallet')} />
+          <SettingRow icon="heart"       label="Liste de souhaits" sub="Mes favoris"            onPress={() => nav.navigate('Wishlist')} />
+          <SettingRow icon="bell"        label="Notifications"     sub="Push, SMS"              onPress={() => nav.navigate('Notifications')} />
+          <SettingRow icon="package"     label="Suivre une commande"                            onPress={() => nav.navigate('TrackEntry')} />
+          <SettingRow icon="refresh"     label="Demander un retour"                             onPress={() => nav.navigate('ReturnRequest')} />
+          <SettingRow icon="headset"     label="Aide"                                           onPress={() => nav.navigate('Help')} last />
         </View>
       </View>
-      <View style={{ paddingHorizontal: 16, paddingTop: 14 }}>
-        <Text style={{ fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600), marginBottom: 8 }}>Business tools</Text>
-        <View style={{ backgroundColor: LMX.surface, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.border, overflow: 'hidden' }}>
-          <SettingRow icon="chart" label="Seller dashboard" onPress={() => nav.navigate('Seller')} />
-          <SettingRow icon="bike" label="Driver dashboard" onPress={() => nav.navigate('Driver')} />
-          <SettingRow icon="truck" label="Logistics ops" onPress={() => nav.navigate('Logistics')} last />
+
+      {/* Business tools — visible to vendors/drivers/admin */}
+      {(isVendor || isDriver || user?.roles?.includes('administrator')) && (
+        <View style={{ paddingHorizontal: 16, paddingTop: 14 }}>
+          <Text style={{ fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600), marginBottom: 8 }}>Outils professionnels</Text>
+          <View style={{ backgroundColor: LMX.surface, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.border, overflow: 'hidden' }}>
+            {isVendor && <SettingRow icon="chart"     label="Tableau de bord vendeur"  onPress={() => nav.navigate('Seller')} />}
+            {isDriver  && <SettingRow icon="bike"      label="Tableau de bord livreur"  onPress={() => nav.navigate('Driver')} />}
+            <SettingRow icon="truck"      label="Opérations logistique" onPress={() => nav.navigate('Logistics')} last />
+          </View>
         </View>
+      )}
+
+      {/* Logout */}
+      <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 }}>
+        <Pressable onPress={handleLogout} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.rose + '44', backgroundColor: '#FFF5F5' }}>
+          {loggingOut
+            ? <ActivityIndicator color={LMX.rose} />
+            : <>
+                <Icon name="arrowU" size={16} color={LMX.rose} />
+                <Text style={{ fontSize: 14, fontFamily: sans(600), color: LMX.rose }}>Déconnexion</Text>
+              </>
+          }
+        </Pressable>
       </View>
     </Screen>
   );

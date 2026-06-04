@@ -1,10 +1,12 @@
 import React from 'react';
-import { View, Text, Pressable } from 'react-native';
+import { View, Text, Pressable, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator, BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { LMX, sans, mono } from './theme';
 import { Icon, IconName } from './Icon';
+import { useAuth } from './context/AuthContext';
+import { useCart } from './context/CartContext';
 
 import { ScreenSplash } from './screens/splash';
 import { ScreenOnboarding, ScreenSignIn, ScreenSignUp, ScreenOTP, ScreenForgot, ScreenResetPassword } from './screens/auth';
@@ -20,41 +22,43 @@ import { ScreenSeller, ScreenAddProduct, ScreenDriver, ScreenLogistics } from '.
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-const TABS: { name: string; icon: IconName; label: string; badge?: number; push?: string }[] = [
-  { name: 'Home', icon: 'home', label: 'Accueil' },
-  { name: 'Account', icon: 'user', label: 'Compte' },
-  { name: 'Cart', icon: 'bag', label: 'Panier', badge: 3, push: 'Cart' },
-  { name: 'Categories', icon: 'grid', label: 'Menu' },
-  { name: 'Support', icon: 'msg', label: 'Chat' },
+const TABS: { name: string; icon: IconName; label: string; push?: string }[] = [
+  { name: 'Home',       icon: 'home',  label: 'Accueil' },
+  { name: 'Categories', icon: 'grid',  label: 'Catégories' },
+  { name: 'CartTab',    icon: 'bag',   label: 'Panier',   push: 'Cart' },
+  { name: 'OrdersList', icon: 'package', label: 'Commandes', push: 'OrdersList' },
+  { name: 'Account',    icon: 'user',  label: 'Compte' },
 ];
 
 function LoomodexTabBar({ state, navigation }: BottomTabBarProps) {
-  const insets = useSafeAreaInsets();
+  const insets     = useSafeAreaInsets();
   const activeName = state.routes[state.index].name;
+  const { cart }   = useCart();
+
   return (
     <View style={{
       flexDirection: 'row', justifyContent: 'space-around', alignItems: 'flex-end',
-      backgroundColor: LMX.bg, borderTopWidth: 1, borderTopColor: LMX.hairline,
+      backgroundColor: LMX.surface, borderTopWidth: 1, borderTopColor: LMX.hairline,
       paddingTop: 8, paddingBottom: Math.max(insets.bottom, 10),
     }}>
       {TABS.map(t => {
         const isActive = !t.push && t.name === activeName;
+        const badge = t.push === 'Cart' ? cart.item_count : 0;
         return (
           <Pressable
             key={t.name}
             onPress={() => (t.push ? navigation.navigate(t.push as never) : navigation.navigate(t.name as never))}
-            style={{ alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 4 }}
+            style={{ alignItems: 'center', gap: 3, paddingHorizontal: 12, paddingVertical: 4 }}
           >
             <View>
-              <Icon name={t.icon} size={22} color={isActive ? LMX.ink : LMX.ink50} strokeWidth={isActive ? 1.9 : 1.5} />
-              {t.badge ? (
-                <View style={{ position: 'absolute', top: -4, right: -7, minWidth: 16, height: 16, borderRadius: 8, paddingHorizontal: 4, backgroundColor: LMX.accent, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: LMX.bg }}>
-                  <Text style={{ color: '#fff', fontSize: 9.5, fontFamily: mono(700) }}>{t.badge}</Text>
+              <Icon name={t.icon} size={22} color={isActive ? LMX.brand : LMX.ink50} />
+              {badge > 0 && (
+                <View style={{ position: 'absolute', top: -4, right: -7, minWidth: 16, height: 16, borderRadius: 8, paddingHorizontal: 4, backgroundColor: LMX.accent, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: LMX.surface }}>
+                  <Text style={{ color: '#fff', fontSize: 9, fontFamily: mono(700) }}>{badge}</Text>
                 </View>
-              ) : null}
+              )}
             </View>
-            <Text style={{ fontSize: 10, fontFamily: isActive ? sans(600) : sans(500), color: isActive ? LMX.ink : LMX.ink50 }}>{t.label}</Text>
-            {isActive && <View style={{ position: 'absolute', bottom: -2, width: 4, height: 4, borderRadius: 2, backgroundColor: LMX.accent }} />}
+            <Text style={{ fontSize: 10, fontFamily: isActive ? sans(600) : sans(400), color: isActive ? LMX.brand : LMX.ink50 }}>{t.label}</Text>
           </Pressable>
         );
       })}
@@ -74,16 +78,30 @@ function MainTabs() {
 }
 
 export function RootNavigator() {
+  const { isLoggedIn, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: LMX.bg, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator size="large" color={LMX.brand} />
+      </View>
+    );
+  }
+
   return (
-    <Stack.Navigator initialRouteName="Splash" screenOptions={{ headerShown: false, contentStyle: { backgroundColor: LMX.bg } }}>
-      <Stack.Screen name="Splash" component={ScreenSplash} />
-      <Stack.Screen name="Onboarding" component={ScreenOnboarding} />
-      <Stack.Screen name="SignIn" component={ScreenSignIn} />
-      <Stack.Screen name="SignUp" component={ScreenSignUp} />
-      <Stack.Screen name="OTP" component={ScreenOTP} />
-      <Stack.Screen name="Forgot" component={ScreenForgot} />
-      <Stack.Screen name="Reset" component={ScreenResetPassword} />
-      <Stack.Screen name="Main" component={MainTabs} />
+    <Stack.Navigator
+      initialRouteName={isLoggedIn ? 'Main' : 'Splash'}
+      screenOptions={{ headerShown: false, contentStyle: { backgroundColor: LMX.bg } }}
+    >
+      {/* Always available */}
+      <Stack.Screen name="Splash"      component={ScreenSplash} />
+      <Stack.Screen name="Onboarding"  component={ScreenOnboarding} />
+      <Stack.Screen name="SignIn"      component={ScreenSignIn} />
+      <Stack.Screen name="SignUp"      component={ScreenSignUp} />
+      <Stack.Screen name="OTP"         component={ScreenOTP} />
+      <Stack.Screen name="Forgot"      component={ScreenForgot} />
+      <Stack.Screen name="Reset"       component={ScreenResetPassword} />
+      <Stack.Screen name="Main"        component={MainTabs} />
 
       <Stack.Screen name="Search" component={ScreenSearch} />
       <Stack.Screen name="SearchResults" component={ScreenSearchResults} />
