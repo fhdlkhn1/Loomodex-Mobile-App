@@ -44,7 +44,7 @@ Both Apple and Google require working demo credentials. All three are **public r
 - Cash on Delivery **or** Loomodex Wallet payment
 - Structured Guinea delivery address (Zone → Commune → Quartier → Landmark) + optional map pin
 - Recipient can differ from the buyer (separate recipient phone)
-- Order tracking (status + live driver location on a map), OTP delivery confirmation
+- Order tracking — order status + live driver location on a map
 - In-app notifications (bell) + push notifications
 - "USA Store" section for imported products with an international delivery estimate
 
@@ -56,8 +56,10 @@ Both Apple and Google require working demo credentials. All three are **public r
 
 **Delivery drivers** (native dashboard)
 - See assigned deliveries, pickup & delivery addresses
-- Update status (Picked up → On the way → Arrived), verify OTP to complete
-- Live GPS broadcast, navigate to customer, "Send Location Request" SMS, call/WhatsApp recipient
+- Update status (Picked up → On the way → Arrived), complete delivery
+- Live GPS broadcast, navigate to customer, call/WhatsApp recipient
+
+> _Note: SMS/WhatsApp features (OTP by SMS, the "Send Location Request" text) depend on the Twilio account, which is not connected in this version — so they are omitted from the store description below. Order confirmation still works via in-app + push notifications._
 
 ---
 
@@ -107,7 +109,7 @@ PAIEMENT & LIVRAISON
 SUIVI EN TEMPS RÉEL
 • Suivez votre commande étape par étape
 • Visualisez la position du livreur sur la carte
-• Livraison sécurisée confirmée par code (OTP)
+• Recevez des notifications à chaque étape de la livraison
 
 POUR LES VENDEURS
 • Gérez votre boutique directement depuis l'application
@@ -116,7 +118,7 @@ POUR LES VENDEURS
 
 POUR LES LIVREURS
 • Tableau de bord de vos livraisons assignées
-• Navigation GPS, mise à jour du statut, confirmation par OTP
+• Navigation GPS et mise à jour du statut de livraison
 
 Loomodex — vos achats, livrés avec soin, partout à Conakry.
 ```
@@ -143,7 +145,7 @@ PAYMENT & DELIVERY
 REAL-TIME TRACKING
 • Follow your order step by step
 • See the driver's live location on the map
-• Secure delivery confirmed with a one-time code (OTP)
+• Get notified at every delivery step
 
 FOR SELLERS
 • Manage your store right from the app
@@ -152,7 +154,7 @@ FOR SELLERS
 
 FOR DRIVERS
 • Dashboard of your assigned deliveries
-• GPS navigation, status updates, OTP confirmation
+• GPS navigation and delivery status updates
 
 Loomodex — your shopping, delivered with care, all across Conakry.
 ```
