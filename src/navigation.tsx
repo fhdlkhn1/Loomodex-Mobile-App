@@ -6,18 +6,20 @@ import { createBottomTabNavigator, BottomTabBarProps } from '@react-navigation/b
 import { LMX, sans, mono } from './theme';
 import { Icon, IconName } from './Icon';
 import { useAuth } from './context/AuthContext';
+import { staffHomeRoute } from './roles';
 import { useCart } from './context/CartContext';
 
 import { ScreenSplash } from './screens/splash';
 import { ScreenOnboarding, ScreenSignIn, ScreenSignUp, ScreenOTP, ScreenForgot, ScreenResetPassword } from './screens/auth';
 import { ScreenHome, ScreenCategories, ScreenCategory, ScreenSearch, ScreenSearchResults } from './screens/discover';
-import { ScreenFilterSheet } from './screens/filter';
 import { ScreenProductDetail, ScreenSellerStorefront, ScreenCart, ScreenCheckout } from './screens/buy';
-import { ScreenOrderSuccess, ScreenTracking, ScreenTrackEntry, ScreenOrdersList, ScreenOrderDetails, ScreenReturnRequest, ScreenWriteReview } from './screens/orders';
-import { ScreenWishlist, ScreenListeSouhaits, ScreenAccount, ScreenNotifications, ScreenAccountDetails, ScreenAddresses, ScreenAddressForm } from './screens/account';
-import { ScreenWallet, ScreenPaymentMethods } from './screens/wallet';
-import { ScreenHelp, ScreenSupport, ScreenInquiries } from './screens/support';
-import { ScreenSeller, ScreenAddProduct, ScreenDriver, ScreenLogistics } from './screens/business';
+import { ScreenOrderSuccess, ScreenTracking, ScreenTrackEntry, ScreenOrdersList, ScreenOrderDetails } from './screens/orders';
+import { ScreenWishlist, ScreenListeSouhaits, ScreenAccount, ScreenAccountDetails, ScreenAddresses, ScreenAddressForm } from './screens/account';
+import { ScreenWallet, ScreenWalletTopup } from './screens/wallet';
+import { ScreenHelp } from './screens/support';
+import { ScreenNotifications } from './screens/notifications';
+import { ScreenUsaStore } from './screens/usastore';
+import { ScreenSeller, ScreenAddProduct, ScreenDriver, ScreenDriverOrder, ScreenLogistics, ScreenCS, ScreenVendorProducts, ScreenVendorEditProduct, ScreenVendorOrders, ScreenVendorOrder, ScreenVendorStore, ScreenDriverLocate } from './screens/business';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -72,13 +74,12 @@ function MainTabs() {
       <Tab.Screen name="Home" component={ScreenHome} />
       <Tab.Screen name="Account" component={ScreenAccount} />
       <Tab.Screen name="Categories" component={ScreenCategories} />
-      <Tab.Screen name="Support" component={ScreenSupport} />
     </Tab.Navigator>
   );
 }
 
 export function RootNavigator() {
-  const { isLoggedIn, loading } = useAuth();
+  const { isLoggedIn, user, loading } = useAuth();
 
   if (loading) {
     return (
@@ -88,9 +89,13 @@ export function RootNavigator() {
     );
   }
 
+  // On launch: customers → shop; staff → straight to their dashboard (so a driver never
+  // reopens the app onto the shopping home and gets lost).
+  const initialRoute = !isLoggedIn ? 'Splash' : (staffHomeRoute(user?.roles) ?? 'Main');
+
   return (
     <Stack.Navigator
-      initialRouteName={isLoggedIn ? 'Main' : 'Splash'}
+      initialRouteName={initialRoute}
       screenOptions={{ headerShown: false, contentStyle: { backgroundColor: LMX.bg } }}
     >
       {/* Always available */}
@@ -106,7 +111,6 @@ export function RootNavigator() {
       <Stack.Screen name="Search" component={ScreenSearch} />
       <Stack.Screen name="SearchResults" component={ScreenSearchResults} />
       <Stack.Screen name="Category" component={ScreenCategory} />
-      <Stack.Screen name="FilterSheet" component={ScreenFilterSheet} options={{ presentation: 'transparentModal', animation: 'fade' }} />
 
       <Stack.Screen name="ProductDetail" component={ScreenProductDetail} />
       <Stack.Screen name="SellerStorefront" component={ScreenSellerStorefront} />
@@ -118,26 +122,31 @@ export function RootNavigator() {
       <Stack.Screen name="TrackEntry" component={ScreenTrackEntry} />
       <Stack.Screen name="OrdersList" component={ScreenOrdersList} />
       <Stack.Screen name="OrderDetails" component={ScreenOrderDetails} />
-      <Stack.Screen name="ReturnRequest" component={ScreenReturnRequest} />
-      <Stack.Screen name="WriteReview" component={ScreenWriteReview} />
 
       <Stack.Screen name="Wishlist" component={ScreenWishlist} />
       <Stack.Screen name="ListeSouhaits" component={ScreenListeSouhaits} />
-      <Stack.Screen name="Notifications" component={ScreenNotifications} />
       <Stack.Screen name="AccountDetails" component={ScreenAccountDetails} />
       <Stack.Screen name="Addresses" component={ScreenAddresses} />
       <Stack.Screen name="AddressForm" component={ScreenAddressForm} />
-
       <Stack.Screen name="Wallet" component={ScreenWallet} />
-      <Stack.Screen name="PaymentMethods" component={ScreenPaymentMethods} />
+      <Stack.Screen name="WalletTopup" component={ScreenWalletTopup} />
 
       <Stack.Screen name="Help" component={ScreenHelp} />
-      <Stack.Screen name="Inquiries" component={ScreenInquiries} />
+      <Stack.Screen name="Notifications" component={ScreenNotifications} />
+      <Stack.Screen name="UsaStore" component={ScreenUsaStore} />
 
       <Stack.Screen name="Seller" component={ScreenSeller} />
       <Stack.Screen name="AddProduct" component={ScreenAddProduct} />
+      <Stack.Screen name="VendorProducts" component={ScreenVendorProducts} />
+      <Stack.Screen name="VendorEditProduct" component={ScreenVendorEditProduct} />
+      <Stack.Screen name="VendorOrders" component={ScreenVendorOrders} />
+      <Stack.Screen name="VendorOrder" component={ScreenVendorOrder} />
+      <Stack.Screen name="VendorStore" component={ScreenVendorStore} />
       <Stack.Screen name="Driver" component={ScreenDriver} />
+      <Stack.Screen name="DriverOrder" component={ScreenDriverOrder} />
       <Stack.Screen name="Logistics" component={ScreenLogistics} />
+      <Stack.Screen name="DriverLocate" component={ScreenDriverLocate} />
+      <Stack.Screen name="CS" component={ScreenCS} />
     </Stack.Navigator>
   );
 }

@@ -1,12 +1,17 @@
 import React from 'react';
 import {
   View, Text, Image, Pressable, ScrollView, TextInput, StyleProp, ViewStyle, TextStyle,
+  KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import { Image as ExpoImage } from 'expo-image';
 import Svg, { Path, Rect, G, Circle, Text as SvgText } from 'react-native-svg';
 import { LMX, FONT, sans, mono, shadow } from './theme';
 import { Icon, IconName, CategoryGlyph } from './Icon';
 import { IMG, Product, Category } from './data';
+import { useNotifications } from './context/NotificationsContext';
+import { useAuth } from './context/AuthContext';
 
 // ── Screen shell ───────────────────────────────────────────────
 export function Screen({
@@ -23,12 +28,17 @@ export function Screen({
   const top = padTop ? insets.top + 6 : 0;
   const bottomPad = (footer ? 96 : 24) + insets.bottom;
   return (
-    <View style={{ flex: 1, backgroundColor: bg || LMX.bg }}>
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: bg || LMX.bg }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       {scroll ? (
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={[{ paddingTop: top, paddingBottom: bottomPad }, contentStyle]}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
         >
           {children}
         </ScrollView>
@@ -43,14 +53,20 @@ export function Screen({
           {footer}
         </View>
       )}
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
 // ── AppBar ─────────────────────────────────────────────────────
+/**
+ * The app has no global navigator header (headerShown is false everywhere), so
+ * AppBar is the closest thing to one. The bell is rendered here — rather than at
+ * each of the ~47 call sites — so it appears on every page for free. Screens that
+ * need the slot back can pass bell={false}.
+ */
 export function AppBar({
-  left, right, title, overlay = false,
-}: { left?: React.ReactNode; right?: React.ReactNode; title?: string | null; overlay?: boolean }) {
+  left, right, title, overlay = false, bell = true,
+}: { left?: React.ReactNode; right?: React.ReactNode; title?: string | null; overlay?: boolean; bell?: boolean }) {
   const insets = useSafeAreaInsets();
   return (
     <View style={[
@@ -59,14 +75,38 @@ export function AppBar({
     ]}>
       <View style={{ minWidth: 40, flexDirection: 'row', alignItems: 'center' }}>{left}</View>
       {!!title && <Text style={{ fontFamily: sans(600), fontSize: 15, color: LMX.ink }}>{title}</Text>}
-      <View style={{ minWidth: 40, flexDirection: 'row', justifyContent: 'flex-end', gap: 6 }}>{right}</View>
+      <View style={{ minWidth: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
+        {bell && <BellButton bg={overlay ? LMX.surface : 'transparent'} />}
+        {right}
+      </View>
     </View>
   );
 }
 
+/**
+ * Bell + unread badge. Renders nothing when signed out — a logged-out user has no
+ * inbox, which also keeps it off the auth/onboarding screens automatically.
+ */
+export function BellButton({ bg = 'transparent', color = LMX.ink }: { bg?: string; color?: string }) {
+  const nav = useNavigation<any>();
+  const { unread } = useNotifications();
+  const { isLoggedIn } = useAuth();
+  if (!isLoggedIn) return null;
+  return (
+    <IconBtn
+      icon="bell"
+      bg={bg}
+      color={color}
+      badge={unread > 0 ? unread : undefined}
+      badgeColor={LMX.rose}
+      onPress={() => nav.navigate('Notifications')}
+    />
+  );
+}
+
 export function IconBtn({
-  icon, badge, onPress, bg = 'transparent', size = 38, color = LMX.ink,
-}: { icon: IconName; badge?: number; onPress?: () => void; bg?: string; size?: number; color?: string }) {
+  icon, badge, onPress, bg = 'transparent', size = 38, color = LMX.ink, badgeColor = LMX.accent,
+}: { icon: IconName; badge?: number; onPress?: () => void; bg?: string; size?: number; color?: string; badgeColor?: string }) {
   return (
     <Pressable onPress={onPress} style={{
       width: size, height: size, borderRadius: 999, backgroundColor: bg,
@@ -76,10 +116,10 @@ export function IconBtn({
       {badge != null && (
         <View style={{
           position: 'absolute', top: 3, right: 3, minWidth: 16, height: 16, borderRadius: 8,
-          backgroundColor: LMX.accent, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4,
+          backgroundColor: badgeColor, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4,
           borderWidth: 1.5, borderColor: LMX.bg,
         }}>
-          <Text style={{ color: '#fff', fontSize: 9.5, fontFamily: mono(700) }}>{badge}</Text>
+          <Text style={{ color: '#fff', fontSize: 9.5, fontFamily: mono(700) }}>{badge > 99 ? '99+' : badge}</Text>
         </View>
       )}
     </Pressable>
@@ -161,13 +201,15 @@ export function Discount({ off }: { off: number }) {
 export function ProductCard({
   product, variant = 'grid', onPress,
 }: { product: Product; variant?: 'grid' | 'list'; onPress?: () => void }) {
+  // Prefer a real product image (WooCommerce/plugin); fall back to the slug resolver.
+  const imageUri = product.image || IMG(product.slug);
   if (variant === 'list') {
     return (
       <Pressable onPress={onPress} style={{
         flexDirection: 'row', gap: 12, padding: 10, backgroundColor: LMX.surface,
         borderRadius: LMX.r.lg, alignItems: 'center', borderWidth: 1, borderColor: LMX.border,
       }}>
-        <Image source={{ uri: IMG(product.slug) }} style={{ width: 76, height: 76, borderRadius: 12, backgroundColor: LMX.surfaceAlt }} />
+        <ExpoImage source={imageUri} style={{ width: 76, height: 76, borderRadius: 12, backgroundColor: LMX.surfaceAlt }} contentFit="cover" transition={150} cachePolicy="memory-disk" />
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={{ fontSize: 10, color: LMX.ink50, marginBottom: 3, letterSpacing: 0.5, textTransform: 'uppercase', fontFamily: sans(500) }}>{product.seller}</Text>
           <Text numberOfLines={2} style={{ fontSize: 13.5, fontFamily: sans(500), color: LMX.ink, lineHeight: 18, marginBottom: 6 }}>{product.name}</Text>
@@ -176,44 +218,53 @@ export function ProductCard({
       </Pressable>
     );
   }
-  const isNew = product.reviews === 0 || product.reviews < 3;
   return (
     <Pressable onPress={onPress} style={{
       backgroundColor: LMX.surface, borderRadius: LMX.r.lg, overflow: 'hidden',
       borderWidth: 1, borderColor: LMX.border, flex: 1,
     }}>
       <View style={{ aspectRatio: 1, backgroundColor: LMX.surfaceAlt }}>
-        <Image source={{ uri: IMG(product.slug) }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+        <ExpoImage source={imageUri} style={{ width: '100%', height: '100%' }} contentFit="cover" transition={150} cachePolicy="memory-disk" />
         {product.off > 0 && (
           <View style={{ position: 'absolute', top: 8, left: 8, backgroundColor: '#FF7A00', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 }}>
             <Text style={{ color: '#fff', fontSize: 10, fontFamily: mono(700) }}>−{product.off}%</Text>
           </View>
         )}
-        <View style={{
-          position: 'absolute', top: 8, right: 8, width: 32, height: 32, borderRadius: 999,
-          backgroundColor: 'rgba(255,255,255,0.9)', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <Icon name="heart" size={16} color={LMX.ink} />
-        </View>
+        {product.is_usa && (
+          <View style={{ position: 'absolute', top: 8, right: 8, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: LMX.navy, paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6 }}>
+            <Text style={{ fontSize: 9 }}>🇺🇸</Text>
+            <Text style={{ color: '#fff', fontSize: 9, fontFamily: sans(700), letterSpacing: 0.3 }}>USA</Text>
+          </View>
+        )}
       </View>
       <View style={{ paddingHorizontal: 10, paddingTop: 9, paddingBottom: 10 }}>
-        {/* Verified / New badge */}
+        {/* Rating if reviewed, otherwise a "Verified Product" trust badge (launch phase) */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 5 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: isNew ? '#EEF4FF' : '#DAF1E6', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5 }}>
-            <Icon name={isNew ? 'sparkle' : 'shield'} size={9} color={isNew ? '#1E6BFF' : '#0E8A57'} />
-            <Text style={{ fontSize: 9, fontFamily: sans(600), color: isNew ? '#1E6BFF' : '#0E8A57' }}>{isNew ? 'New Product' : 'Verified'}</Text>
-          </View>
+          {product.reviews > 0 ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+              <Icon name="star" size={10} color={LMX.amber} />
+              <Text style={{ fontSize: 9.5, fontFamily: sans(600), color: LMX.ink }}>{Number(product.rating).toFixed(1)}</Text>
+              <Text style={{ fontSize: 9, color: LMX.ink50 }}>({product.reviews})</Text>
+            </View>
+          ) : (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#DAF1E6', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5 }}>
+              <Icon name="shield" size={9} color="#0E8A57" />
+              <Text style={{ fontSize: 9, fontFamily: sans(600), color: '#0E8A57' }}>Produit vérifié</Text>
+            </View>
+          )}
         </View>
         <Text numberOfLines={2} style={{ fontSize: 12.5, fontFamily: sans(500), color: LMX.ink, lineHeight: 17, marginBottom: 6, minHeight: 34 }}>{product.name}</Text>
         <Price value={product.price} was={product.was} size="md" />
-        {/* Delivery info */}
+        {/* Delivery info — imported goods must never show the local 3h–48h promise */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 }}>
-          <Icon name="truck" size={10} color="#1E6BFF" />
-          <Text style={{ fontSize: 9.5, color: '#1E6BFF', fontFamily: sans(500) }}>24–48h Conakry</Text>
+          <Icon name={product.is_usa ? 'package' : 'truck'} size={10} color={product.is_usa ? LMX.navy : '#1E6BFF'} />
+          <Text numberOfLines={1} style={{ fontSize: 9.5, color: product.is_usa ? LMX.navy : '#1E6BFF', fontFamily: sans(500) }}>
+            {product.is_usa ? (product.delivery_estimate || '10–14 jours ouvrables') : '3h–48h Conakry'}
+          </Text>
         </View>
         {/* Buy Now button */}
         <Pressable onPress={onPress} style={{ marginTop: 8, backgroundColor: '#1E6BFF', borderRadius: 8, paddingVertical: 7, alignItems: 'center' }}>
-          <Text style={{ color: '#fff', fontSize: 11.5, fontFamily: sans(700) }}>Buy Now</Text>
+          <Text style={{ color: '#fff', fontSize: 11.5, fontFamily: sans(700) }}>Acheter</Text>
         </Pressable>
       </View>
     </Pressable>
@@ -273,13 +324,14 @@ export function Chip({ children, active, icon, onPress }: { children: React.Reac
 
 // ── Form field ─────────────────────────────────────────────────
 export function Field({
-  label, value, onChangeText, prefix, trailingIcon, onTrailingPress,
+  label, value, onChangeText, prefix, leadingIcon, trailingIcon, onTrailingPress,
   secure, keyboardType, autoCapitalize, placeholder,
 }: {
   label: string;
   value?: string;
   onChangeText?: (v: string) => void;
   prefix?: string;
+  leadingIcon?: IconName;
   trailingIcon?: IconName;
   onTrailingPress?: () => void;
   secure?: boolean;
@@ -298,6 +350,7 @@ export function Field({
         flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: LMX.surface,
         borderWidth: 1, borderColor: LMX.border, borderRadius: 14, paddingHorizontal: 16, height: 54,
       }}>
+        {leadingIcon && <Icon name={leadingIcon} size={18} color={LMX.ink50} />}
         {prefix && (
           <>
             <Text style={{ fontFamily: mono(500), fontSize: 14, color: LMX.ink70 }}>{prefix}</Text>

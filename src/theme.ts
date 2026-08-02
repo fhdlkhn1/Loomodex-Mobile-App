@@ -78,6 +78,22 @@ export const fr = (n: number): string =>
 
 export const gnf = (n: number): string => fr(n) + ' GNF';
 
+// Decode HTML entities WordPress returns in titles (e.g. "Beauty &amp; Care" → "Beauty & Care")
+export const decodeEntities = (s?: string | null): string => {
+  if (!s) return '';
+  return s
+    .replace(/&amp;/g, '&')
+    .replace(/&#0*38;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#0*39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&rsquo;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&#0*(\d+);/g, (_, n: string) => String.fromCharCode(parseInt(n, 10)));
+};
+
 export const gnfShort = (n: number): string => {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(n % 1_000_000 === 0 ? 0 : 1) + 'M';
   if (n >= 1000) return Math.round(n / 1000) + 'K';

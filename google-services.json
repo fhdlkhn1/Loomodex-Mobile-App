@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "364267773913",
+    "project_id": "loomodex-23c01",
+    "storage_bucket": "loomodex-23c01.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:364267773913:android:03da18b33032a233c843c8",
+        "android_client_info": {
+          "package_name": "com.loomodex.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAWP_4_6eRrWIjylCqyURiQIFGK1GLcUNU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

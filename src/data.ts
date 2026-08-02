@@ -12,6 +12,10 @@ export type Product = {
   rating: number;
   reviews: number;
   sold: number;
+  image?: string | null;
+  /** USA Store: imported goods show an international estimate, not "3h–48h Conakry". */
+  is_usa?: boolean;
+  delivery_estimate?: string | null;
 };
 
 export type Category = {

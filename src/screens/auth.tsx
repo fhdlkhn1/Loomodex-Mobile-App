@@ -7,6 +7,7 @@ import { Icon } from '../Icon';
 import { Screen, AppBar, IconBtn, Button, Field, Wordmark } from '../components';
 import { useAuth } from '../context/AuthContext';
 import { authApi } from '../api';
+import { staffHomeRoute } from '../roles';
 
 // ── Helpers ───────────────────────────────────────────────────────
 function Dot({ active }: { active?: boolean }) {
@@ -49,7 +50,7 @@ export function ScreenOnboarding() {
           </View>
           <View style={{ position: 'absolute', top: 120, right: 20, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: LMX.surface, borderRadius: 999, flexDirection: 'row', alignItems: 'center', gap: 6, ...shadow('md') }}>
             <Icon name="truck" size={12} color={LMX.emerald} />
-            <Text style={{ fontSize: 11.5, fontFamily: sans(600), color: LMX.ink }}>24–48h Conakry</Text>
+            <Text style={{ fontSize: 11.5, fontFamily: sans(600), color: LMX.ink }}>3h–48h Conakry</Text>
           </View>
           <View style={{ position: 'absolute', bottom: 100, right: 10, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: LMX.brand, borderRadius: 999, flexDirection: 'row', alignItems: 'center', gap: 6, ...shadow('md') }}>
             <Icon name="shield" size={12} color="#fff" />
@@ -94,8 +95,11 @@ export function ScreenSignIn() {
     }
     setLoading(true);
     try {
-      await login(email.trim().toLowerCase(), password);
-      nav.reset({ index: 0, routes: [{ name: 'Main' }] });
+      const u = await login(email.trim().toLowerCase(), password);
+      // Staff land on their dashboard as the ROOT (no shop underneath) so they can't
+      // swipe/back into the customer shopping screens and get lost. Logout returns to SignIn.
+      const dash = staffHomeRoute(u?.roles);
+      nav.reset({ index: 0, routes: [{ name: dash ?? 'Main' }] });
     } catch (e: any) {
       Alert.alert('Connexion échouée', e.message ?? 'Email ou mot de passe incorrect.');
     } finally {
@@ -117,9 +121,11 @@ export function ScreenSignIn() {
         <Field label="Adresse email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
         <Field
           label="Mot de passe"
+          leadingIcon="key"
+          placeholder="Votre mot de passe"
           value={password}
           onChangeText={setPassword}
-          trailingIcon={showPass ? 'eye' : 'eye'}
+          trailingIcon="eye"
           onTrailingPress={() => setShowPass(v => !v)}
           secure={!showPass}
         />
@@ -161,28 +167,36 @@ export function ScreenSignUp() {
   const [email, setEmail]         = useState('');
   const [phone, setPhone]         = useState('');
   const [password, setPassword]   = useState('');
+  const [confirmPass, setConfirmPass] = useState('');
+  const [showPass, setShowPass]       = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading]     = useState(false);
   const [agreed, setAgreed]       = useState(false);
 
   const passLen  = password.length >= 6;
   const passNum  = /\d/.test(password);
+  const passMatch = confirmPass.length > 0 && password === confirmPass;
 
   const handleRegister = async () => {
-    if (!firstName || !email || !password) {
-      Alert.alert('Champs manquants', 'Veuillez remplir tous les champs obligatoires.');
-      return;
-    }
-    if (!agreed) {
-      Alert.alert('Conditions', "Veuillez accepter les conditions d'utilisation.");
+    if (!firstName.trim() || !phone.trim() || !password) {
+      Alert.alert('Champs manquants', 'Le prénom, le téléphone et le mot de passe sont obligatoires.');
       return;
     }
     if (!passLen) {
       Alert.alert('Mot de passe trop court', 'Minimum 6 caractères.');
       return;
     }
+    if (password !== confirmPass) {
+      Alert.alert('Mots de passe différents', 'Les deux mots de passe ne correspondent pas.');
+      return;
+    }
+    if (!agreed) {
+      Alert.alert('Conditions', "Veuillez accepter les conditions d'utilisation.");
+      return;
+    }
     setLoading(true);
     try {
-      await register({ email: email.trim().toLowerCase(), password, first_name: firstName, last_name: lastName, phone });
+      await register({ email: email.trim().toLowerCase(), password, first_name: firstName, last_name: lastName, phone: phone.trim() });
       nav.reset({ index: 0, routes: [{ name: 'Main' }] });
     } catch (e: any) {
       Alert.alert('Erreur', e.message ?? "L'inscription a échoué.");
@@ -199,19 +213,20 @@ export function ScreenSignUp() {
         <Text style={{ fontFamily: FONT.display, fontSize: 34, lineHeight: 38, marginTop: 8, color: LMX.ink }}>
           Rejoignez{'\n'}<Text style={{ color: LMX.accent }}>Loomodex</Text>
         </Text>
+        <Text style={{ fontSize: 13, color: LMX.ink70, marginTop: 10, lineHeight: 19 }}>Remplissez les informations ci-dessous pour créer votre compte.</Text>
       </View>
 
       <View style={{ paddingHorizontal: 24, paddingTop: 24, gap: 14 }}>
-        <View style={{ flexDirection: 'row', gap: 12 }}>
-          <View style={{ flex: 1 }}><Field label="Prénom *" value={firstName} onChangeText={setFirstName} /></View>
-          <View style={{ flex: 1 }}><Field label="Nom" value={lastName} onChangeText={setLastName} /></View>
-        </View>
-        <Field label="Email *" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
-        <Field label="Téléphone" value={phone} onChangeText={setPhone} keyboardType="phone-pad" prefix="+224" />
-        <Field label="Mot de passe *" value={password} onChangeText={setPassword} secure />
+        <Field label="Prénom *" leadingIcon="user" placeholder="Votre prénom" value={firstName} onChangeText={setFirstName} />
+        <Field label="Nom" leadingIcon="user" placeholder="Votre nom" value={lastName} onChangeText={setLastName} />
+        <Field label="Email (optionnel)" placeholder="Votre email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+        <Field label="Téléphone *" leadingIcon="phone" prefix="+224" placeholder="Numéro de téléphone" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
+        <Field label="Mot de passe *" leadingIcon="key" placeholder="Mot de passe" value={password} onChangeText={setPassword} secure={!showPass} trailingIcon="eye" onTrailingPress={() => setShowPass(v => !v)} />
+        <Field label="Confirmer le mot de passe *" leadingIcon="key" placeholder="Confirmez votre mot de passe" value={confirmPass} onChangeText={setConfirmPass} secure={!showConfirm} trailingIcon="eye" onTrailingPress={() => setShowConfirm(v => !v)} />
         <View style={{ gap: 2, paddingLeft: 4 }}>
           <Requirement label="Au moins 6 caractères" met={passLen} />
           <Requirement label="Contient un chiffre" met={passNum} />
+          <Requirement label="Les mots de passe correspondent" met={passMatch} />
         </View>
       </View>
 
@@ -305,7 +320,7 @@ export function ScreenForgot() {
         <Text style={{ fontSize: 11, color: LMX.ink50, letterSpacing: 0.6, textTransform: 'uppercase', fontFamily: sans(600) }}>Récupération</Text>
         <Text style={{ fontFamily: FONT.display, fontSize: 36, lineHeight: 40, marginTop: 8, color: LMX.ink }}>Mot de passe{'\n'}oublié ?</Text>
         <Text style={{ fontSize: 13, color: LMX.ink70, marginTop: 12, lineHeight: 20 }}>
-          Entrez l'email lié à votre compte — nous vous enverrons un lien de réinitialisation.
+          Entrez l'email lié à votre compte — nous vous enverrons un code de réinitialisation.
         </Text>
       </View>
 
@@ -316,9 +331,10 @@ export function ScreenForgot() {
           </View>
           <Text style={{ fontSize: 16, fontFamily: sans(600), color: LMX.ink, textAlign: 'center' }}>Email envoyé !</Text>
           <Text style={{ fontSize: 13, color: LMX.ink70, textAlign: 'center', lineHeight: 20 }}>
-            Si cet email existe, vous recevrez un lien de réinitialisation sous peu.
+            Si cet email existe, vous recevrez un code de réinitialisation sous peu.
           </Text>
-          <Button variant="accent" onPress={() => nav.navigate('SignIn')}>Retour à la connexion</Button>
+          <Button variant="accent" onPress={() => nav.navigate('Reset', { email: email.trim() })}>J'ai reçu mon code</Button>
+          <Pressable onPress={() => nav.navigate('SignIn')}><Text style={{ fontSize: 12, color: LMX.ink50, textDecorationLine: 'underline' }}>Retour à la connexion</Text></Pressable>
         </View>
       ) : (
         <>
@@ -328,7 +344,7 @@ export function ScreenForgot() {
           <View style={{ paddingHorizontal: 24, paddingTop: 20 }}>
             {loading
               ? <ActivityIndicator color={LMX.brand} />
-              : <Button full variant="accent" size="lg" icon="arrowR" onPress={handleSend}>Envoyer le lien</Button>
+              : <Button full variant="accent" size="lg" icon="arrowR" onPress={handleSend}>Envoyer le code</Button>
             }
           </View>
         </>
@@ -338,8 +354,10 @@ export function ScreenForgot() {
 }
 
 // ── Reset Password ────────────────────────────────────────────────
-export function ScreenResetPassword() {
+export function ScreenResetPassword({ route }: any) {
   const nav = useNavigation<any>();
+  const [email, setEmail]         = useState(route?.params?.email ?? '');
+  const [code, setCode]           = useState('');
   const [password, setPassword]   = useState('');
   const [confirm, setConfirm]     = useState('');
   const [loading, setLoading]     = useState(false);
@@ -348,14 +366,17 @@ export function ScreenResetPassword() {
   const passMatch  = password === confirm && confirm.length > 0;
 
   const handleReset = async () => {
+    if (!email.trim() || !code.trim()) { Alert.alert('Champs requis', 'Veuillez renseigner votre email et le code reçu.'); return; }
     if (!passLen) { Alert.alert('Trop court', 'Minimum 6 caractères.'); return; }
     if (!passMatch) { Alert.alert('Ne correspond pas', 'Les mots de passe ne correspondent pas.'); return; }
     setLoading(true);
     try {
-      // In a full flow this gets email+token from route params
+      await authApi.resetPassword(email.trim().toLowerCase(), code.trim(), password);
       Alert.alert('Succès', 'Mot de passe mis à jour.', [
-        { text: 'OK', onPress: () => nav.navigate('SignIn') }
+        { text: 'OK', onPress: () => nav.reset({ index: 0, routes: [{ name: 'SignIn' }] }) }
       ]);
+    } catch (e: any) {
+      Alert.alert('Échec', e?.message ?? 'Code invalide ou expiré.');
     } finally {
       setLoading(false);
     }
@@ -369,6 +390,8 @@ export function ScreenResetPassword() {
         <Text style={{ fontFamily: FONT.display, fontSize: 34, lineHeight: 38, marginTop: 8, color: LMX.ink }}>Créer un nouveau{'\n'}mot de passe</Text>
       </View>
       <View style={{ paddingHorizontal: 24, paddingTop: 28, gap: 14 }}>
+        <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+        <Field label="Code de réinitialisation" value={code} onChangeText={setCode} autoCapitalize="none" />
         <Field label="Nouveau mot de passe" value={password} onChangeText={setPassword} secure />
         <Field label="Confirmer le mot de passe" value={confirm} onChangeText={setConfirm} secure />
         <View style={{ gap: 2, paddingLeft: 4 }}>

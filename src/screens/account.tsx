@@ -1,12 +1,25 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, Image, Pressable, ScrollView, Alert, ActivityIndicator } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { Image as ExpoImage } from 'expo-image';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { LMX, FONT, sans, mono } from '../theme';
 import { IMG, PRODUCTS } from '../data';
 import { Icon } from '../Icon';
 import { Screen, AppBar, IconBtn, Button, Price, Discount, ProductCard, SettingRow, Field, Toggle, MapVisual, Chip } from '../components';
 import { useAuth } from '../context/AuthContext';
+import { useCart } from '../context/CartContext';
+import { profileApi } from '../api/profile';
+import { Product as ApiProduct } from '../api/products';
+
+// Map an API product to the shape ProductCard expects
+function apiToCard(p: ApiProduct) {
+  return {
+    id: String(p.id), name: p.name, slug: p.slug, price: p.price,
+    was: p.regular_price > p.price ? p.regular_price : null, off: p.off,
+    cat: '', seller: p.seller, rating: p.rating, reviews: p.reviews, sold: p.sold, image: p.image,
+  };
+}
 
 // ── Wishlist (Saved collections) ───────────────────────────────
 function CollectionCard({ label, count, slug, bg, active }: { label: string; count: number; slug?: string; bg?: string; active?: boolean }) {
@@ -25,47 +38,103 @@ function CollectionCard({ label, count, slug, bg, active }: { label: string; cou
 
 export function ScreenWishlist() {
   const nav = useNavigation<any>();
-  const saved = [PRODUCTS[3], PRODUCTS[6], PRODUCTS[11], PRODUCTS[14], PRODUCTS[2], PRODUCTS[10]];
+  const { isLoggedIn } = useAuth();
+  const [items, setItems]   = useState<ApiProduct[]>([]);
+  const [loading, setLoad]  = useState(true);
+
+  const load = useCallback(async () => {
+    if (!isLoggedIn) { setLoad(false); return; }
+    try {
+      const { products } = await profileApi.getWishlist();
+      setItems(products ?? []);
+    } catch {}
+    finally { setLoad(false); }
+  }, [isLoggedIn]);
+
+  // Refresh whenever the screen regains focus (so toggles elsewhere reflect)
+  useFocusEffect(useCallback(() => { setLoad(true); load(); }, [load]));
+
   return (
     <Screen>
-      <AppBar left={<View style={{ width: 38 }} />} title="Saved · 12" right={<IconBtn icon="filter" />} />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingHorizontal: 16, paddingBottom: 16 }}>
-        <CollectionCard label="All" count={12} active />
-        <CollectionCard label="Wedding gifts" count={4} bg="#F0DAD8" slug="premium-perfume-gift-set" />
-        <CollectionCard label="For Aïssa" count={5} bg="#E5DDF0" slug="womens-genuine-leather-handbag" />
-        <CollectionCard label="Home setup" count={3} bg="#E7E0CF" slug="stainless-steel-kitchen-set-12-piece" />
-        <View style={{ width: 84, borderRadius: 14, borderWidth: 1, borderColor: LMX.border, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-          <Icon name="plus" size={18} color={LMX.ink70} /><Text style={{ fontSize: 10.5, fontFamily: sans(500), color: LMX.ink70 }}>New list</Text>
+      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title={`Liste de souhaits · ${items.length}`} right={<View style={{ width: 38 }} />} />
+
+      {!isLoggedIn ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 16 }}>
+          <Icon name="heart" size={48} color={LMX.ink30} />
+          <Text style={{ fontSize: 16, fontFamily: sans(600), textAlign: 'center' }}>Connectez-vous pour voir vos favoris</Text>
+          <Button variant="accent" onPress={() => nav.navigate('SignIn')}>Se connecter</Button>
         </View>
-      </ScrollView>
-      <View style={{ paddingHorizontal: 16, paddingBottom: 14 }}>
-        <Pressable onPress={() => nav.navigate('ListeSouhaits')} style={{ backgroundColor: LMX.ink, borderRadius: LMX.r.lg, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' }}><Icon name="sparkle" size={18} color="#fff" /></View>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 13, fontFamily: sans(600), color: '#fff' }}>2 items just dropped in price</Text>
-            <Text style={{ fontSize: 11, color: '#fff', opacity: 0.65, marginTop: 2 }}>Save up to 21% on saved products</Text>
-          </View>
-          <Icon name="chevR" size={16} color="#fff" />
-        </Pressable>
-      </View>
-      <View style={{ paddingHorizontal: 16, flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-        {saved.map(p => <View key={p.id} style={{ width: '47.5%' }}><ProductCard product={p} onPress={() => nav.navigate('ProductDetail')} /></View>)}
-      </View>
+      ) : loading ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={LMX.brand} size="large" /></View>
+      ) : items.length === 0 ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, gap: 14 }}>
+          <View style={{ width: 96, height: 96, borderRadius: 48, backgroundColor: LMX.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}><Icon name="heart" size={42} color={LMX.ink30} strokeWidth={1.4} /></View>
+          <Text style={{ fontFamily: FONT.display, fontSize: 24, textAlign: 'center' }}>Votre liste est vide</Text>
+          <Text style={{ fontSize: 13, color: LMX.ink70, lineHeight: 20, textAlign: 'center', maxWidth: 260 }}>Touchez le cœur sur un produit pour l'enregistrer ici.</Text>
+          <Button variant="accent" size="lg" icon="arrowR" onPress={() => nav.navigate('Main')}>Découvrir des produits</Button>
+        </View>
+      ) : (
+        <View style={{ paddingHorizontal: 16, flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+          {items.map(p => (
+            <View key={p.id} style={{ width: '47.5%' }}>
+              <ProductCard product={apiToCard(p) as any} onPress={() => nav.navigate('ProductDetail', { productId: p.id })} />
+            </View>
+          ))}
+        </View>
+      )}
     </Screen>
   );
 }
 
-// ── Liste de souhaits (FR) ─────────────────────────────────────
-export function ScreenListeSouhaits({ route }: any) {
+// ── Liste de souhaits (FR) — detailed live list ────────────────
+export function ScreenListeSouhaits() {
   const nav = useNavigation<any>();
-  const empty = route?.params?.empty;
-  const saved = [
-    { p: PRODUCTS[6], stock: true },
-    { p: PRODUCTS[3], stock: true },
-    { p: PRODUCTS[12], stock: true },
-    { p: PRODUCTS[2], stock: false },
-  ];
-  if (empty) {
+  const { isLoggedIn } = useAuth();
+  const { addToCart } = useCart();
+  const [items, setItems]  = useState<ApiProduct[]>([]);
+  const [loading, setLoad] = useState(true);
+  const [busyId, setBusy]  = useState<number | null>(null);
+
+  const load = useCallback(async () => {
+    if (!isLoggedIn) { setLoad(false); return; }
+    try {
+      const { products } = await profileApi.getWishlist();
+      setItems(products ?? []);
+    } catch {}
+    finally { setLoad(false); }
+  }, [isLoggedIn]);
+
+  useFocusEffect(useCallback(() => { setLoad(true); load(); }, [load]));
+
+  const remove = async (id: number) => {
+    setItems(prev => prev.filter(p => p.id !== id)); // optimistic
+    try { await profileApi.toggleWishlist(id); } catch { load(); }
+  };
+
+  const add = async (p: ApiProduct) => {
+    setBusy(p.id);
+    try {
+      await addToCart(p.id, 1);
+      Alert.alert('Ajouté !', `${p.name} ajouté au panier.`);
+    } catch (e: any) {
+      Alert.alert('Erreur', e?.message ?? "Impossible d'ajouter au panier.");
+    } finally { setBusy(null); }
+  };
+
+  if (!isLoggedIn) {
+    return (
+      <Screen>
+        <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title="Liste de souhaits" right={<View style={{ width: 38 }} />} />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 16 }}>
+          <Icon name="heart" size={48} color={LMX.ink30} />
+          <Text style={{ fontSize: 16, fontFamily: sans(600), textAlign: 'center' }}>Connectez-vous pour voir vos favoris</Text>
+          <Button variant="accent" onPress={() => nav.navigate('SignIn')}>Se connecter</Button>
+        </View>
+      </Screen>
+    );
+  }
+
+  if (!loading && items.length === 0) {
     return (
       <Screen>
         <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title="Liste de souhaits" right={<View style={{ width: 38 }} />} />
@@ -78,52 +147,55 @@ export function ScreenListeSouhaits({ route }: any) {
       </Screen>
     );
   }
+
   return (
     <Screen>
       <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title="Liste de souhaits" right={<IconBtn icon="share" />} />
-      <View style={{ paddingHorizontal: 16, paddingBottom: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Text style={{ fontSize: 12.5, color: LMX.ink70 }}><Text style={{ color: LMX.ink, fontFamily: sans(600) }}>4 articles</Text> enregistrés</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}><Icon name="bag" size={14} color={LMX.accent} /><Text style={{ fontSize: 12.5, fontFamily: sans(600), color: LMX.accent }}>Tout ajouter</Text></View>
-      </View>
-      <View style={{ paddingHorizontal: 16, gap: 12 }}>
-        {saved.map(({ p, stock }) => (
-          <View key={p.id} style={{ backgroundColor: LMX.surface, borderRadius: LMX.r.lg, overflow: 'hidden', borderWidth: 1, borderColor: LMX.border, flexDirection: 'row' }}>
-            <View style={{ width: 116, backgroundColor: LMX.surfaceAlt }}>
-              <Image source={{ uri: IMG(p.slug) }} style={{ width: '100%', height: '100%' }} />
-              {p.off > 0 && <View style={{ position: 'absolute', top: 8, left: 8 }}><Discount off={p.off} /></View>}
-            </View>
-            <View style={{ flex: 1, padding: 12, paddingLeft: 14 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 10, color: LMX.ink50, textTransform: 'uppercase', marginBottom: 3 }}>{p.seller}</Text>
-                  <Text numberOfLines={2} style={{ fontSize: 13, fontFamily: sans(600), lineHeight: 17 }}>{p.name}</Text>
-                </View>
-                <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: LMX.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}><Icon name="heart" size={16} color={LMX.rose} /></View>
-              </View>
-              <View style={{ marginTop: 8 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: stock ? LMX.emerald : LMX.ink30 }} />
-                  <Text style={{ fontSize: 11, fontFamily: sans(600), color: stock ? LMX.emerald : LMX.ink50 }}>{stock ? 'En stock' : 'Rupture de stock'}</Text>
-                </View>
-              </View>
-              <View style={{ marginTop: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                <Price value={p.price} was={p.was} size="md" />
-                <View style={{ height: 38, paddingHorizontal: 14, borderRadius: 11, backgroundColor: stock ? LMX.ink : LMX.surfaceAlt, borderWidth: stock ? 0 : 1, borderColor: LMX.border, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Icon name="bag" size={14} color={stock ? '#fff' : LMX.ink50} />
-                  <Text style={{ fontSize: 12, fontFamily: sans(600), color: stock ? '#fff' : LMX.ink50 }}>{stock ? 'Ajouter' : "M'avertir"}</Text>
-                </View>
-              </View>
-            </View>
+      {loading ? (
+        <View style={{ paddingTop: 60 }}><ActivityIndicator color={LMX.brand} size="large" /></View>
+      ) : (
+        <>
+          <View style={{ paddingHorizontal: 16, paddingBottom: 14 }}>
+            <Text style={{ fontSize: 12.5, color: LMX.ink70 }}><Text style={{ color: LMX.ink, fontFamily: sans(600) }}>{items.length} article{items.length !== 1 ? 's' : ''}</Text> enregistré{items.length !== 1 ? 's' : ''}</Text>
           </View>
-        ))}
-      </View>
-      <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
-        <View style={{ backgroundColor: LMX.brandSoft, borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Icon name="sparkle" size={14} color={LMX.brandDeep} />
-          <Text style={{ flex: 1, fontSize: 12, fontFamily: sans(600), color: LMX.brandDeep }}>Baisse de prix sur 1 article enregistré</Text>
-          <Icon name="chevR" size={12} color={LMX.brandDeep} />
-        </View>
-      </View>
+          <View style={{ paddingHorizontal: 16, gap: 12 }}>
+            {items.map(p => {
+              const stock = p.in_stock;
+              const was = p.regular_price > p.price ? p.regular_price : null;
+              return (
+                <View key={p.id} style={{ backgroundColor: LMX.surface, borderRadius: LMX.r.lg, overflow: 'hidden', borderWidth: 1, borderColor: LMX.border, flexDirection: 'row' }}>
+                  <Pressable onPress={() => nav.navigate('ProductDetail', { productId: p.id })} style={{ width: 116, backgroundColor: LMX.surfaceAlt }}>
+                    <Image source={{ uri: p.image || IMG(p.slug) }} style={{ width: '100%', height: '100%' }} />
+                    {p.off > 0 && <View style={{ position: 'absolute', top: 8, left: 8 }}><Discount off={p.off} /></View>}
+                  </Pressable>
+                  <View style={{ flex: 1, padding: 12, paddingLeft: 14 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                      <Pressable style={{ flex: 1 }} onPress={() => nav.navigate('ProductDetail', { productId: p.id })}>
+                        <Text style={{ fontSize: 10, color: LMX.ink50, textTransform: 'uppercase', marginBottom: 3 }}>{p.seller}</Text>
+                        <Text numberOfLines={2} style={{ fontSize: 13, fontFamily: sans(600), lineHeight: 17 }}>{p.name}</Text>
+                      </Pressable>
+                      <Pressable onPress={() => remove(p.id)} style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: LMX.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}><Icon name="heart" size={16} color={LMX.rose} /></Pressable>
+                    </View>
+                    <View style={{ marginTop: 8 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                        <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: stock ? LMX.emerald : LMX.ink30 }} />
+                        <Text style={{ fontSize: 11, fontFamily: sans(600), color: stock ? LMX.emerald : LMX.ink50 }}>{stock ? 'En stock' : 'Rupture de stock'}</Text>
+                      </View>
+                    </View>
+                    <View style={{ marginTop: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                      <Price value={p.price} was={was} size="md" />
+                      <Pressable onPress={() => stock && add(p)} disabled={!stock || busyId === p.id} style={{ height: 38, paddingHorizontal: 14, borderRadius: 11, backgroundColor: stock ? LMX.ink : LMX.surfaceAlt, borderWidth: stock ? 0 : 1, borderColor: LMX.border, flexDirection: 'row', alignItems: 'center', gap: 6, opacity: busyId === p.id ? 0.6 : 1 }}>
+                        <Icon name="bag" size={14} color={stock ? '#fff' : LMX.ink50} />
+                        <Text style={{ fontSize: 12, fontFamily: sans(600), color: stock ? '#fff' : LMX.ink50 }}>{stock ? 'Ajouter' : "M'avertir"}</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        </>
+      )}
     </Screen>
   );
 }
@@ -156,8 +228,16 @@ function OrderTab({ icon, label, count, dot }: { icon: any; label: string; count
 
 export function ScreenAccount() {
   const nav = useNavigation<any>();
-  const { user, isLoggedIn, logout, isVendor, isDriver } = useAuth();
+  const { user, isLoggedIn, logout, isVendor, isDriver, isLogistics, isSupport, isAdmin } = useAuth();
   const [loggingOut, setLoggingOut] = useState(false);
+  const [stats, setStats] = useState<{ orders: number; wishlist: number; reviews: number } | null>(null);
+
+  useFocusEffect(useCallback(() => {
+    if (!isLoggedIn) { setStats(null); return; }
+    let alive = true;
+    profileApi.stats().then(s => { if (alive) setStats(s); }).catch(() => {});
+    return () => { alive = false; };
+  }, [isLoggedIn]));
 
   const handleLogout = () => {
     Alert.alert('Déconnexion', 'Êtes-vous sûr de vouloir vous déconnecter ?', [
@@ -196,15 +276,14 @@ export function ScreenAccount() {
 
   const initials = `${user?.first_name?.[0] ?? ''}${user?.last_name?.[0] ?? ''}`.toUpperCase() || '?';
   const fullName = `${user?.first_name ?? ''} ${user?.last_name ?? ''}`.trim() || user?.username || 'Utilisateur';
-  const walletDisplay = user?.wallet ? `${Math.round(user.wallet).toLocaleString('fr-FR')} GNF` : '0 GNF';
+  const walletDisplay = `${Math.round(user?.wallet ?? 0).toLocaleString('fr-FR')} GNF`;
 
   return (
     <Screen>
       <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 14 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-          <Image source={require('../../assets/logo.png')} style={{ width: 110, height: 30 }} resizeMode="contain" />
+          <ExpoImage source={require('../../assets/logo.png')} style={{ width: 134, height: 30 }} contentFit="contain" />
           <View style={{ flexDirection: 'row' }}>
-            <IconBtn icon="bell" onPress={() => nav.navigate('Notifications')} />
             <IconBtn icon="settings" onPress={() => nav.navigate('AccountDetails')} />
           </View>
         </View>
@@ -225,56 +304,31 @@ export function ScreenAccount() {
           </Pressable>
         </View>
         <View style={{ flexDirection: 'row', gap: 1, marginTop: 18, backgroundColor: LMX.hairline, borderRadius: 14, overflow: 'hidden' }}>
-          <Stat label="Commandes" value="—" /><Stat label="Favoris" value="—" /><Stat label="Avis" value="—" />
+          <Stat label="Commandes" value={stats ? String(stats.orders) : '—'} />
+          <Stat label="Favoris" value={stats ? String(stats.wishlist) : '—'} />
+          <Stat label="Avis" value={stats ? String(stats.reviews) : '—'} />
         </View>
       </View>
-
-      {/* Order quick tabs */}
-      <View style={{ paddingHorizontal: 16, paddingBottom: 14 }}>
-        <View style={{ backgroundColor: LMX.surface, borderRadius: LMX.r.lg, padding: 4, borderWidth: 1, borderColor: LMX.border, flexDirection: 'row' }}>
-          <OrderTab icon="package" label="À payer" count={0} />
-          <OrderTab icon="refresh" label="Préparation" count={0} />
-          <OrderTab icon="truck" label="En route" count={0} />
-          <OrderTab icon="checkCircle" label="Avis" count={0} />
-        </View>
-      </View>
-
-      {/* Sell on Loomodex CTA */}
-      {!isVendor && (
-        <View style={{ paddingHorizontal: 16, paddingBottom: 14 }}>
-          <Pressable onPress={() => nav.navigate('Seller')} style={{ backgroundColor: LMX.navy, borderRadius: LMX.r.lg, padding: 18, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-            <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: LMX.accent, alignItems: 'center', justifyContent: 'center' }}><Icon name="storefront" size={22} color="#fff" /></View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontFamily: FONT.display, fontSize: 17, color: '#fff' }}>Vendre sur Loomodex</Text>
-              <Text style={{ fontSize: 11, color: '#fff', opacity: 0.7, marginTop: 3 }}>500+ vendeurs · ouvrir une boutique en 5 min</Text>
-            </View>
-            <Icon name="chevR" size={16} color="#fff" />
-          </Pressable>
-        </View>
-      )}
 
       {/* Settings */}
       <View style={{ paddingHorizontal: 16 }}>
         <View style={{ backgroundColor: LMX.surface, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.border, overflow: 'hidden' }}>
           <SettingRow icon="pin"         label="Adresses"         sub="Gérer mes adresses"     onPress={() => nav.navigate('Addresses')} />
-          <SettingRow icon="money"       label="Paiement"         sub="Orange · MTN · Cash"    onPress={() => nav.navigate('PaymentMethods')} />
           <SettingRow icon="wallet"      label="Mon portefeuille"  sub={walletDisplay}          onPress={() => nav.navigate('Wallet')} />
-          <SettingRow icon="heart"       label="Liste de souhaits" sub="Mes favoris"            onPress={() => nav.navigate('Wishlist')} />
-          <SettingRow icon="bell"        label="Notifications"     sub="Push, SMS"              onPress={() => nav.navigate('Notifications')} />
           <SettingRow icon="package"     label="Suivre une commande"                            onPress={() => nav.navigate('TrackEntry')} />
-          <SettingRow icon="refresh"     label="Demander un retour"                             onPress={() => nav.navigate('ReturnRequest')} />
           <SettingRow icon="headset"     label="Aide"                                           onPress={() => nav.navigate('Help')} last />
         </View>
       </View>
 
-      {/* Business tools — visible to vendors/drivers/admin */}
-      {(isVendor || isDriver || user?.roles?.includes('administrator')) && (
+      {/* Business tools — each row gated to the matching role */}
+      {(isVendor || isDriver || isLogistics || isSupport || isAdmin) && (
         <View style={{ paddingHorizontal: 16, paddingTop: 14 }}>
           <Text style={{ fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600), marginBottom: 8 }}>Outils professionnels</Text>
           <View style={{ backgroundColor: LMX.surface, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.border, overflow: 'hidden' }}>
-            {isVendor && <SettingRow icon="chart"     label="Tableau de bord vendeur"  onPress={() => nav.navigate('Seller')} />}
-            {isDriver  && <SettingRow icon="bike"      label="Tableau de bord livreur"  onPress={() => nav.navigate('Driver')} />}
-            <SettingRow icon="truck"      label="Opérations logistique" onPress={() => nav.navigate('Logistics')} last />
+            {(isVendor || isAdmin)    && <SettingRow icon="chart"  label="Tableau de bord vendeur"  sub="Ventes, commandes, produits" onPress={() => nav.navigate('Seller')} />}
+            {(isDriver || isAdmin)    && <SettingRow icon="bike"   label="Tableau de bord livreur"  sub="Mes livraisons assignées"   onPress={() => nav.navigate('Driver')} />}
+            {(isSupport || isAdmin)   && <SettingRow icon="headset" label="Support client"          sub="Confirmer / rejeter commandes" onPress={() => nav.navigate('CS')} />}
+            {(isLogistics || isAdmin) && <SettingRow icon="truck"  label="Opérations logistique"   sub="Assigner les livreurs"       onPress={() => nav.navigate('Logistics')} last />}
           </View>
         </View>
       )}
@@ -291,50 +345,54 @@ export function ScreenAccount() {
           }
         </Pressable>
       </View>
-    </Screen>
-  );
-}
 
-// ── Notifications ──────────────────────────────────────────────
-function NotifRow({ title, sub, time, unread, icon, accent }: any) {
-  return (
-    <View style={{ backgroundColor: LMX.surface, borderRadius: LMX.r.lg, padding: 14, borderWidth: 1, borderColor: LMX.border, flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
-      <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: accent + '1A', alignItems: 'center', justifyContent: 'center' }}><Icon name={icon} size={17} color={accent} /></View>
-      <View style={{ flex: 1 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
-          <Text style={{ fontSize: 13, fontFamily: unread ? sans(600) : sans(500), flex: 1 }}>{title}</Text>
-          <Text style={{ fontSize: 10.5, color: LMX.ink50, fontFamily: mono(400) }}>{time}</Text>
+      {/* Delete account (App Store requirement) — customers & vendors only */}
+      {!isDriver && !isLogistics && !isSupport && !isAdmin && (
+        <View style={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 16 }}>
+          <Pressable
+            onPress={() => Alert.alert(
+              'Supprimer le compte',
+              'Cette action est définitive : votre compte et vos informations seront supprimés. Vos commandes passées sont conservées de façon anonyme. Continuer ?',
+              [
+                { text: 'Annuler', style: 'cancel' },
+                {
+                  text: 'Supprimer définitivement', style: 'destructive',
+                  onPress: async () => {
+                    try {
+                      await profileApi.deleteAccount();
+                      await logout();
+                      nav.reset({ index: 0, routes: [{ name: 'SignIn' }] });
+                    } catch (e: any) {
+                      Alert.alert('Erreur', e?.message ?? 'Suppression impossible.');
+                    }
+                  },
+                },
+              ]
+            )}
+            style={{ alignItems: 'center', paddingVertical: 10 }}
+          >
+            <Text style={{ fontSize: 12.5, color: LMX.ink50, textDecorationLine: 'underline' }}>Supprimer mon compte</Text>
+          </Pressable>
         </View>
-        <Text style={{ fontSize: 11.5, color: LMX.ink70, marginTop: 3, lineHeight: 16 }}>{sub}</Text>
-      </View>
-      {unread && <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: LMX.accent, marginTop: 4 }} />}
-    </View>
-  );
-}
+      )}
 
-export function ScreenNotifications() {
-  const nav = useNavigation<any>();
-  const today = [
-    { title: 'Mamadou is on the way', sub: 'Order LMX-204-882 · 7 min away', time: 'Now', unread: true, icon: 'truck', accent: LMX.emerald },
-    { title: 'Price drop on a saved item', sub: 'Sport Smartwatch Elite — now 320 000 GNF', time: '1h', unread: true, icon: 'tag', accent: LMX.accent },
-    { title: 'Seller confirmed your order', sub: 'Maison Diallo accepted LMX-204-431', time: '3h', unread: false, icon: 'checkCircle', accent: LMX.ink },
-  ];
-  const earlier = [
-    { title: 'Flash deal · 30% off Smart TV', sub: 'Ends in 8h · only 12 left', time: 'Yesterday', unread: false, icon: 'flame', accent: LMX.accent },
-    { title: 'How was your order?', sub: 'Tap to rate Wireless Headphones Pro', time: '2d', unread: false, icon: 'star', accent: LMX.amber },
-    { title: 'Your phone number is verified', sub: '+224 623 84 51 09 confirmed', time: '5d', unread: false, icon: 'shield', accent: LMX.emerald },
-  ];
-  return (
-    <Screen>
-      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title="Notifications" right={<IconBtn icon="settings" />} />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingHorizontal: 16, paddingBottom: 14 }}>
-        <Chip active>All · 6</Chip><Chip>Orders</Chip><Chip>Price drops</Chip><Chip>Promos</Chip>
-      </ScrollView>
-      <Text style={{ paddingHorizontal: 16, paddingBottom: 6, fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600) }}>Today</Text>
-      <View style={{ paddingHorizontal: 16, paddingBottom: 16, gap: 8 }}>{today.map((n, i) => <NotifRow key={i} {...n} />)}</View>
-      <Text style={{ paddingHorizontal: 16, paddingBottom: 6, fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600) }}>Earlier</Text>
-      <View style={{ paddingHorizontal: 16, paddingBottom: 16, gap: 8 }}>{earlier.map((n, i) => <NotifRow key={i} {...n} />)}</View>
-      <Text style={{ textAlign: 'center', fontSize: 12.5, color: LMX.ink70, fontFamily: sans(500) }}>Mark all as read</Text>
+      {/* Accepted payments + about (app-appropriate "footer") */}
+      <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 28 }}>
+        <Text style={{ fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600), marginBottom: 8 }}>Paiements acceptés</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
+          {[
+            { label: 'Paiement à la livraison', icon: 'money' as const },
+            { label: 'Portefeuille Loomodex',   icon: 'wallet' as const },
+          ].map(m => (
+            <View key={m.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: LMX.surfaceAlt, borderRadius: 8, borderWidth: 1, borderColor: LMX.border, paddingHorizontal: 9, paddingVertical: 6 }}>
+              <Icon name={m.icon} size={12} color={LMX.ink50} />
+              <Text style={{ fontSize: 11, fontFamily: sans(500), color: LMX.ink70 }}>{m.label}</Text>
+            </View>
+          ))}
+        </View>
+        <Text style={{ fontSize: 11.5, color: LMX.ink50, textAlign: 'center' }}>Loomodex · Marketplace de Guinée</Text>
+        <Text style={{ fontSize: 10.5, color: LMX.ink50, textAlign: 'center', marginTop: 2, opacity: 0.7 }}>Version 1.0.0</Text>
+      </View>
     </Screen>
   );
 }
@@ -342,34 +400,78 @@ export function ScreenNotifications() {
 // ── Account details ────────────────────────────────────────────
 export function ScreenAccountDetails() {
   const nav = useNavigation<any>();
+  const { user, setUser, refreshUser } = useAuth();
+
+  const [firstName, setFirstName] = useState(user?.first_name ?? '');
+  const [lastName, setLastName]   = useState(user?.last_name ?? '');
+  const [phone, setPhone]         = useState(user?.phone ?? '');
+  const [saving, setSaving]       = useState(false);
+
+  // Inline change-password
+  const [showPw, setShowPw]   = useState(false);
+  const [curPw, setCurPw]     = useState('');
+  const [newPw, setNewPw]     = useState('');
+  const [pwBusy, setPwBusy]   = useState(false);
+
+  const initials = `${user?.first_name?.[0] ?? ''}${user?.last_name?.[0] ?? ''}`.toUpperCase() || '?';
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const updated = await profileApi.update({ first_name: firstName, last_name: lastName, billing_phone: phone });
+      setUser(updated);
+      Alert.alert('Enregistré', 'Vos informations ont été mises à jour.');
+    } catch (e: any) {
+      Alert.alert('Erreur', e?.message ?? 'Impossible de sauvegarder.');
+    } finally { setSaving(false); refreshUser(); }
+  };
+
+  const changePassword = async () => {
+    if (newPw.length < 6) { Alert.alert('Trop court', 'Le nouveau mot de passe doit faire au moins 6 caractères.'); return; }
+    setPwBusy(true);
+    try {
+      await profileApi.changePassword(curPw, newPw);
+      setCurPw(''); setNewPw(''); setShowPw(false);
+      Alert.alert('Succès', 'Mot de passe mis à jour.');
+    } catch (e: any) {
+      Alert.alert('Erreur', e?.message ?? 'Mot de passe actuel incorrect.');
+    } finally { setPwBusy(false); }
+  };
+
   return (
-    <Screen>
-      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title="Account details" right={<Text style={{ color: LMX.accent, fontSize: 13, fontFamily: sans(600) }}>Save</Text>} />
+    <Screen footer={<Button full variant="accent" size="lg" icon="check" onPress={save} disabled={saving}>{saving ? 'Enregistrement...' : 'Enregistrer'}</Button>}>
+      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title="Mes informations" right={<Pressable onPress={save}><Text style={{ color: LMX.accent, fontSize: 13, fontFamily: sans(600) }}>Enregistrer</Text></Pressable>} />
       <View style={{ paddingBottom: 18, alignItems: 'center' }}>
         <View>
           <LinearGradient colors={['#F37524', '#0EA5E9']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: 92, height: 92, borderRadius: 46, alignItems: 'center', justifyContent: 'center' }}>
-            <Text style={{ fontFamily: FONT.display, fontSize: 42, color: '#fff' }}>A</Text>
+            {user?.avatar
+              ? <Image source={{ uri: user.avatar }} style={{ width: 88, height: 88, borderRadius: 44 }} />
+              : <Text style={{ fontFamily: FONT.display, fontSize: 42, color: '#fff' }}>{initials}</Text>}
           </LinearGradient>
-          <View style={{ position: 'absolute', bottom: 0, right: 0, width: 30, height: 30, borderRadius: 15, backgroundColor: LMX.ink, borderWidth: 3, borderColor: LMX.bg, alignItems: 'center', justifyContent: 'center' }}><Icon name="pencil" size={13} color="#fff" /></View>
         </View>
       </View>
-      <Text style={{ paddingHorizontal: 16, fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600), marginBottom: 8 }}>Personal information</Text>
+      <Text style={{ paddingHorizontal: 16, fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600), marginBottom: 8 }}>Informations personnelles</Text>
       <View style={{ paddingHorizontal: 16, paddingBottom: 14, gap: 12 }}>
-        <Field label="Full name" value="Aïssata Diallo" />
-        <Field label="Phone number" prefix="+224" value="623 84 51 09" trailingIcon="checkCircle" />
-        <Field label="Email (optional)" value="aissata.diallo@gmail.com" />
-        <Field label="Date of birth" value="14 March 1996" />
+        <View style={{ flexDirection: 'row', gap: 12 }}>
+          <View style={{ flex: 1 }}><Field label="Prénom" value={firstName} onChangeText={setFirstName} /></View>
+          <View style={{ flex: 1 }}><Field label="Nom" value={lastName} onChangeText={setLastName} /></View>
+        </View>
+        <Field label="Téléphone" prefix="+224" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
+        <Field label="Email" value={user?.email ?? ''} />
+        <Text style={{ fontSize: 10.5, color: LMX.ink50, paddingLeft: 4 }}>L'email ne peut pas être modifié depuis l'application.</Text>
       </View>
-      <Text style={{ paddingHorizontal: 16, fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600), marginBottom: 8 }}>Security & sign-in</Text>
+      <Text style={{ paddingHorizontal: 16, fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600), marginBottom: 8 }}>Sécurité</Text>
       <View style={{ paddingHorizontal: 16, paddingBottom: 14 }}>
         <View style={{ backgroundColor: LMX.surface, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.border, overflow: 'hidden' }}>
-          <SettingRow icon="key" label="Change password" sub="Last changed 2 months ago" />
-          <SettingRow icon="shield" label="Two-factor auth" sub="SMS · +224 ••• 5109" />
-          <SettingRow icon="phone" label="Connected devices" sub="2 devices" last />
+          <SettingRow icon="key" label="Changer le mot de passe" sub={showPw ? 'Masquer' : 'Mettre à jour votre mot de passe'} onPress={() => setShowPw(v => !v)} last={!showPw} />
+          {showPw && (
+            <View style={{ padding: 16, gap: 12, borderTopWidth: 1, borderTopColor: LMX.hairline }}>
+              <Field label="Mot de passe actuel" value={curPw} onChangeText={setCurPw} secure />
+              <Field label="Nouveau mot de passe" value={newPw} onChangeText={setNewPw} secure />
+              <Button variant="primary" size="md" onPress={changePassword} disabled={pwBusy}>{pwBusy ? 'Mise à jour...' : 'Mettre à jour le mot de passe'}</Button>
+            </View>
+          )}
         </View>
-      </View>
-      <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
-        <Pressable style={{ paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: LMX.rose, borderRadius: LMX.r.lg }}><Text style={{ color: LMX.rose, fontFamily: sans(600), fontSize: 13 }}>Delete account</Text></Pressable>
       </View>
     </Screen>
   );
@@ -383,7 +485,7 @@ function AddressCard({ label, name, phone, line, area, icon, primary, onPress }:
       <View style={{ flex: 1 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
           <Text style={{ fontSize: 13.5, fontFamily: sans(600) }}>{label}</Text>
-          {primary && <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: LMX.ink }}><Text style={{ fontSize: 9, fontFamily: sans(700), color: '#fff', textTransform: 'uppercase' }}>Default</Text></View>}
+          {primary && <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: LMX.ink }}><Text style={{ fontSize: 9, fontFamily: sans(700), color: '#fff', textTransform: 'uppercase' }}>Par défaut</Text></View>}
         </View>
         <Text style={{ fontSize: 12.5, color: LMX.ink70, lineHeight: 17 }}>{name} · <Text style={{ fontFamily: mono(400), fontSize: 11.5 }}>{phone}</Text></Text>
         <Text style={{ fontSize: 12.5, color: LMX.ink70, marginTop: 4, lineHeight: 17 }}>{line}{'\n'}<Text style={{ color: LMX.ink50 }}>{area}</Text></Text>
@@ -395,28 +497,60 @@ function AddressCard({ label, name, phone, line, area, icon, primary, onPress }:
 
 export function ScreenAddresses() {
   const nav = useNavigation<any>();
-  const addresses = [
-    { label: 'Home', name: 'Aïssata Diallo', phone: '+224 623 84 51 09', line: 'Immeuble Niger, 4ème étage, Boulbinet', area: 'Kaloum, Conakry', icon: 'home', primary: true },
-    { label: 'Office', name: 'Aïssata Diallo', phone: '+224 623 84 51 09', line: 'Loomodex HQ, Avenue de la République', area: 'Almamya, Conakry', icon: 'storefront' },
-    { label: 'Parents', name: 'Mariama Diallo', phone: '+224 622 14 77 03', line: 'Lot 22, Quartier Coleah', area: 'Matam, Conakry', icon: 'user' },
-  ];
+  const { isLoggedIn } = useAuth();
+  const [addr, setAddr]    = useState<any | null>(null);
+  const [loading, setLoad] = useState(true);
+
+  useFocusEffect(useCallback(() => {
+    if (!isLoggedIn) { setLoad(false); return; }
+    let alive = true;
+    setLoad(true);
+    profileApi.getAddresses()
+      .then(({ addresses }) => { if (alive) setAddr(addresses?.[0] ?? null); })
+      .catch(() => {})
+      .finally(() => { if (alive) setLoad(false); });
+    return () => { alive = false; };
+  }, [isLoggedIn]));
+
+  const hasAddress = addr && (addr.address_1 || addr.city);
+
   return (
     <Screen>
-      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title="Addresses" right={<IconBtn icon="plus" onPress={() => nav.navigate('AddressForm')} />} />
+      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title="Mes adresses" right={<IconBtn icon="pencil" onPress={() => nav.navigate('AddressForm')} />} />
       <View style={{ paddingHorizontal: 16, paddingBottom: 14 }}>
         <View style={{ height: 130, borderRadius: LMX.r.lg, overflow: 'hidden', borderWidth: 1, borderColor: LMX.border }}>
           <MapVisual />
           <View style={{ position: 'absolute', bottom: 10, left: 10, paddingHorizontal: 11, paddingVertical: 6, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.95)', flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Icon name="pin" size={12} color={LMX.brand} /><Text style={{ fontSize: 11, fontFamily: sans(600) }}>3 saved · Conakry</Text>
+            <Icon name="pin" size={12} color={LMX.brand} /><Text style={{ fontSize: 11, fontFamily: sans(600) }}>{addr?.city || 'Conakry'}</Text>
           </View>
         </View>
       </View>
-      <View style={{ paddingHorizontal: 16, gap: 10 }}>
-        {addresses.map((a, i) => <AddressCard key={i} {...a} onPress={() => nav.navigate('AddressForm')} />)}
-      </View>
+
+      {loading ? (
+        <View style={{ paddingTop: 30 }}><ActivityIndicator color={LMX.brand} /></View>
+      ) : hasAddress ? (
+        <View style={{ paddingHorizontal: 16 }}>
+          <AddressCard
+            label="Adresse de livraison"
+            name={`${addr.first_name ?? ''} ${addr.last_name ?? ''}`.trim() || '—'}
+            phone={addr.phone || '—'}
+            line={[addr.address_1, addr.address_2].filter(Boolean).join(', ') || '—'}
+            area={[addr.city, addr.country === 'GN' ? 'Guinée' : addr.country].filter(Boolean).join(', ')}
+            icon="home"
+            primary
+            onPress={() => nav.navigate('AddressForm')}
+          />
+        </View>
+      ) : (
+        <View style={{ paddingHorizontal: 16, alignItems: 'center', gap: 12, paddingTop: 20 }}>
+          <Icon name="pin" size={40} color={LMX.ink30} />
+          <Text style={{ fontSize: 14, color: LMX.ink70, fontFamily: sans(500) }}>Aucune adresse enregistrée</Text>
+        </View>
+      )}
+
       <View style={{ paddingHorizontal: 16, paddingTop: 14 }}>
         <Pressable onPress={() => nav.navigate('AddressForm')} style={{ paddingVertical: 14, backgroundColor: LMX.surface, borderWidth: 1, borderColor: LMX.border, borderStyle: 'dashed', borderRadius: LMX.r.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-          <Icon name="plus" size={16} color={LMX.ink} /><Text style={{ color: LMX.ink, fontFamily: sans(600), fontSize: 13 }}>Add new address</Text>
+          <Icon name={hasAddress ? 'pencil' : 'plus'} size={16} color={LMX.ink} /><Text style={{ color: LMX.ink, fontFamily: sans(600), fontSize: 13 }}>{hasAddress ? "Modifier l'adresse" : 'Ajouter une adresse'}</Text>
         </Pressable>
       </View>
     </Screen>
@@ -434,42 +568,78 @@ function LabelPick({ icon, label, active }: { icon: any; label: string; active?:
 
 export function ScreenAddressForm() {
   const nav = useNavigation<any>();
+  const { user } = useAuth();
+
+  const [firstName, setFirstName] = useState(user?.first_name ?? '');
+  const [lastName, setLastName]   = useState(user?.last_name ?? '');
+  const [phone, setPhone]         = useState(user?.phone ?? '');
+  const [street, setStreet]       = useState('');
+  const [neighborhood, setHood]   = useState('');
+  const [city, setCity]           = useState('Conakry');
+  const [loading, setLoad]        = useState(true);
+  const [saving, setSaving]       = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { addresses } = await profileApi.getAddresses();
+        const a = addresses?.[0];
+        if (a) {
+          if (a.first_name) setFirstName(a.first_name);
+          if (a.last_name)  setLastName(a.last_name);
+          if (a.phone)      setPhone(a.phone);
+          if (a.address_1)  setStreet(a.address_1);
+          if (a.address_2)  setHood(a.address_2);
+          if (a.city)       setCity(a.city);
+        }
+      } catch {}
+      finally { setLoad(false); }
+    })();
+  }, []);
+
+  const save = async () => {
+    if (!street.trim() || !city.trim()) { Alert.alert('Champs requis', 'Veuillez renseigner l\'adresse et la ville.'); return; }
+    setSaving(true);
+    try {
+      await profileApi.saveAddress({
+        type: 'billing',
+        first_name: firstName, last_name: lastName, phone,
+        address_1: street, address_2: neighborhood, city, country: 'GN',
+      });
+      nav.goBack();
+    } catch (e: any) {
+      Alert.alert('Erreur', e?.message ?? 'Impossible d\'enregistrer l\'adresse.');
+    } finally { setSaving(false); }
+  };
+
   return (
-    <Screen footer={<Button full variant="accent" size="lg" icon="check" onPress={() => nav.goBack()}>Save address</Button>}>
-      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title="Add address" right={<Text style={{ color: LMX.accent, fontSize: 13, fontFamily: sans(600) }}>Save</Text>} />
+    <Screen footer={<Button full variant="accent" size="lg" icon="check" onPress={save} disabled={saving || loading}>{saving ? 'Enregistrement...' : 'Enregistrer l\'adresse'}</Button>}>
+      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title="Adresse de livraison" right={<Pressable onPress={save}><Text style={{ color: LMX.accent, fontSize: 13, fontFamily: sans(600) }}>Enregistrer</Text></Pressable>} />
       <View style={{ paddingHorizontal: 16, paddingBottom: 14 }}>
         <View style={{ height: 150, borderRadius: LMX.r.lg, overflow: 'hidden', borderWidth: 1, borderColor: LMX.border }}>
           <MapVisual />
           <View style={{ position: 'absolute', top: '40%', left: '50%', marginLeft: -18 }}><Icon name="pin" size={36} color={LMX.accent} strokeWidth={2.5} /></View>
           <View style={{ position: 'absolute', top: 10, left: 10, right: 10, backgroundColor: 'rgba(255,255,255,0.95)', paddingHorizontal: 11, paddingVertical: 6, borderRadius: 999, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Icon name="location" size={12} color={LMX.brand} /><Text style={{ flex: 1, fontSize: 11, fontFamily: sans(600) }}>Boulbinet, Kaloum · Conakry</Text><Icon name="refresh" size={12} color={LMX.ink50} />
+            <Icon name="location" size={12} color={LMX.brand} /><Text style={{ flex: 1, fontSize: 11, fontFamily: sans(600) }}>{neighborhood || city || 'Conakry'}</Text>
           </View>
         </View>
       </View>
-      <Text style={{ paddingHorizontal: 16, fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600), marginBottom: 8 }}>Address type</Text>
-      <View style={{ paddingHorizontal: 16, paddingBottom: 16, flexDirection: 'row', gap: 8 }}>
-        <LabelPick icon="home" label="Home" active /><LabelPick icon="storefront" label="Office" /><LabelPick icon="plus" label="Other" />
-      </View>
-      <View style={{ paddingHorizontal: 16, paddingBottom: 14, gap: 12 }}>
-        <Field label="Recipient name" value="Aïssata Diallo" />
-        <Field label="Phone for delivery" prefix="+224" value="623 84 51 09" />
-        <Field label="Street address & building" value="Immeuble Niger, 4ème étage" />
-        <View style={{ flexDirection: 'row', gap: 10 }}>
-          <View style={{ flex: 1 }}><Field label="Neighborhood" value="Boulbinet" /></View>
-          <View style={{ flex: 1 }}><Field label="City" value="Conakry" /></View>
-        </View>
-        <Field label="Delivery notes (optional)" value="Ring twice. Gate code 22B." />
-      </View>
-      <View style={{ paddingHorizontal: 16 }}>
-        <View style={{ backgroundColor: LMX.surface, borderRadius: LMX.r.lg, padding: 16, borderWidth: 1, borderColor: LMX.border, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <View style={{ width: 32, height: 32, borderRadius: 9, backgroundColor: LMX.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}><Icon name="pin" size={15} color={LMX.ink} /></View>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 13, fontFamily: sans(600) }}>Set as default address</Text>
-            <Text style={{ fontSize: 11, color: LMX.ink50, marginTop: 2 }}>Used at checkout by default</Text>
+      {loading ? (
+        <View style={{ paddingTop: 24 }}><ActivityIndicator color={LMX.brand} /></View>
+      ) : (
+        <View style={{ paddingHorizontal: 16, paddingBottom: 14, gap: 12 }}>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <View style={{ flex: 1 }}><Field label="Prénom" value={firstName} onChangeText={setFirstName} /></View>
+            <View style={{ flex: 1 }}><Field label="Nom" value={lastName} onChangeText={setLastName} /></View>
           </View>
-          <Toggle on />
+          <Field label="Téléphone de livraison" prefix="+224" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
+          <Field label="Adresse & bâtiment" value={street} onChangeText={setStreet} placeholder="Immeuble Niger, 4ème étage" />
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <View style={{ flex: 1 }}><Field label="Quartier / commune" value={neighborhood} onChangeText={setHood} placeholder="Kaloum" /></View>
+            <View style={{ flex: 1 }}><Field label="Ville" value={city} onChangeText={setCity} /></View>
+          </View>
         </View>
-      </View>
+      )}
     </Screen>
   );
 }

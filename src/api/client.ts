@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export const API_BASE = 'https://loomodex.com/wp-json/loomodex/v1';
+export const API_BASE = 'https://loomodex.com/wp-json/loomodexapp/v1';
 
 export async function apiRequest<T = any>(
   path: string,
@@ -18,19 +18,33 @@ export async function apiRequest<T = any>(
     if (token) headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...fetchOpts,
-    headers,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, { ...fetchOpts, headers });
+  } catch {
+    // Network failure (no connection, DNS, captive portal, TLS) — never a JSON parse error
+    throw new Error('Connexion au serveur impossible. Vérifiez votre connexion internet.');
+  }
 
-  const data = await res.json();
+  // Read the raw body once, then try to parse. A server/CDN error page is HTML,
+  // not JSON — surface a clear message instead of a cryptic "JSON Parse error".
+  const raw = await res.text();
+  let data: any = null;
+  if (raw) {
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      if (!res.ok) throw new Error(`Erreur serveur (${res.status}). Veuillez réessayer.`);
+      throw new Error('Réponse inattendue du serveur. Veuillez réessayer.');
+    }
+  }
 
   if (!res.ok) {
     const msg = data?.message || data?.code || `Error ${res.status}`;
     throw new Error(msg);
   }
 
-  return data;
+  return data as T;
 }
 
 export function get<T = any>(path: string, auth = false) {

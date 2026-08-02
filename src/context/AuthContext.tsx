@@ -1,18 +1,25 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authApi, User } from '../api';
+import { registerForPush, unregisterForPush } from '../notifications';
 
 interface AuthState {
   user: User | null;
   token: string | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<User>;
   register: (data: RegisterData) => Promise<void>;
+  /** Create an account from a just-placed guest order and sign in. */
+  claimOrder: (orderId: number, password: string, email?: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  setUser: (user: User) => void;
   isLoggedIn: boolean;
   isVendor: boolean;
   isDriver: boolean;
+  isLogistics: boolean;
+  isSupport: boolean;
+  isAdmin: boolean;
 }
 
 interface RegisterData {
@@ -21,6 +28,7 @@ interface RegisterData {
   first_name: string;
   last_name: string;
   phone: string;
+  address?: string;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -39,6 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setToken(stored);
           const me = await authApi.me();
           setUser(me);
+          registerForPush();
         }
       } catch {
         // Token expired or invalid — clear it
@@ -56,6 +65,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await AsyncStorage.setItem('lmx_token', res.token);
     setToken(res.token);
     setUser(res.user);
+    registerForPush();
+    return res.user;
   }, []);
 
   const register = useCallback(async (data: RegisterData) => {
@@ -63,9 +74,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await AsyncStorage.setItem('lmx_token', res.token);
     setToken(res.token);
     setUser(res.user);
+    registerForPush();
+  }, []);
+
+  const claimOrder = useCallback(async (orderId: number, password: string, email?: string) => {
+    const res = await authApi.claimOrder(orderId, password, email);
+    await AsyncStorage.setItem('lmx_token', res.token);
+    setToken(res.token);
+    setUser(res.user);
+    registerForPush();
   }, []);
 
   const logout = useCallback(async () => {
+    await unregisterForPush();
     await AsyncStorage.removeItem('lmx_token');
     setToken(null);
     setUser(null);
@@ -79,11 +100,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const isLoggedIn = !!user && !!token;
-  const isVendor   = isLoggedIn && (user!.roles.includes('seller') || user!.roles.includes('dokandar') || user!.roles.includes('vendor'));
-  const isDriver   = isLoggedIn && user!.roles.includes('delivery_driver');
+  const hasRole = (...roles: string[]) =>
+    isLoggedIn && roles.some(r => user!.roles.includes(r));
+
+  const isVendor   = hasRole('seller', 'dokandar', 'vendor', 'wcfm_vendor');
+  const isDriver   = hasRole('delivery_driver');
+  const isLogistics= hasRole('logistics_manager');
+  const isSupport  = hasRole('customer_support');
+  const isAdmin    = hasRole('administrator');
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout, refreshUser, isLoggedIn, isVendor, isDriver }}>
+    <AuthContext.Provider value={{ user, token, loading, login, register, claimOrder, logout, refreshUser, setUser, isLoggedIn, isVendor, isDriver, isLogistics, isSupport, isAdmin }}>
       {children}
     </AuthContext.Provider>
   );

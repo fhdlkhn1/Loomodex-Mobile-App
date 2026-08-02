@@ -33,11 +33,15 @@ export const authApi = {
     first_name: string;
     last_name: string;
     phone: string;
+    address?: string;
   }) => post<AuthResponse>('/auth/register', data),
 
   me: () => get<User>('/auth/me', true),
 
   refresh: () => post<AuthResponse>('/auth/refresh', {}, true),
+
+  claimOrder: (order_id: number, password: string, email?: string) =>
+    post<AuthResponse>('/auth/claim-order', { order_id, password, email }),
 
   forgotPassword: (email: string) =>
     post<{ message: string }>('/auth/forgot-password', { email }),

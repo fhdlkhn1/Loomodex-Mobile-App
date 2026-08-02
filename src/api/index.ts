@@ -1,7 +1,15 @@
 export { authApi } from './auth';
 export { productsApi } from './products';
 export { ordersApi } from './orders';
+export { profileApi } from './profile';
+export { driverApi, logisticsApi, csApi } from './delivery';
+export { configApi } from './config';
+export { checkoutApi } from './checkout';
+export type { DeliveryZone, ZoneCommune, DeliveryZonesResponse } from './checkout';
 export { get, post, apiRequest, API_BASE } from './client';
 export type { User, AuthResponse } from './auth';
 export type { Product, ProductsResponse } from './products';
-export type { Order, OrderItem } from './orders';
+export type { Order, OrderItem, OrderTracking } from './orders';
+export type { AppConfig } from './config';
+export type { Address, ProfileStats, WalletData } from './profile';
+export type { DeliveryOrder, DriverSummary, LogisticsDriver } from './delivery';

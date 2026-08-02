@@ -20,7 +20,8 @@ export function ScreenSplash() {
       Animated.timing(rise, { toValue: 0, duration: 600, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
       Animated.timing(progress, { toValue: 1, duration: 2100, easing: Easing.inOut(Easing.cubic), useNativeDriver: false }),
     ]).start();
-    const t = setTimeout(() => nav.replace('Onboarding'), 2400);
+    // Straight to the home page — customers browse and check out as guests, no login gate.
+    const t = setTimeout(() => nav.replace('Main'), 2400);
     return () => clearTimeout(t);
   }, []);
 
@@ -68,7 +69,7 @@ export function ScreenSplash() {
           <Text style={{ color: 'rgba(237,241,247,0.3)' }}>·</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Icon name="truck" size={14} color="rgba(237,241,247,0.6)" />
-            <Text style={{ fontSize: 12, color: 'rgba(237,241,247,0.6)', fontFamily: sans(500) }}>Livraison 24–48h</Text>
+            <Text style={{ fontSize: 12, color: 'rgba(237,241,247,0.6)', fontFamily: sans(500) }}>Livraison 3h–48h</Text>
           </View>
         </View>
         <Text style={{ textAlign: 'center', marginTop: 14, fontSize: 11, color: 'rgba(237,241,247,0.32)', fontFamily: mono(400), letterSpacing: 1 }}>v1.0 · Conakry</Text>

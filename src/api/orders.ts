@@ -27,6 +27,35 @@ export interface Order {
   otp_code: string | null;
   tracking_url: string | null;
   driver: { id: number; name: string; phone: string } | null;
+  /** When the driver collected the order — lets the vendor follow the pickup. */
+  pickup_time?: string | null;
+}
+
+export interface OrderTracking {
+  order_id: number;
+  number: string;
+  status: string;
+  status_label: string;
+  active: boolean;
+  driver: {
+    name: string;
+    phone: string;
+    whatsapp: string;
+    lat: number | null;
+    lng: number | null;
+    heading: number;
+    updated: number | null;
+  } | null;
+  customer?: { lat: number | null; lng: number | null; updated: number | null };
+  destination: {
+    address: string;
+    area: string;
+    city: string;
+    lat: number | null;
+    lng: number | null;
+  };
+  maps_key: string;
+  otp?: string | null;
 }
 
 export const ordersApi = {
@@ -38,13 +67,30 @@ export const ordersApi = {
 
   get: (id: number) => get<Order>(`/orders/${id}`, true),
 
+  tracking: (id: number) => get<OrderTracking>(`/orders/${id}/tracking`, true),
+
   create: (data: {
     items: { product_id: number; qty: number }[];
-    billing: Record<string, string>;
+    // boolean allowed for flags like recipient_same
+    billing: Record<string, string | boolean>;
     shipping?: Record<string, string>;
     payment_method: string;
     notes?: string;
-  }) => post<{ order: Order; message: string }>('/orders/create', data, true),
+    region?: string;
+    dest_lat?: number;
+    dest_lng?: number;
+  }) => post<{ order: Order; message: string; pay_url?: string }>('/orders/create', data, true),
+
+  /** Guest checkout — order without an account (no auth token). Items come from the local cart. */
+  createGuest: (data: {
+    items: { product_id: number; qty: number; variation_id?: number; variation?: Record<string, string> }[];
+    billing: Record<string, string | boolean>;
+    payment_method: string;
+    notes?: string;
+    region?: string;
+    dest_lat?: number;
+    dest_lng?: number;
+  }) => post<{ order: Order; message: string; pay_url?: string }>('/orders/create-guest', data, false),
 
   cancel: (id: number, reason?: string) =>
     post<{ message: string; order: Order }>(`/orders/${id}/cancel`, { reason }, true),
