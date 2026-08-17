@@ -29,6 +29,8 @@ export interface Order {
   driver: { id: number; name: string; phone: string } | null;
   /** When the driver collected the order — lets the vendor follow the pickup. */
   pickup_time?: string | null;
+  /** Pickup code the STORE reads to the driver at handover (vendor view only). */
+  pickup_otp?: string | null;
 }
 
 export interface OrderTracking {

@@ -68,9 +68,17 @@ export const driverApi = {
   updateLocation: (lat: number, lng: number, heading = 0) =>
     post<{ success: boolean }>('/driver/location', { lat, lng, heading }, true),
 
-  /** SMS the recipient a one-tap link to share their live location. Assigned driver only. */
+  /**
+   * Mint a one-tap location-share link for the recipient. Tries the automatic SMS and
+   * always returns the link + phone so the caller can send it manually if SMS is off.
+   * Allowed for the assigned driver and for logistics managers.
+   */
   requestLocation: (order_id: number) =>
-    post<{ success: boolean; phone: string }>('/driver/location-request', { order_id }, true),
+    post<{ success: boolean; sms_sent: boolean; phone: string; url: string }>('/driver/location-request', { order_id }, true),
+
+  /** Confirm pickup with the store's code → advances the order to "On the way". */
+  verifyPickup: (order_id: number, code: string) =>
+    post<{ success: boolean; order: DeliveryOrder }>('/driver/verify-pickup', { order_id, code }, true),
 };
 
 export const logisticsApi = {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, Image, Pressable, ScrollView, ActivityIndicator, Alert, TextInput, Linking } from 'react-native';
+import { View, Text, Image, Pressable, ScrollView, ActivityIndicator, Alert, TextInput, Linking, Platform } from 'react-native';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 import * as Clipboard from 'expo-clipboard';
@@ -479,6 +479,17 @@ export function ScreenVendorOrder() {
           </View>
         </View>
 
+        {/* Pickup code — the store reads this to the driver at handover */}
+        {!!order.pickup_otp && (
+          <View style={{ backgroundColor: LMX.accentSoft, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.accent + '55', padding: 16, alignItems: 'center', gap: 6 }}>
+            <Text style={{ fontSize: 11, color: LMX.accent, textTransform: 'uppercase', fontFamily: sans(700), letterSpacing: 0.5 }}>Code de ramassage</Text>
+            <Text style={{ fontFamily: mono(700), fontSize: 34, letterSpacing: 10, color: LMX.ink }}>{order.pickup_otp}</Text>
+            <Text style={{ fontSize: 11.5, color: LMX.ink70, textAlign: 'center', lineHeight: 16 }}>
+              Communiquez ce code au livreur lorsqu'il vient récupérer la commande. Il le saisit dans son application pour confirmer le ramassage.
+            </Text>
+          </View>
+        )}
+
         {/* Customer */}
         <View style={{ backgroundColor: LMX.surface, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.border, padding: 14, gap: 10 }}>
           <LogiRow icon="user" label="Client" value={`${order.billing?.first_name ?? ''} ${order.billing?.last_name ?? ''}`.trim() || '—'} />
@@ -705,6 +716,40 @@ const DRIVER_TABS: { key: 'active' | 'history' | 'failed'; label: string; icon: 
 const call     = (phone?: string) => { if (phone) Linking.openURL(`tel:${phone}`).catch(() => {}); };
 const whatsapp = (num?: string) => { const c = (num || '').replace(/[^0-9]/g, ''); if (c) Linking.openURL(`https://wa.me/${c}`).catch(() => {}); };
 
+// sms: URL differs between platforms (iOS uses & before body, Android uses ?)
+const smsLink = (phone: string, body: string) => {
+  const num = (phone || '').replace(/[^0-9+]/g, '');
+  const sep = Platform.OS === 'ios' ? '&' : '?';
+  return `sms:${num}${sep}body=${encodeURIComponent(body)}`;
+};
+
+/**
+ * Ask the recipient to share their live location. Fires the automatic Twilio SMS if it's
+ * configured; otherwise lets the driver / logistics manager send the link themselves —
+ * open their SMS app pre-filled, or copy it for WhatsApp / any messenger.
+ */
+async function promptSendLocation(orderId: number) {
+  try {
+    const res = await driverApi.requestLocation(orderId);
+    if (res.sms_sent) {
+      Alert.alert('Demande envoyée', `Un SMS avec le lien de partage de position a été envoyé au ${res.phone}. Sa position apparaîtra sur la carte dès qu'il l'aura partagé.`);
+      return;
+    }
+    const msg = `Loomodex : partagez votre position exacte pour votre livraison en un tap : ${res.url}`;
+    Alert.alert(
+      'Envoyer le lien de position',
+      `Le SMS automatique n'est pas activé. Envoyez ce lien au destinataire (${res.phone}) :`,
+      [
+        { text: 'Ouvrir SMS', onPress: () => Linking.openURL(smsLink(res.phone, msg)).catch(() => {}) },
+        { text: 'Copier le lien', onPress: async () => { await Clipboard.setStringAsync(res.url); Alert.alert('Copié', 'Lien copié. Collez-le dans WhatsApp ou un autre message.'); } },
+        { text: 'Annuler', style: 'cancel' },
+      ]
+    );
+  } catch (e: any) {
+    Alert.alert('Envoi impossible', e?.message ?? 'Réessayez dans un instant.');
+  }
+}
+
 // Share the secure tracking link with the customer (copy / WhatsApp)
 const copyTrackLink = async (o: DeliveryOrder) => {
   if (!o.track_url) return;
@@ -889,12 +934,30 @@ function DriverOrderRow({ o, onPress }: { o: DeliveryOrder; onPress: () => void 
   );
 }
 
-function DriverActiveCard({ o, busy, otp, onOtp, onAdvance, onVerify, onLocationRequest }: {
+// Pickup: driver enters the code the store reads to them → confirms collection.
+function PickupOtpBox({ busy, onSubmit }: { busy: boolean; onSubmit: (code: string) => void }) {
+  const [code, setCode] = useState('');
+  return (
+    <View style={{ backgroundColor: LMX.accentSoft, borderRadius: 12, padding: 12, gap: 10, borderWidth: 1, borderColor: LMX.accent + '44' }}>
+      <Text style={{ fontSize: 12, fontFamily: sans(700), color: LMX.ink }}>📦 Code de ramassage</Text>
+      <Text style={{ fontSize: 11, color: LMX.ink70 }}>Demandez au magasin le code à 4 chiffres pour confirmer la récupération de la commande.</Text>
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        <View style={{ flex: 1, height: 48, borderRadius: 12, borderWidth: 1, borderColor: LMX.border, backgroundColor: LMX.surface, paddingHorizontal: 14, justifyContent: 'center' }}>
+          <TextInput value={code} onChangeText={setCode} keyboardType="number-pad" maxLength={4} placeholder="••••" placeholderTextColor={LMX.ink50} style={{ fontFamily: mono(600), fontSize: 18, letterSpacing: 6, color: LMX.ink, padding: 0 }} />
+        </View>
+        <Button variant="accent" size="md" icon="check" onPress={() => onSubmit(code.trim())} disabled={busy || code.trim().length < 4}>Confirmer</Button>
+      </View>
+    </View>
+  );
+}
+
+function DriverActiveCard({ o, busy, otp, onOtp, onAdvance, onVerify, onLocationRequest, onVerifyPickup }: {
   o: DeliveryOrder; busy: boolean; otp: string;
   onOtp: (v: string) => void;
   onAdvance: (o: DeliveryOrder, to: 'out-delivery' | 'driver-arrived') => void;
   onVerify: (o: DeliveryOrder) => void;
   onLocationRequest: (o: DeliveryOrder) => void;
+  onVerifyPickup: (o: DeliveryOrder, code: string) => void;
 }) {
   const st = STATUS_STYLE[o.status] ?? { label: o.status_label, color: LMX.brand };
   const showOtp = ['driver-arrived', 'otp-pending'].includes(o.status);
@@ -984,9 +1047,9 @@ function DriverActiveCard({ o, busy, otp, onOtp, onAdvance, onVerify, onLocation
           </>
         )}
 
-        {/* Stage action */}
+        {/* Stage action — pickup now requires the store's code before "on the way" */}
         {o.status === 'assigned-driver' && (
-          <Button full variant="primary" size="md" icon="arrowR" onPress={() => onAdvance(o, 'out-delivery')} disabled={busy}>Ramassé — en route</Button>
+          <PickupOtpBox busy={busy} onSubmit={(code) => onVerifyPickup(o, code)} />
         )}
         {o.status === 'out-delivery' && (
           <Button full variant="primary" size="md" icon="pin" onPress={() => onAdvance(o, 'driver-arrived')} disabled={busy}>Je suis arrivé</Button>
@@ -1051,20 +1114,25 @@ export function ScreenDriverOrder() {
     finally { setBusy(false); }
   };
 
+  // Pickup: driver enters the store's code → order moves to "On the way" only if correct.
+  const verifyPickup = async (o: DeliveryOrder, code: string) => {
+    if (code.length < 4) { Alert.alert('Code requis', 'Entrez le code à 4 chiffres du magasin.'); return; }
+    setBusy(true);
+    try {
+      const res = await driverApi.verifyPickup(o.id, code);
+      if (res?.order) setOrder(res.order);
+    } catch (e: any) {
+      Alert.alert('Ramassage', e?.message ?? 'Code de ramassage incorrect.');
+    } finally { setBusy(false); }
+  };
+
   // Addresses in Guinea are often imprecise — SMS the recipient a one-tap link. Their
   // shared position lands in the same field the tracking poll above already reads, so
   // the map/navigation updates on its own within ~20s.
   const requestLocation = async (o: DeliveryOrder) => {
     setBusy(true);
-    try {
-      const res = await driverApi.requestLocation(o.id);
-      Alert.alert(
-        'Demande envoyée',
-        `Un SMS avec un lien de partage de position a été envoyé au ${res.phone || 'destinataire'}. Sa position apparaîtra sur la carte dès qu'il l'aura partagée.`
-      );
-    } catch (e: any) {
-      Alert.alert('Envoi impossible', e?.message ?? 'Réessayez dans un instant.');
-    } finally { setBusy(false); }
+    try { await promptSendLocation(o.id); }
+    finally { setBusy(false); }
   };
 
   const verifyOtp = async (o: DeliveryOrder) => {
@@ -1092,7 +1160,7 @@ export function ScreenDriverOrder() {
             <Icon name="arrowR" size={16} color="#fff" />
           </Pressable>
         )}
-        <DriverActiveCard o={order} busy={busy} otp={otp} onOtp={setOtp} onAdvance={advance} onVerify={verifyOtp} onLocationRequest={requestLocation} />
+        <DriverActiveCard o={order} busy={busy} otp={otp} onOtp={setOtp} onAdvance={advance} onVerify={verifyOtp} onLocationRequest={requestLocation} onVerifyPickup={verifyPickup} />
       </View>
     </Screen>
   );
@@ -1248,8 +1316,14 @@ function LogisticsCard({ o, drivers, onAssigned }: { o: DeliveryOrder; drivers: 
         )}
       </View>
 
-      {(canResend || canOverride) && (
-        <View style={{ paddingHorizontal: 14, paddingBottom: 14, flexDirection: 'row', gap: 8 }}>
+      {(canResend || canOverride || !!o.driver_name) && (
+        <View style={{ paddingHorizontal: 14, paddingBottom: 14, flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+          {!!o.driver_name && (
+            <Button variant="ghost" size="md" style={{ flex: 1, minWidth: 150 }} icon="pin"
+              onPress={async () => { setBusy(true); try { await promptSendLocation(o.id); } finally { setBusy(false); } }} disabled={busy}>
+              Demander position
+            </Button>
+          )}
           {canResend && <Button variant="ghost" size="md" style={{ flex: 1 }} icon="arrowR" onPress={resendOtp} disabled={busy}>Renvoyer OTP</Button>}
           {canOverride && <Button variant="accent" size="md" style={{ flex: 1 }} icon="shield" onPress={override} disabled={busy}>Forcer</Button>}
         </View>
