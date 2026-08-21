@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   View, Text, Image, Pressable, ScrollView, TextInput, StyleProp, ViewStyle, TextStyle,
-  KeyboardAvoidingView, Platform,
+  KeyboardAvoidingView, Platform, Modal, ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -101,6 +101,31 @@ export function BellButton({ bg = 'transparent', color = LMX.ink }: { bg?: strin
       badgeColor={LMX.rose}
       onPress={() => nav.navigate('Notifications')}
     />
+  );
+}
+
+/**
+ * Full-screen loading overlay — a dimmed backdrop with a card + spinner. Drop it into any
+ * screen and drive it off the same `busy` flag as the action, e.g.
+ *   <LoadingOverlay visible={busy} message="Mise à jour…" />
+ */
+export function LoadingOverlay({ visible, message }: { visible: boolean; message?: string }) {
+  return (
+    <Modal transparent visible={visible} animationType="fade" statusBarTranslucent onRequestClose={() => {}}>
+      <View style={{ flex: 1, backgroundColor: 'rgba(11,31,58,0.38)', alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{
+          backgroundColor: LMX.surface, borderRadius: 20, paddingVertical: 26, paddingHorizontal: 32,
+          alignItems: 'center', gap: 14, minWidth: 150, maxWidth: 260, ...shadow('lg'),
+        }}>
+          <ActivityIndicator size="large" color={LMX.brand} />
+          {!!message && (
+            <Text style={{ fontSize: 13, fontFamily: sans(600), color: LMX.ink, textAlign: 'center', lineHeight: 18 }}>
+              {message}
+            </Text>
+          )}
+        </View>
+      </View>
+    </Modal>
   );
 }
 

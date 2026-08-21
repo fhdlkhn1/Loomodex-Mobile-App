@@ -9,7 +9,7 @@ import Svg, { Path, Defs, LinearGradient as SvgGrad, Stop } from 'react-native-s
 import { LMX, FONT, sans, mono, fr, decodeEntities } from '../theme';
 import { IMG, PRODUCTS } from '../data';
 import { Icon } from '../Icon';
-import { Screen, AppBar, IconBtn, Button, Field, Toggle, MapVisual, CategoryGlyph } from '../components';
+import { Screen, AppBar, IconBtn, Button, Field, Toggle, MapVisual, CategoryGlyph, LoadingOverlay } from '../components';
 import { Picker } from '../components/Picker';
 import { useAuth } from '../context/AuthContext';
 import { get, post } from '../api/client';
@@ -442,6 +442,7 @@ export function ScreenVendorOrder() {
   const route = useRoute<any>();
   const [order, setOrder] = useState<Order | undefined>(route.params?.order);
   const [busy, setBusy]   = useState(false);
+  const [pickupCode, setPickupCode] = useState('');
 
   if (!order) {
     return (
@@ -456,15 +457,31 @@ export function ScreenVendorOrder() {
     setBusy(true);
     try {
       const res = await post<{ order: Order }>(`/vendor/orders/${order.id}/status`, { status }, true);
-      setOrder(res?.order ?? { ...order, status, status_label: status });
-    } catch (e: any) { Alert.alert('Erreur', e?.message ?? 'Échec.'); }
+      const updated = res?.order ?? { ...order, status, status_label: status };
+      setOrder(updated);
+      Alert.alert('Statut mis à jour', `La commande est maintenant : ${updated.status_label}.`);
+    } catch (e: any) { Alert.alert('Erreur', e?.message ?? 'Échec de la mise à jour.'); }
     finally { setBusy(false); }
   };
 
-  const addr = [order.billing?.address_1, order.billing?.city].filter(Boolean).join(', ');
+  // Store verifies the driver's pickup code to hand over the order.
+  const verifyPickup = async () => {
+    const code = pickupCode.trim();
+    if (code.length < 4) { Alert.alert('Code requis', 'Saisissez le code à 4 chiffres communiqué par le livreur.'); return; }
+    setBusy(true);
+    try {
+      const res = await post<{ order: Order }>(`/vendor/orders/${order!.id}/verify-pickup`, { code }, true);
+      if (res?.order) setOrder(res.order);
+      setPickupCode('');
+      Alert.alert('Ramassage confirmé', 'Le livreur est vérifié. La commande lui a été remise.');
+    } catch (e: any) {
+      Alert.alert('Code incorrect', e?.message ?? 'Le code du livreur est incorrect.');
+    } finally { setBusy(false); }
+  };
 
   return (
     <Screen>
+      <LoadingOverlay visible={busy} message="Traitement…" />
       <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title={`Commande #${order.number}`} />
       <View style={{ paddingHorizontal: 16, paddingTop: 8, gap: 12 }}>
         {/* Status + total */}
@@ -479,30 +496,32 @@ export function ScreenVendorOrder() {
           </View>
         </View>
 
-        {/* Pickup code — the store reads this to the driver at handover */}
-        {!!order.pickup_otp && (
-          <View style={{ backgroundColor: LMX.accentSoft, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.accent + '55', padding: 16, alignItems: 'center', gap: 6 }}>
-            <Text style={{ fontSize: 11, color: LMX.accent, textTransform: 'uppercase', fontFamily: sans(700), letterSpacing: 0.5 }}>Code de ramassage</Text>
-            <Text style={{ fontFamily: mono(700), fontSize: 34, letterSpacing: 10, color: LMX.ink }}>{order.pickup_otp}</Text>
-            <Text style={{ fontSize: 11.5, color: LMX.ink70, textAlign: 'center', lineHeight: 16 }}>
-              Communiquez ce code au livreur lorsqu'il vient récupérer la commande. Il le saisit dans son application pour confirmer le ramassage.
+        {/* Pickup verification — store enters the DRIVER's code to confirm his identity and
+            hand over the order. Proves he's the driver Loomodex assigned. */}
+        {order.pickup_pending && (
+          <View style={{ backgroundColor: LMX.accentSoft, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.accent + '55', padding: 16, gap: 10 }}>
+            <Text style={{ fontSize: 12, fontFamily: sans(700), color: LMX.ink }}>📦 Vérifier le livreur</Text>
+            <Text style={{ fontSize: 11.5, color: LMX.ink70, lineHeight: 16 }}>
+              Demandez au livreur son code de ramassage à 4 chiffres et saisissez-le pour lui remettre la commande.
             </Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <View style={{ flex: 1, height: 48, borderRadius: 12, borderWidth: 1, borderColor: LMX.border, backgroundColor: LMX.surface, paddingHorizontal: 14, justifyContent: 'center' }}>
+                <TextInput value={pickupCode} onChangeText={setPickupCode} keyboardType="number-pad" maxLength={4} placeholder="••••" placeholderTextColor={LMX.ink50} style={{ fontFamily: mono(600), fontSize: 18, letterSpacing: 6, color: LMX.ink, padding: 0 }} />
+              </View>
+              <Button variant="accent" size="md" icon="check" onPress={verifyPickup} disabled={busy || pickupCode.trim().length < 4}>Confirmer</Button>
+            </View>
           </View>
         )}
 
-        {/* Customer */}
+        {/* Order info — customer phone/address are hidden from the store for privacy;
+            delivery contact & location are handled by the Loomodex delivery side. */}
         <View style={{ backgroundColor: LMX.surface, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.border, padding: 14, gap: 10 }}>
-          <LogiRow icon="user" label="Client" value={`${order.billing?.first_name ?? ''} ${order.billing?.last_name ?? ''}`.trim() || '—'} />
-          {!!order.billing?.phone && <LogiRow icon="phone" label="Téléphone" value={order.billing.phone} />}
-          {!!addr && <LogiRow icon="pin" label="Adresse" value={addr} />}
+          <LogiRow icon="user" label="Client" value={order.billing?.first_name || '—'} />
           {!!order.payment_method && <LogiRow icon="money" label="Paiement" value={order.payment_method} />}
-          {!!order.billing?.phone && (
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              <Pressable onPress={() => call(order.billing.phone)} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 40, borderRadius: 10, backgroundColor: LMX.surfaceAlt }}>
-                <Icon name="phone" size={14} color={LMX.ink} /><Text style={{ fontSize: 12, fontFamily: sans(600) }}>Appeler</Text>
-              </Pressable>
-            </View>
-          )}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: LMX.surfaceAlt, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7 }}>
+            <Icon name="shield" size={13} color={LMX.ink50} />
+            <Text style={{ flex: 1, fontSize: 10.5, color: LMX.ink50, lineHeight: 14 }}>Coordonnées client gérées par la livraison Loomodex.</Text>
+          </View>
         </View>
 
         {/* Driver / pickup — so the vendor can follow who collected the order and when */}
@@ -531,20 +550,30 @@ export function ScreenVendorOrder() {
           ))}
         </View>
 
-        {/* Status actions */}
-        <View style={{ backgroundColor: LMX.surface, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.border, padding: 14 }}>
-          <Text style={{ fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600), marginBottom: 10 }}>Mettre à jour le statut</Text>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            {VENDOR_STAGES.map(s => {
-              const active = order.status === s.key;
-              return (
-                <Pressable key={s.key} onPress={() => !active && setStatus(s.key)} disabled={busy} style={{ flex: 1, paddingVertical: 11, borderRadius: 10, alignItems: 'center', backgroundColor: active ? LMX.brand : LMX.surfaceAlt, borderWidth: 1, borderColor: active ? LMX.brand : LMX.border }}>
-                  <Text style={{ fontSize: 10.5, fontFamily: sans(600), color: active ? '#fff' : LMX.ink70 }}>{s.label}</Text>
-                </Pressable>
-              );
-            })}
+        {/* Status actions — the store controls the order only until a driver takes over.
+            Once assigned/picked up, the delivery flow owns it and the store can't change it. */}
+        {(!!order.driver || ['assigned-driver', 'out-delivery', 'driver-arrived', 'otp-pending', 'otp-verified', 'completed'].includes(order.status)) ? (
+          <View style={{ backgroundColor: LMX.surfaceAlt, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.border, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Icon name="shield" size={16} color={LMX.ink50} />
+            <Text style={{ flex: 1, fontSize: 12, color: LMX.ink70, lineHeight: 16 }}>
+              Commande prise en charge par le livreur. Le statut est désormais géré par la livraison et ne peut plus être modifié depuis la boutique.
+            </Text>
           </View>
-        </View>
+        ) : (
+          <View style={{ backgroundColor: LMX.surface, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.border, padding: 14 }}>
+            <Text style={{ fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600), marginBottom: 10 }}>Mettre à jour le statut</Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {VENDOR_STAGES.map(s => {
+                const active = order.status === s.key;
+                return (
+                  <Pressable key={s.key} onPress={() => !active && setStatus(s.key)} disabled={busy} style={{ flex: 1, paddingVertical: 11, borderRadius: 10, alignItems: 'center', backgroundColor: active ? LMX.brand : LMX.surfaceAlt, borderWidth: 1, borderColor: active ? LMX.brand : LMX.border }}>
+                    <Text style={{ fontSize: 10.5, fontFamily: sans(600), color: active ? '#fff' : LMX.ink70 }}>{s.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        )}
       </View>
     </Screen>
   );
@@ -935,29 +964,26 @@ function DriverOrderRow({ o, onPress }: { o: DeliveryOrder; onPress: () => void 
 }
 
 // Pickup: driver enters the code the store reads to them → confirms collection.
-function PickupOtpBox({ busy, onSubmit }: { busy: boolean; onSubmit: (code: string) => void }) {
-  const [code, setCode] = useState('');
+// Driver DISPLAYS his pickup code — he tells it to the store, who enters it to release the
+// order. The order advances (to "on the way") when the store verifies it.
+function PickupCodeDisplay({ code }: { code?: string | null }) {
   return (
-    <View style={{ backgroundColor: LMX.accentSoft, borderRadius: 12, padding: 12, gap: 10, borderWidth: 1, borderColor: LMX.accent + '44' }}>
-      <Text style={{ fontSize: 12, fontFamily: sans(700), color: LMX.ink }}>📦 Code de ramassage</Text>
-      <Text style={{ fontSize: 11, color: LMX.ink70 }}>Demandez au magasin le code à 4 chiffres pour confirmer la récupération de la commande.</Text>
-      <View style={{ flexDirection: 'row', gap: 8 }}>
-        <View style={{ flex: 1, height: 48, borderRadius: 12, borderWidth: 1, borderColor: LMX.border, backgroundColor: LMX.surface, paddingHorizontal: 14, justifyContent: 'center' }}>
-          <TextInput value={code} onChangeText={setCode} keyboardType="number-pad" maxLength={4} placeholder="••••" placeholderTextColor={LMX.ink50} style={{ fontFamily: mono(600), fontSize: 18, letterSpacing: 6, color: LMX.ink, padding: 0 }} />
-        </View>
-        <Button variant="accent" size="md" icon="check" onPress={() => onSubmit(code.trim())} disabled={busy || code.trim().length < 4}>Confirmer</Button>
-      </View>
+    <View style={{ backgroundColor: LMX.accentSoft, borderRadius: 12, padding: 14, gap: 6, borderWidth: 1, borderColor: LMX.accent + '55', alignItems: 'center' }}>
+      <Text style={{ fontSize: 11, color: LMX.accent, textTransform: 'uppercase', fontFamily: sans(700), letterSpacing: 0.5 }}>Votre code de ramassage</Text>
+      <Text style={{ fontFamily: mono(700), fontSize: 34, letterSpacing: 10, color: LMX.ink }}>{code || '••••'}</Text>
+      <Text style={{ fontSize: 11.5, color: LMX.ink70, textAlign: 'center', lineHeight: 16 }}>
+        Donnez ce code au magasin. Il le saisit pour vérifier votre identité et vous remettre la commande.
+      </Text>
     </View>
   );
 }
 
-function DriverActiveCard({ o, busy, otp, onOtp, onAdvance, onVerify, onLocationRequest, onVerifyPickup }: {
+function DriverActiveCard({ o, busy, otp, onOtp, onAdvance, onVerify, onLocationRequest }: {
   o: DeliveryOrder; busy: boolean; otp: string;
   onOtp: (v: string) => void;
   onAdvance: (o: DeliveryOrder, to: 'out-delivery' | 'driver-arrived') => void;
   onVerify: (o: DeliveryOrder) => void;
   onLocationRequest: (o: DeliveryOrder) => void;
-  onVerifyPickup: (o: DeliveryOrder, code: string) => void;
 }) {
   const st = STATUS_STYLE[o.status] ?? { label: o.status_label, color: LMX.brand };
   const showOtp = ['driver-arrived', 'otp-pending'].includes(o.status);
@@ -1049,7 +1075,7 @@ function DriverActiveCard({ o, busy, otp, onOtp, onAdvance, onVerify, onLocation
 
         {/* Stage action — pickup now requires the store's code before "on the way" */}
         {o.status === 'assigned-driver' && (
-          <PickupOtpBox busy={busy} onSubmit={(code) => onVerifyPickup(o, code)} />
+          <PickupCodeDisplay code={o.pickup_otp} />
         )}
         {o.status === 'out-delivery' && (
           <Button full variant="primary" size="md" icon="pin" onPress={() => onAdvance(o, 'driver-arrived')} disabled={busy}>Je suis arrivé</Button>
@@ -1114,18 +1140,6 @@ export function ScreenDriverOrder() {
     finally { setBusy(false); }
   };
 
-  // Pickup: driver enters the store's code → order moves to "On the way" only if correct.
-  const verifyPickup = async (o: DeliveryOrder, code: string) => {
-    if (code.length < 4) { Alert.alert('Code requis', 'Entrez le code à 4 chiffres du magasin.'); return; }
-    setBusy(true);
-    try {
-      const res = await driverApi.verifyPickup(o.id, code);
-      if (res?.order) setOrder(res.order);
-    } catch (e: any) {
-      Alert.alert('Ramassage', e?.message ?? 'Code de ramassage incorrect.');
-    } finally { setBusy(false); }
-  };
-
   // Addresses in Guinea are often imprecise — SMS the recipient a one-tap link. Their
   // shared position lands in the same field the tracking poll above already reads, so
   // the map/navigation updates on its own within ~20s.
@@ -1160,7 +1174,7 @@ export function ScreenDriverOrder() {
             <Icon name="arrowR" size={16} color="#fff" />
           </Pressable>
         )}
-        <DriverActiveCard o={order} busy={busy} otp={otp} onOtp={setOtp} onAdvance={advance} onVerify={verifyOtp} onLocationRequest={requestLocation} onVerifyPickup={verifyPickup} />
+        <DriverActiveCard o={order} busy={busy} otp={otp} onOtp={setOtp} onAdvance={advance} onVerify={verifyOtp} onLocationRequest={requestLocation} />
       </View>
     </Screen>
   );

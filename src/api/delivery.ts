@@ -18,6 +18,8 @@ export interface DeliveryOrder {
   recipient_phone: string;
   recipient_is_customer: boolean;
   whatsapp: string;
+  /** Pickup code the driver shows/tells the store; the store enters it to release the order. */
+  pickup_otp?: string | null;
   address: string;
   city: string;
   commune: string;
@@ -76,9 +78,6 @@ export const driverApi = {
   requestLocation: (order_id: number) =>
     post<{ success: boolean; sms_sent: boolean; phone: string; url: string }>('/driver/location-request', { order_id }, true),
 
-  /** Confirm pickup with the store's code → advances the order to "On the way". */
-  verifyPickup: (order_id: number, code: string) =>
-    post<{ success: boolean; order: DeliveryOrder }>('/driver/verify-pickup', { order_id, code }, true),
 };
 
 export const logisticsApi = {
