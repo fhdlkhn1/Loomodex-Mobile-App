@@ -15,6 +15,7 @@ import { useAuth } from '../context/AuthContext';
 import { get, post } from '../api/client';
 import { ordersApi, Order, OrderTracking } from '../api/orders';
 import { LiveMap } from '../components/LiveMap';
+import { configApi } from '../api/config';
 import { Product as ApiProduct } from '../api/products';
 import { driverApi, logisticsApi, csApi, DeliveryOrder, LogisticsDriver, DriverSummary } from '../api/delivery';
 import { wcfmApi, WcfmOrder, WcfmSalesStats, SITE_ORIGIN, uploadMedia } from '../api/wcfm';
@@ -1106,6 +1107,13 @@ export function ScreenDriverOrder() {
   const [busy, setBusy]   = useState(false);
   const [otp, setOtp]     = useState('');
   const [custLoc, setCustLoc] = useState<{ lat: number; lng: number } | null>(null);
+  const [myPos, setMyPos] = useState<{ lat: number; lng: number } | null>(null);
+  const [mapsKey, setMapsKey] = useState('');
+  const [eta, setEta] = useState<{ duration: string; distance: string } | null>(null);
+
+  const active = !!order && ['out-delivery', 'driver-arrived', 'otp-pending'].includes(order.status);
+
+  useEffect(() => { configApi.get().then(c => setMapsKey(c.google_maps_key ?? '')).catch(() => {}); }, []);
 
   // Poll the customer's shared live location so the driver can navigate to them
   useEffect(() => {
@@ -1123,6 +1131,25 @@ export function ScreenDriverOrder() {
     const i = setInterval(load, 20000);
     return () => clearInterval(i);
   }, [order?.id]);
+
+  // Driver's own live GPS — drives the in-app map AND keeps broadcasting to logistics.
+  useEffect(() => {
+    if (!active) return;
+    let sub: Location.LocationSubscription | null = null;
+    let cancelled = false;
+    (async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted' || cancelled) return;
+      sub = await Location.watchPositionAsync(
+        { accuracy: Location.Accuracy.High, timeInterval: 8000, distanceInterval: 15 },
+        pos => {
+          setMyPos({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+          driverApi.updateLocation(pos.coords.latitude, pos.coords.longitude, pos.coords.heading ?? 0).catch(() => {});
+        }
+      );
+    })();
+    return () => { cancelled = true; if (sub) sub.remove(); };
+  }, [active]);
 
   if (!order) {
     return (
@@ -1164,15 +1191,33 @@ export function ScreenDriverOrder() {
     <Screen>
       <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title={`Commande #${order.number}`} />
       <View style={{ paddingHorizontal: 16, paddingTop: 8, gap: 12 }}>
-        {custLoc && (
-          <Pressable onPress={() => Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${custLoc.lat},${custLoc.lng}`)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: LMX.brand, borderRadius: LMX.r.lg, padding: 14 }}>
-            <View style={{ width: 38, height: 38, borderRadius: 11, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' }}><Icon name="pin" size={18} color="#fff" /></View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 14, fontFamily: sans(700), color: '#fff' }}>Naviguer vers le client</Text>
-              <Text style={{ fontSize: 11.5, color: '#fff', opacity: 0.85, marginTop: 2 }}>Position partagée par le client · ouvrir dans Maps</Text>
+        {/* In-app navigation map — driver's live position, the customer, the route + ETA */}
+        {!!mapsKey && (custLoc || order.delivery_address) && (
+          <View style={{ borderRadius: LMX.r.lg, overflow: 'hidden', borderWidth: 1, borderColor: LMX.border }}>
+            <LiveMap
+              mapsKey={mapsKey}
+              driver={myPos}
+              destination={custLoc ? { lat: custLoc.lat, lng: custLoc.lng } : { address: order.delivery_address, city: order.city }}
+              height={260}
+              onEta={setEta}
+            />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, backgroundColor: LMX.surface }}>
+              <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: LMX.brandSoft, alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name="truck" size={16} color={LMX.brand} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 13.5, fontFamily: sans(700), color: LMX.ink }}>
+                  {eta ? `${eta.distance}${eta.duration ? ` · ${eta.duration}` : ''}` : (myPos ? 'Calcul de l\'itinéraire…' : 'Localisation en cours…')}
+                </Text>
+                <Text style={{ fontSize: 11, color: LMX.ink50, marginTop: 1 }}>Itinéraire vers le client</Text>
+              </View>
+              {custLoc && (
+                <Pressable onPress={() => Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${custLoc.lat},${custLoc.lng}`)} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 9, borderWidth: 1, borderColor: LMX.border }}>
+                  <Icon name="share" size={13} color={LMX.ink70} /><Text style={{ fontSize: 11, fontFamily: sans(600), color: LMX.ink70 }}>Google Maps</Text>
+                </Pressable>
+              )}
             </View>
-            <Icon name="arrowR" size={16} color="#fff" />
-          </Pressable>
+          </View>
         )}
         <DriverActiveCard o={order} busy={busy} otp={otp} onOtp={setOtp} onAdvance={advance} onVerify={verifyOtp} onLocationRequest={requestLocation} />
       </View>
