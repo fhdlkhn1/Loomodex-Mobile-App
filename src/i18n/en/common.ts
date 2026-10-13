@@ -1,0 +1,30 @@
+// Strings shared across the app (API errors, statuses, generic actions).
+const common: Record<string, string> = {
+  'Une erreur est survenue': 'Something went wrong',
+  "Veuillez fermer puis rouvrir l'application.": 'Please close and reopen the app.',
+  'Une erreur est survenue. Veuillez réessayer.': 'Something went wrong. Please try again.',
+  'Connexion au serveur impossible. Vérifiez votre connexion internet.': 'Cannot reach the server. Check your internet connection.',
+  'Accès refusé par le serveur ({status}). Réessayez dans un instant.': 'The server refused access ({status}). Please try again in a moment.',
+  'Le serveur met trop de temps à répondre. Réessayez dans un instant.': 'The server is taking too long to respond. Please try again in a moment.',
+  'Le serveur a rencontré une erreur ({status}). Réessayez dans un instant.': 'The server encountered an error ({status}). Please try again in a moment.',
+  'Le serveur met trop de temps à répondre.': 'The server is taking too long to respond.',
+  'Erreur serveur ({status}). Veuillez réessayer.': 'Server error ({status}). Please try again.',
+  'Réponse inattendue du serveur. Veuillez réessayer.': 'Unexpected server response. Please try again.',
+  'Fichier trop volumineux pour le serveur.': 'File too large for the server.',
+  'Échec du téléversement.': 'Upload failed.',
+  'Réessayer': 'Try again',
+  'Annuler': 'Cancel',
+  'Confirmer': 'Confirm',
+  'Enregistrer': 'Save',
+  'Fermer': 'Close',
+  'Retour': 'Back',
+  'OK': 'OK',
+  'Oui': 'Yes',
+  'Non': 'No',
+  'Chargement…': 'Loading…',
+  'Langue': 'Language',
+  'Français': 'French',
+  'English': 'English',
+};
+
+export default common;

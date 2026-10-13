@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   View, Text, Image, Pressable, ScrollView, TextInput, StyleProp, ViewStyle, TextStyle,
-  KeyboardAvoidingView, Platform, Modal, ActivityIndicator,
+  KeyboardAvoidingView, Platform, Modal, ActivityIndicator, RefreshControlProps,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -12,10 +12,11 @@ import { Icon, IconName, CategoryGlyph } from './Icon';
 import { IMG, Product, Category } from './data';
 import { useNotifications } from './context/NotificationsContext';
 import { useAuth } from './context/AuthContext';
+import { t, useLanguage, Lang } from './i18n';
 
 // ── Screen shell ───────────────────────────────────────────────
 export function Screen({
-  children, bg, footer, scroll = true, padTop = true, contentStyle,
+  children, bg, footer, scroll = true, padTop = true, contentStyle, refreshControl,
 }: {
   children: React.ReactNode;
   bg?: string;
@@ -23,6 +24,8 @@ export function Screen({
   scroll?: boolean;
   padTop?: boolean;
   contentStyle?: StyleProp<ViewStyle>;
+  /** Pull-to-refresh (a <RefreshControl>) for scrolling screens. */
+  refreshControl?: React.ReactElement<RefreshControlProps>;
 }) {
   const insets = useSafeAreaInsets();
   const top = padTop ? insets.top + 6 : 0;
@@ -39,6 +42,7 @@ export function Screen({
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
+          refreshControl={refreshControl}
         >
           {children}
         </ScrollView>
@@ -274,7 +278,7 @@ export function ProductCard({
           ) : (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#DAF1E6', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5 }}>
               <Icon name="shield" size={9} color="#0E8A57" />
-              <Text style={{ fontSize: 9, fontFamily: sans(600), color: '#0E8A57' }}>Produit vérifié</Text>
+              <Text style={{ fontSize: 9, fontFamily: sans(600), color: '#0E8A57' }}>{t('Produit vérifié')}</Text>
             </View>
           )}
         </View>
@@ -284,12 +288,12 @@ export function ProductCard({
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 }}>
           <Icon name={product.is_usa ? 'package' : 'truck'} size={10} color={product.is_usa ? LMX.navy : '#1E6BFF'} />
           <Text numberOfLines={1} style={{ fontSize: 9.5, color: product.is_usa ? LMX.navy : '#1E6BFF', fontFamily: sans(500) }}>
-            {product.is_usa ? (product.delivery_estimate || '10–14 jours ouvrables') : '3h–48h Conakry'}
+            {product.is_usa ? (product.delivery_estimate || t('10–14 jours ouvrables')) : t('3h–48h Conakry')}
           </Text>
         </View>
         {/* Buy Now button */}
         <Pressable onPress={onPress} style={{ marginTop: 8, backgroundColor: '#1E6BFF', borderRadius: 8, paddingVertical: 7, alignItems: 'center' }}>
-          <Text style={{ color: '#fff', fontSize: 11.5, fontFamily: sans(700) }}>Acheter</Text>
+          <Text style={{ color: '#fff', fontSize: 11.5, fontFamily: sans(700) }}>{t('Acheter')}</Text>
         </Pressable>
       </View>
     </Pressable>
@@ -458,6 +462,33 @@ export function ActivePill({ children }: { children: React.ReactNode }) {
     }}>
       <Text style={{ fontSize: 11.5, fontFamily: sans(600), color: LMX.accent }}>{children}</Text>
       <Icon name="close" size={12} color={LMX.accent} />
+    </View>
+  );
+}
+
+// ── Language toggle (FR | EN) ──────────────────────────────────
+/** Compact FR | EN switch for the first-run screens. Changing it remounts the app. */
+export function LangToggle({ light }: { light?: boolean }) {
+  const { lang, setLang } = useLanguage();
+  const opts: Lang[] = ['fr', 'en'];
+  const border = light ? 'rgba(255,255,255,0.28)' : LMX.border;
+  return (
+    <View style={{ flexDirection: 'row', borderRadius: 999, borderWidth: 1, borderColor: border, overflow: 'hidden' }}>
+      {opts.map(l => {
+        const active = l === lang;
+        return (
+          <Pressable
+            key={l}
+            onPress={() => { if (!active) setLang(l); }}
+            accessibilityLabel={l === 'fr' ? 'Français' : 'English'}
+            style={{ paddingHorizontal: 10, paddingVertical: 5, backgroundColor: active ? (light ? 'rgba(255,255,255,0.18)' : LMX.ink) : 'transparent' }}
+          >
+            <Text style={{ fontSize: 11, fontFamily: mono(700), letterSpacing: 0.5, color: active ? '#fff' : (light ? 'rgba(237,241,247,0.6)' : LMX.ink50) }}>
+              {l.toUpperCase()}
+            </Text>
+          </Pressable>
+        );
+      })}
     </View>
   );
 }

@@ -6,6 +6,7 @@ import { LMX, FONT, sans, decodeEntities } from '../theme';
 import { Icon } from '../Icon';
 import { Screen, AppBar, IconBtn, ProductCard } from '../components';
 import { productsApi, Product as ApiProduct } from '../api/products';
+import { t } from '../i18n';
 
 /**
  * USA Store — products imported from the United States.
@@ -21,7 +22,7 @@ export function ScreenUsaStore() {
   });
 
   const products = data?.products ?? [];
-  const eta = data?.delivery_estimate || '10–14 jours ouvrables';
+  const eta = data?.delivery_estimate || t('10–14 jours ouvrables');
 
   const toCard = (p: ApiProduct) => ({
     id: String(p.id),
@@ -54,13 +55,12 @@ export function ScreenUsaStore() {
           <Text style={{ fontFamily: FONT.display, fontSize: 22, color: '#fff' }}>USA Store</Text>
         </View>
         <Text style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.75)', lineHeight: 18, marginBottom: 14 }}>
-          iPhone, MacBook, Apple Watch, AirPods et autres produits électroniques expédiés
-          directement des États-Unis.
+          {t('iPhone, MacBook, Apple Watch, AirPods et autres produits électroniques expédiés directement des États-Unis.')}
         </Text>
         {[
-          { icon: 'package', text: `Livraison estimée : ${eta}` },
-          { icon: 'checkCircle', text: 'Produits américains authentiques' },
-          { icon: 'shield', text: 'Expédition internationale sécurisée' },
+          { icon: 'package', text: t('Livraison estimée : {eta}', { eta }) },
+          { icon: 'checkCircle', text: t('Produits américains authentiques') },
+          { icon: 'shield', text: t('Expédition internationale sécurisée') },
         ].map(r => (
           <View key={r.text} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 3 }}>
             <Icon name={r.icon as any} size={14} color="#fff" />
@@ -78,9 +78,9 @@ export function ScreenUsaStore() {
           <View style={{ width: 68, height: 68, borderRadius: 34, backgroundColor: LMX.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
             <Text style={{ fontSize: 26 }}>🇺🇸</Text>
           </View>
-          <Text style={{ fontSize: 15, fontFamily: sans(700), color: LMX.ink, marginTop: 4 }}>Aucun produit importé</Text>
+          <Text style={{ fontSize: 15, fontFamily: sans(700), color: LMX.ink, marginTop: 4 }}>{t('Aucun produit importé')}</Text>
           <Text style={{ fontSize: 12.5, color: LMX.ink50, textAlign: 'center', lineHeight: 18 }}>
-            Les produits importés des États-Unis apparaîtront ici dès que nos vendeurs les auront ajoutés.
+            {t('Les produits importés des États-Unis apparaîtront ici dès que nos vendeurs les auront ajoutés.')}
           </Text>
         </View>
       ) : (

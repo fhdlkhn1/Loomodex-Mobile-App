@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, ScrollView, ActivityIndicator, Alert, TextInput } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { useQuery } from '@tanstack/react-query';
@@ -10,7 +10,8 @@ import { Icon } from '../Icon';
 import { Screen, AppBar, IconBtn, Button, Price, ProductCard, SummaryRow, Field } from '../components';
 import { Picker } from '../components/Picker';
 import { productsApi, Product as ApiProduct, ProductTabs } from '../api/products';
-import { checkoutApi, DeliveryZone } from '../api/checkout';
+import { checkoutApi, DeliveryZone, DeliveryQuote } from '../api/checkout';
+import { FeeBreakdown, Notice } from '../components/FeeBreakdown';
 import { configApi } from '../api/config';
 import { LocationPicker, LatLng } from '../components/LocationPicker';
 import { get } from '../api/client';
@@ -18,6 +19,11 @@ import { profileApi } from '../api/profile';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { ordersApi } from '../api/orders';
+import { friendlyError } from '../api/client';
+import { ImageViewer } from '../components/ImageViewer';
+import { ProductVideo } from '../components/ProductVideo';
+import { PhoneInput, toE164 } from '../components/PhoneInput';
+import { t } from '../i18n';
 
 // ─── Helpers ─────────────────────────────────────────────────────
 
@@ -63,6 +69,7 @@ export function ScreenProductDetail() {
   const [buyingNow, setBuyingNow] = useState(false);
   const [qty, setQty] = useState(1);
   const [imgIdx, setImgIdx] = useState(0);
+  const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedVar, setSelectedVar] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState<'description' | 'reviews' | 'offers' | 'policies'>('description');
   const [reviewRating, setReviewRating] = useState(5);
@@ -84,15 +91,15 @@ export function ScreenProductDetail() {
   const submitReview = async () => {
     if (!isLoggedIn) { nav.navigate('SignIn'); return; }
     if (!product) return;
-    if (!reviewText.trim()) { Alert.alert('Avis vide', 'Veuillez écrire votre avis.'); return; }
+    if (!reviewText.trim()) { Alert.alert(t('Avis vide'), t('Veuillez écrire votre avis.')); return; }
     setReviewBusy(true);
     try {
       await productsApi.postReview(product.id, reviewRating, reviewText.trim());
       setReviewText(''); setReviewRating(5);
       await refetchTabs();
-      Alert.alert('Merci !', 'Votre avis a été publié.');
+      Alert.alert(t('Merci !'), t('Votre avis a été publié.'));
     } catch (e: any) {
-      Alert.alert('Erreur', e?.message ?? 'Impossible de publier l\'avis.');
+      Alert.alert(t('Erreur'), friendlyError(e, t("Impossible de publier l'avis.")));
     } finally { setReviewBusy(false); }
   };
 
@@ -101,12 +108,12 @@ export function ScreenProductDetail() {
     const attrs = product?.variation_attributes ?? [];
     if (product?.type === 'variable' && attrs.length) {
       if (!attrs.every(a => selectedVar[a.key])) {
-        Alert.alert('Sélection requise', 'Veuillez choisir toutes les options du produit.');
+        Alert.alert(t('Sélection requise'), t('Veuillez choisir toutes les options du produit.'));
         return null;
       }
       const v = (product.variations ?? []).find(vv => attrs.every(a => !vv.attributes[a.key] || vv.attributes[a.key] === selectedVar[a.key]));
-      if (!v) { Alert.alert('Indisponible', "Cette combinaison n'est pas disponible."); return null; }
-      if (!v.in_stock) { Alert.alert('Rupture', "Cette option est en rupture de stock."); return null; }
+      if (!v) { Alert.alert(t('Indisponible'), t("Cette combinaison n'est pas disponible.")); return null; }
+      if (!v.in_stock) { Alert.alert(t('Rupture'), t('Cette option est en rupture de stock.')); return null; }
       return { variationId: v.id, variationMap: selectedVar };
     }
     return {};
@@ -120,12 +127,12 @@ export function ScreenProductDetail() {
     setAddingCart(true);
     try {
       await addToCart(product.id, qty, r.variationId, r.variationMap);
-      Alert.alert('Ajouté !', `${product.name} ajouté au panier.`, [
-        { text: 'Voir le panier', onPress: () => nav.navigate('Cart') },
-        { text: 'Continuer', style: 'cancel' },
+      Alert.alert(t('Ajouté !'), t('{name} ajouté au panier.', { name: product.name }), [
+        { text: t('Voir le panier'), onPress: () => nav.navigate('Cart') },
+        { text: t('Continuer'), style: 'cancel' },
       ]);
     } catch (e: any) {
-      Alert.alert('Erreur', e.message ?? 'Impossible d\'ajouter au panier.');
+      Alert.alert(t('Erreur'), friendlyError(e, t("Impossible d'ajouter au panier.")));
     } finally {
       setAddingCart(false);
     }
@@ -141,7 +148,7 @@ export function ScreenProductDetail() {
       await addToCart(product.id, qty, r.variationId, r.variationMap);
       nav.navigate('Checkout');
     } catch (e: any) {
-      Alert.alert('Erreur', e.message ?? 'Impossible d\'ajouter au panier.');
+      Alert.alert(t('Erreur'), friendlyError(e, t("Impossible d'ajouter au panier.")));
     } finally {
       setBuyingNow(false);
     }
@@ -164,16 +171,18 @@ export function ScreenProductDetail() {
   if (!p) {
     return (
       <Screen>
-        <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title="Produit" />
+        <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title={t('Produit')} />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
           <Icon name="bag" size={48} color={LMX.ink30} />
-          <Text style={{ fontSize: 15, color: LMX.ink70 }}>Produit introuvable</Text>
+          <Text style={{ fontSize: 15, color: LMX.ink70 }}>{t('Produit introuvable')}</Text>
         </View>
       </Screen>
     );
   }
 
   const gallery  = (p.images && p.images.length ? p.images : (p.image ? [p.image] : [])).filter(Boolean);
+  const video    = (p.video || '').trim();
+  const showVideo = !!video && imgIdx === gallery.length;
   const imageUri = gallery[imgIdx] ?? gallery[0] ?? null;
   const wasPrice = p.regular_price && p.regular_price > p.price ? p.regular_price : null;
   const desc     = decodeEntities(p.short_desc || p.description || '');
@@ -194,10 +203,10 @@ export function ScreenProductDetail() {
       footer={
         <View style={{ gap: 8 }}>
           <Button full variant="accent" size="lg" icon="bag" onPress={handleAddToCart} disabled={addingCart || buyingNow || !inStock}>
-            {!inStock ? 'Indisponible' : addingCart ? 'Ajout...' : 'Ajouter au panier'}
+            {!inStock ? t('Indisponible') : addingCart ? t('Ajout...') : t('Ajouter au panier')}
           </Button>
           <Button full variant="accent" size="lg" icon="arrowR" onPress={handleBuyNow} disabled={addingCart || buyingNow || !inStock} style={{ backgroundColor: LMX.brand }}>
-            {buyingNow ? '...' : 'Acheter maintenant'}
+            {buyingNow ? '...' : t('Acheter maintenant')}
           </Button>
         </View>
       }
@@ -208,23 +217,56 @@ export function ScreenProductDetail() {
         right={<IconBtn icon="bag" bg="rgba(255,255,255,0.9)" badge={cartCount || undefined} onPress={() => nav.navigate('Cart')} />}
       />
 
-      {/* Product image */}
-      <View style={{ height: 340, backgroundColor: LMX.surfaceAlt }}>
-        {imageUri
-          ? <ExpoImage source={{ uri: imageUri }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
-          : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><Icon name="bag" size={60} color={LMX.ink30} /></View>
+      {/* Product image (tap → full-screen viewer) or the product video */}
+      <View style={{ height: 340, backgroundColor: showVideo ? '#000' : LMX.surfaceAlt }}>
+        {showVideo
+          ? <ProductVideo url={video} style={{ flex: 1, marginTop: 64, marginBottom: 22 }} />
+          : imageUri
+            ? (
+              <Pressable onPress={() => setViewerOpen(true)} style={{ flex: 1 }}>
+                <ExpoImage source={{ uri: imageUri }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
+                <View style={{ position: 'absolute', right: 14, bottom: 34, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(11,31,58,0.62)', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 }}>
+                  <Icon name="search" size={12} color="#fff" />
+                  <Text style={{ color: '#fff', fontSize: 11, fontFamily: mono(600) }}>{gallery.length > 1 ? `${imgIdx + 1}/${gallery.length}` : t('Zoom')}</Text>
+                </View>
+              </Pressable>
+            )
+            : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><Icon name="bag" size={60} color={LMX.ink30} /></View>
         }
+        {!!video && !showVideo && (
+          <Pressable onPress={() => setImgIdx(gallery.length)} style={{ position: 'absolute', left: 14, bottom: 34, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: LMX.accent, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7, ...shadow('md') }}>
+            <Icon name="play" size={12} color="#fff" />
+            <Text style={{ color: '#fff', fontSize: 12, fontFamily: sans(700) }}>{t('Vidéo')}</Text>
+          </Pressable>
+        )}
       </View>
+
+      <ImageViewer
+        images={gallery}
+        index={Math.min(imgIdx, Math.max(gallery.length - 1, 0))}
+        visible={viewerOpen}
+        onClose={() => setViewerOpen(false)}
+        onIndexChange={setImgIdx}
+      />
 
       <View style={{ marginTop: -22, backgroundColor: LMX.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20 }}>
         {/* Thumbnail gallery */}
-        {gallery.length > 1 && (
+        {(gallery.length > 1 || !!video) && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }} style={{ marginBottom: 16 }}>
             {gallery.map((img, i) => (
               <Pressable key={i} onPress={() => setImgIdx(i)} style={{ width: 60, height: 60, borderRadius: 12, overflow: 'hidden', borderWidth: 2, borderColor: i === imgIdx ? LMX.brand : LMX.border, backgroundColor: LMX.surfaceAlt }}>
                 <ExpoImage source={{ uri: img }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
               </Pressable>
             ))}
+            {!!video && (
+              <Pressable onPress={() => setImgIdx(gallery.length)} style={{ width: 60, height: 60, borderRadius: 12, overflow: 'hidden', borderWidth: 2, borderColor: showVideo ? LMX.brand : LMX.border, backgroundColor: LMX.navy, alignItems: 'center', justifyContent: 'center', gap: 3 }}>
+                {!!gallery[0] && <ExpoImage source={{ uri: gallery[0] }} style={{ position: 'absolute', width: '100%', height: '100%', opacity: 0.4 }} contentFit="cover" />}
+                <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: LMX.accent, alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name="play" size={11} color="#fff" />
+                </View>
+                <Text style={{ fontSize: 9.5, fontFamily: sans(700), color: '#fff' }}>{t('Vidéo')}</Text>
+              </Pressable>
+            )}
           </ScrollView>
         )}
 
@@ -239,13 +281,13 @@ export function ScreenProductDetail() {
         {/* Stock + (during launch) a Verified Product trust badge when there are no reviews yet */}
         <View style={{ marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           {inStock
-            ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: LMX.emeraldSoft, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}><Icon name="checkCircle" size={13} color={LMX.emerald} /><Text style={{ fontSize: 11.5, color: LMX.emerald, fontFamily: sans(600) }}>En stock</Text></View>
-            : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#FFE9E9', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}><Text style={{ fontSize: 11.5, color: LMX.rose, fontFamily: sans(600) }}>Rupture de stock</Text></View>
+            ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: LMX.emeraldSoft, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}><Icon name="checkCircle" size={13} color={LMX.emerald} /><Text style={{ fontSize: 11.5, color: LMX.emerald, fontFamily: sans(600) }}>{t('En stock')}</Text></View>
+            : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#FFE9E9', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}><Text style={{ fontSize: 11.5, color: LMX.rose, fontFamily: sans(600) }}>{t('Rupture de stock')}</Text></View>
           }
           {(p.reviews ?? 0) === 0 && (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#DAF1E6', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}>
               <Icon name="shield" size={13} color="#0E8A57" />
-              <Text style={{ fontSize: 11.5, color: '#0E8A57', fontFamily: sans(600) }}>Produit vérifié</Text>
+              <Text style={{ fontSize: 11.5, color: '#0E8A57', fontFamily: sans(600) }}>{t('Produit vérifié')}</Text>
             </View>
           )}
         </View>
@@ -267,7 +309,7 @@ export function ScreenProductDetail() {
                 label={a.label}
                 value={selectedVar[a.key] ?? ''}
                 onChange={(val) => setSelectedVar(prev => ({ ...prev, [a.key]: val }))}
-                placeholder={`Choisir ${a.label.toLowerCase()}`}
+                placeholder={t('Choisir {label}', { label: a.label.toLowerCase() })}
                 options={a.options.map(o => ({ value: o, label: decodeEntities(o) }))}
               />
             ))}
@@ -276,7 +318,7 @@ export function ScreenProductDetail() {
 
         {/* Qty selector */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 18 }}>
-          <Text style={{ fontSize: 13, fontFamily: sans(500), color: LMX.ink70 }}>Quantité :</Text>
+          <Text style={{ fontSize: 13, fontFamily: sans(500), color: LMX.ink70 }}>{t('Quantité :')}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: LMX.surfaceAlt, borderRadius: 10, padding: 3, borderWidth: 1, borderColor: LMX.hairline }}>
             <Pressable onPress={() => setQty(q => Math.max(1, q - 1))} style={{ width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}>
               <Icon name="minus" size={14} color={LMX.ink} />
@@ -294,12 +336,12 @@ export function ScreenProductDetail() {
           <View style={{ marginTop: 18, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.border, backgroundColor: LMX.surfaceMuted, padding: 14 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
               <Text style={{ fontSize: 16 }}>🇺🇸</Text>
-              <Text style={{ fontSize: 13.5, fontFamily: sans(700), color: LMX.ink }}>Importé des États-Unis</Text>
+              <Text style={{ fontSize: 13.5, fontFamily: sans(700), color: LMX.ink }}>{t('Importé des États-Unis')}</Text>
             </View>
             {[
-              { icon: 'package', label: 'Livraison estimée', value: p.delivery_estimate || '10–14 jours ouvrables' },
-              { icon: 'checkCircle', label: 'Produits américains authentiques', value: null },
-              { icon: 'shield', label: 'Expédition internationale sécurisée', value: null },
+              { icon: 'package', label: t('Livraison estimée'), value: p.delivery_estimate || t('10–14 jours ouvrables') },
+              { icon: 'checkCircle', label: t('Produits américains authentiques'), value: null },
+              { icon: 'shield', label: t('Expédition internationale sécurisée'), value: null },
             ].map(row => (
               <View key={row.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 4 }}>
                 <Icon name={row.icon as any} size={14} color={LMX.brand} />
@@ -310,7 +352,7 @@ export function ScreenProductDetail() {
               </View>
             ))}
             <Text style={{ fontSize: 11, color: LMX.ink50, marginTop: 8, lineHeight: 15 }}>
-              Ce produit est expédié depuis les États-Unis et prend plus de temps que nos livraisons locales à Conakry.
+              {t('Ce produit est expédié depuis les États-Unis et prend plus de temps que nos livraisons locales à Conakry.')}
             </Text>
           </View>
         )}
@@ -318,9 +360,9 @@ export function ScreenProductDetail() {
         {/* Trust icons (matches website: Fast Delivery · Secure Payment · Easy Returns) */}
         <View style={{ flexDirection: 'row', gap: 16, marginTop: 20, paddingTop: 16, borderTopWidth: 1, borderTopColor: LMX.hairline }}>
           {[
-            { icon: p.is_usa ? 'package' : 'truck', text: p.is_usa ? (p.delivery_estimate || '10–14 jours') : 'Livraison rapide' },
-            { icon: 'shield', text: 'Paiement sécurisé' },
-            { icon: 'refresh', text: 'Retours faciles' },
+            { icon: p.is_usa ? 'package' : 'truck', text: p.is_usa ? (p.delivery_estimate || t('10–14 jours')) : t('Livraison rapide') },
+            { icon: 'shield', text: t('Paiement sécurisé') },
+            { icon: 'refresh', text: t('Retours faciles') },
           ].map(b => (
             <View key={b.text} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Icon name={b.icon as any} size={15} color={LMX.brand} />
@@ -332,7 +374,7 @@ export function ScreenProductDetail() {
         {/* Category line (matches website summary) */}
         {!!category && (
           <Text style={{ fontSize: 12.5, color: LMX.ink70, marginTop: 16 }}>
-            Catégorie : <Text style={{ color: LMX.brand, fontFamily: sans(600) }}>{category}</Text>
+            {t('Catégorie :')} <Text style={{ color: LMX.brand, fontFamily: sans(600) }}>{category}</Text>
           </Text>
         )}
 
@@ -340,13 +382,13 @@ export function ScreenProductDetail() {
         <View style={{ marginTop: 20 }}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ borderBottomWidth: 1, borderBottomColor: LMX.hairline }} contentContainerStyle={{ gap: 18 }}>
             {([
-              { key: 'description', label: 'Description' },
-              { key: 'reviews',     label: `Avis (${tabs?.reviews.count ?? 0})` },
-              { key: 'offers',      label: 'Plus d’offres' },
-              { key: 'policies',    label: 'Politiques' },
-            ] as const).map(t => (
-              <Pressable key={t.key} onPress={() => setActiveTab(t.key)} style={{ paddingBottom: 10, borderBottomWidth: 2, borderBottomColor: activeTab === t.key ? LMX.brand : 'transparent' }}>
-                <Text style={{ fontSize: 13, fontFamily: sans(activeTab === t.key ? 700 : 500), color: activeTab === t.key ? LMX.brand : LMX.ink70 }}>{t.label}</Text>
+              { key: 'description', label: t('Description') },
+              { key: 'reviews',     label: t('Avis ({n})', { n: tabs?.reviews.count ?? 0 }) },
+              { key: 'offers',      label: t('Plus d’offres') },
+              { key: 'policies',    label: t('Politiques') },
+            ] as const).map(tb => (
+              <Pressable key={tb.key} onPress={() => setActiveTab(tb.key)} style={{ paddingBottom: 10, borderBottomWidth: 2, borderBottomColor: activeTab === tb.key ? LMX.brand : 'transparent' }}>
+                <Text style={{ fontSize: 13, fontFamily: sans(activeTab === tb.key ? 700 : 500), color: activeTab === tb.key ? LMX.brand : LMX.ink70 }}>{tb.label}</Text>
               </Pressable>
             ))}
           </ScrollView>
@@ -355,7 +397,7 @@ export function ScreenProductDetail() {
             {/* Description */}
             {activeTab === 'description' && (
               <Text style={{ fontSize: 13, lineHeight: 20, color: LMX.ink70 }}>
-                {decodeEntities(tabs?.description || p.description || p.short_desc || 'Aucune description.')}
+                {decodeEntities(tabs?.description || p.description || p.short_desc || t('Aucune description.'))}
               </Text>
             )}
 
@@ -364,7 +406,7 @@ export function ScreenProductDetail() {
               <View style={{ gap: 14 }}>
                 {/* Write a review */}
                 <View style={{ backgroundColor: LMX.surface, borderRadius: 12, borderWidth: 1, borderColor: LMX.border, padding: 14, gap: 10 }}>
-                  <Text style={{ fontSize: 12.5, fontFamily: sans(700) }}>Donner votre avis</Text>
+                  <Text style={{ fontSize: 12.5, fontFamily: sans(700) }}>{t('Donner votre avis')}</Text>
                   <View style={{ flexDirection: 'row', gap: 4 }}>
                     {[1,2,3,4,5].map(s => (
                       <Pressable key={s} onPress={() => setReviewRating(s)}>
@@ -372,12 +414,12 @@ export function ScreenProductDetail() {
                       </Pressable>
                     ))}
                   </View>
-                  <Field label="Votre avis" value={reviewText} onChangeText={setReviewText} placeholder="Partagez votre expérience…" />
-                  <Button variant="primary" size="md" onPress={submitReview} disabled={reviewBusy}>{reviewBusy ? 'Publication...' : 'Publier mon avis'}</Button>
+                  <Field label={t('Votre avis')} value={reviewText} onChangeText={setReviewText} placeholder={t('Partagez votre expérience…')} />
+                  <Button variant="primary" size="md" onPress={submitReview} disabled={reviewBusy}>{reviewBusy ? t('Publication...') : t('Publier mon avis')}</Button>
                 </View>
                 {/* Existing reviews */}
                 {(tabs?.reviews.items.length ?? 0) === 0
-                  ? <Text style={{ fontSize: 13, color: LMX.ink50 }}>Soyez le premier à donner votre avis.</Text>
+                  ? <Text style={{ fontSize: 13, color: LMX.ink50 }}>{t('Soyez le premier à donner votre avis.')}</Text>
                   : <View style={{ gap: 12 }}>
                     {tabs!.reviews.items.map((r, i) => (
                       <View key={i} style={{ backgroundColor: LMX.surface, borderRadius: 12, borderWidth: 1, borderColor: LMX.border, padding: 12 }}>
@@ -398,14 +440,14 @@ export function ScreenProductDetail() {
             {/* More offers */}
             {activeTab === 'offers' && (
               (tabs?.more_offers.length ?? 0) === 0
-                ? <Text style={{ fontSize: 13, color: LMX.ink50 }}>Aucune autre offre pour ce produit.</Text>
+                ? <Text style={{ fontSize: 13, color: LMX.ink50 }}>{t('Aucune autre offre pour ce produit.')}</Text>
                 : <View style={{ gap: 10 }}>
                     {tabs!.more_offers.map(o => (
                       <Pressable key={o.product_id} onPress={() => nav.push('ProductDetail', { productId: o.product_id })} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: LMX.surface, borderRadius: 12, borderWidth: 1, borderColor: LMX.border, padding: 12 }}>
                         <View style={{ width: 32, height: 32, borderRadius: 9, backgroundColor: LMX.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}><Icon name="storefront" size={15} color={LMX.ink} /></View>
                         <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 12.5, fontFamily: sans(600) }}>{decodeEntities(o.store) || 'Vendeur'}</Text>
-                          <Text style={{ fontSize: 11, color: o.in_stock ? LMX.emerald : LMX.ink50, marginTop: 2 }}>{o.in_stock ? 'En stock' : 'Rupture'}</Text>
+                          <Text style={{ fontSize: 12.5, fontFamily: sans(600) }}>{decodeEntities(o.store) || t('Vendeur')}</Text>
+                          <Text style={{ fontSize: 11, color: o.in_stock ? LMX.emerald : LMX.ink50, marginTop: 2 }}>{o.in_stock ? t('En stock') : t('Rupture')}</Text>
                         </View>
                         <Text style={{ fontFamily: mono(600), fontSize: 12.5, color: LMX.accent }}>{gnf(o.price)}</Text>
                       </Pressable>
@@ -417,11 +459,11 @@ export function ScreenProductDetail() {
             {activeTab === 'policies' && (() => {
               const pol = tabs?.store.policies;
               const rows = [
-                { label: 'Livraison', value: pol?.shipping },
-                { label: 'Remboursement', value: pol?.refund },
-                { label: 'Échange / Retour', value: pol?.exchange },
+                { label: t('Livraison'), value: pol?.shipping },
+                { label: t('Remboursement'), value: pol?.refund },
+                { label: t('Échange / Retour'), value: pol?.exchange },
               ].filter(r => r.value);
-              if (rows.length === 0) return <Text style={{ fontSize: 13, color: LMX.ink50 }}>Aucune politique renseignée par le vendeur.</Text>;
+              if (rows.length === 0) return <Text style={{ fontSize: 13, color: LMX.ink50 }}>{t('Aucune politique renseignée par le vendeur.')}</Text>;
               return (
                 <View style={{ gap: 14 }}>
                   {!!tabs?.store.name && <Text style={{ fontSize: 12.5, fontFamily: sans(600), color: LMX.ink }}>{decodeEntities(tabs.store.name)}</Text>}
@@ -468,7 +510,7 @@ export function ScreenSellerStorefront() {
     })();
   }, [vendorId]);
 
-  const name   = vendor?.name  ?? 'Vendeur';
+  const name   = vendor?.name  ?? t('Vendeur');
   const logo   = vendor?.logo  ?? null;
   const rating = vendor?.rating?.avg ?? 0;
   const reviews= vendor?.rating?.count ?? 0;
@@ -505,25 +547,25 @@ export function ScreenSellerStorefront() {
                 </View>
                 {vendor?.address?.city && (
                   <Text style={{ fontSize: 12, color: LMX.ink70, marginTop: 4 }}>
-                    <Text style={{ color: LMX.emerald, fontFamily: sans(600) }}>● Actif</Text> · {vendor.address.city}, Guinée
+                    <Text style={{ color: LMX.emerald, fontFamily: sans(600) }}>{t('● Actif')}</Text> · {vendor.address.city}, {t('Guinée')}
                   </Text>
                 )}
               </View>
-              <Button variant="primary" size="sm">Suivre</Button>
+              <Button variant="primary" size="sm">{t('Suivre')}</Button>
             </View>
 
             <View style={{ flexDirection: 'row', gap: 8, marginTop: 14, paddingVertical: 14, borderTopWidth: 1, borderBottomWidth: 1, borderColor: LMX.hairline }}>
               <View style={{ flex: 1, alignItems: 'center' }}>
                 <Text style={{ fontFamily: mono(600), fontSize: 17 }}>{rating > 0 ? rating.toFixed(2) : '—'}</Text>
-                <Text style={{ fontSize: 9.5, color: LMX.ink50, marginTop: 2, textTransform: 'uppercase', fontFamily: sans(600) }}>Note</Text>
+                <Text style={{ fontSize: 9.5, color: LMX.ink50, marginTop: 2, textTransform: 'uppercase', fontFamily: sans(600) }}>{t('Note')}</Text>
               </View>
               <View style={{ flex: 1, alignItems: 'center' }}>
                 <Text style={{ fontFamily: mono(600), fontSize: 17 }}>{reviews}</Text>
-                <Text style={{ fontSize: 9.5, color: LMX.ink50, marginTop: 2, textTransform: 'uppercase', fontFamily: sans(600) }}>Avis</Text>
+                <Text style={{ fontSize: 9.5, color: LMX.ink50, marginTop: 2, textTransform: 'uppercase', fontFamily: sans(600) }}>{t('Avis')}</Text>
               </View>
               <View style={{ flex: 1, alignItems: 'center' }}>
                 <Text style={{ fontFamily: mono(600), fontSize: 17 }}>{products.length}</Text>
-                <Text style={{ fontSize: 9.5, color: LMX.ink50, marginTop: 2, textTransform: 'uppercase', fontFamily: sans(600) }}>Produits</Text>
+                <Text style={{ fontSize: 9.5, color: LMX.ink50, marginTop: 2, textTransform: 'uppercase', fontFamily: sans(600) }}>{t('Produits')}</Text>
               </View>
             </View>
 
@@ -534,7 +576,7 @@ export function ScreenSellerStorefront() {
 
           <View style={{ paddingHorizontal: 16, paddingTop: 16, flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
             {products.length === 0
-              ? <Text style={{ color: LMX.ink50, fontSize: 13 }}>Aucun produit disponible.</Text>
+              ? <Text style={{ color: LMX.ink50, fontSize: 13 }}>{t('Aucun produit disponible.')}</Text>
               : products.map(p => (
                   <View key={p.id} style={{ width: '47.5%' }}>
                     <ProductCard
@@ -592,7 +634,7 @@ export function ScreenCart() {
     if (!coupon.trim()) return;
     setCouponBusy(true);
     try { await applyCoupon(coupon.trim()); setCoupon(''); }
-    catch (e: any) { Alert.alert('Code promo', e?.message ?? 'Code invalide.'); }
+    catch (e: any) { Alert.alert(t('Code promo'), friendlyError(e, t('Code invalide.'))); }
     finally { setCouponBusy(false); }
   };
 
@@ -604,12 +646,12 @@ export function ScreenCart() {
   return (
     <Screen footer={
       cart.item_count > 0
-        ? <Button full variant="accent" size="lg" icon="arrowR" onPress={() => nav.navigate('Checkout')}>{`Commander · ${gnfShort(cart.total)} GNF`}</Button>
+        ? <Button full variant="accent" size="lg" icon="arrowR" onPress={() => nav.navigate('Checkout')}>{t('Commander · {amount} GNF', { amount: gnfShort(cart.total) })}</Button>
         : null
     }>
       <AppBar
         left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />}
-        title={`Panier · ${cart.item_count} article${cart.item_count !== 1 ? 's' : ''}`}
+        title={cart.item_count !== 1 ? t('Panier · {n} articles', { n: cart.item_count }) : t('Panier · {n} article', { n: cart.item_count })}
         right={<IconBtn icon="receipt" />}
       />
 
@@ -620,9 +662,9 @@ export function ScreenCart() {
       ) : cart.items.length === 0 ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 16 }}>
           <Icon name="bag" size={52} color={LMX.ink30} />
-          <Text style={{ fontSize: 18, fontFamily: sans(600), color: LMX.ink, textAlign: 'center' }}>Votre panier est vide</Text>
-          <Text style={{ fontSize: 13, color: LMX.ink70, textAlign: 'center' }}>Ajoutez des produits pour commencer vos achats.</Text>
-          <Button variant="accent" onPress={() => nav.navigate('Main')}>Découvrir des produits</Button>
+          <Text style={{ fontSize: 18, fontFamily: sans(600), color: LMX.ink, textAlign: 'center' }}>{t('Votre panier est vide')}</Text>
+          <Text style={{ fontSize: 13, color: LMX.ink70, textAlign: 'center' }}>{t('Ajoutez des produits pour commencer vos achats.')}</Text>
+          <Button variant="accent" onPress={() => nav.navigate('Main')}>{t('Découvrir des produits')}</Button>
         </View>
       ) : (
         <>
@@ -631,11 +673,11 @@ export function ScreenCart() {
             <View style={{ backgroundColor: LMX.surface, borderRadius: LMX.r.lg, padding: 14, borderWidth: 1, borderColor: LMX.border }}>
               {remaining > 0 ? (
                 <Text style={{ fontSize: 12.5, fontFamily: sans(500) }}>
-                  Encore <Text style={{ fontFamily: mono(600) }}>{fr(remaining)}</Text> GNF pour la{' '}
-                  <Text style={{ color: LMX.emerald, fontFamily: sans(600) }}>livraison gratuite</Text>
+                  {t('Encore')} <Text style={{ fontFamily: mono(600) }}>{fr(remaining)}</Text> {t('GNF pour la')}{' '}
+                  <Text style={{ color: LMX.emerald, fontFamily: sans(600) }}>{t('livraison gratuite')}</Text>
                 </Text>
               ) : (
-                <Text style={{ fontSize: 12.5, fontFamily: sans(600), color: LMX.emerald }}>🎉 Livraison gratuite débloquée !</Text>
+                <Text style={{ fontSize: 12.5, fontFamily: sans(600), color: LMX.emerald }}>{t('🎉 Livraison gratuite débloquée !')}</Text>
               )}
               <View style={{ height: 4, borderRadius: 2, backgroundColor: LMX.ink10, marginTop: 10, overflow: 'hidden' }}>
                 <View style={{ width: `${progressPct * 100}%`, height: '100%', backgroundColor: LMX.emerald }} />
@@ -676,7 +718,7 @@ export function ScreenCart() {
               <TextInput
                 value={coupon}
                 onChangeText={setCoupon}
-                placeholder="Code promo ou bon"
+                placeholder={t('Code promo ou bon')}
                 placeholderTextColor={LMX.ink50}
                 autoCapitalize="characters"
                 returnKeyType="done"
@@ -684,7 +726,7 @@ export function ScreenCart() {
                 style={{ flex: 1, fontSize: 13, color: LMX.ink, fontFamily: sans(500), padding: 0 }}
               />
               <Pressable onPress={onApplyCoupon} disabled={couponBusy} style={{ paddingHorizontal: 14, paddingVertical: 9, borderRadius: 10, backgroundColor: LMX.brand }}>
-                <Text style={{ color: '#fff', fontFamily: sans(600), fontSize: 12.5 }}>{couponBusy ? '...' : 'Appliquer'}</Text>
+                <Text style={{ color: '#fff', fontFamily: sans(600), fontSize: 12.5 }}>{couponBusy ? '...' : t('Appliquer')}</Text>
               </Pressable>
             </View>
             {cart.coupons.length > 0 && (
@@ -701,12 +743,12 @@ export function ScreenCart() {
 
           {/* Summary */}
           <View style={{ paddingHorizontal: 16, paddingTop: 8 }}>
-            <SummaryRow label="Sous-total" value={cart.subtotal} />
-            {cart.discount_total > 0 && <SummaryRow label="Réduction" value={-cart.discount_total} accent />}
-            <SummaryRow label="Livraison (Conakry)" value={remaining > 0 ? delivery : 0} />
+            <SummaryRow label={t('Sous-total')} value={cart.subtotal} />
+            {cart.discount_total > 0 && <SummaryRow label={t('Réduction')} value={-cart.discount_total} accent />}
+            <SummaryRow label={t('Livraison (Conakry)')} value={remaining > 0 ? delivery : 0} />
             <View style={{ height: 1, backgroundColor: LMX.hairline, marginVertical: 12 }} />
             <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
-              <Text style={{ fontSize: 13, fontFamily: sans(600) }}>Total</Text>
+              <Text style={{ fontSize: 13, fontFamily: sans(600) }}>{t('Total')}</Text>
               <Price value={cart.total + (remaining > 0 ? delivery : 0)} size="lg" />
             </View>
           </View>
@@ -739,8 +781,8 @@ export function ScreenCheckout() {
   // Billing
   const [firstName, setFirstName] = useState(user?.first_name ?? '');
   const [lastName, setLastName]   = useState(user?.last_name ?? '');
-  const [phone, setPhone]         = useState(user?.phone ?? '');
-  const [whatsapp, setWhatsapp]   = useState(user?.phone ?? '');
+  const [phone, setPhone]         = useState(toE164(user?.phone));
+  const [whatsapp, setWhatsapp]   = useState(toE164(user?.phone));
   // Guests have no account email — collect it (optional) for the receipt + account offer
   const [email, setEmail]         = useState(user?.email ?? '');
   // Recipient — the person who actually receives the parcel. Customers here often
@@ -751,8 +793,17 @@ export function ScreenCheckout() {
   const [zoneKey, setZoneKey]         = useState('');
   const [communeKey, setCommuneKey]   = useState('');
   const [neighborhood, setNeighborhood] = useState('');
+  const [subsector, setSubsector]     = useState('');
   const [landmark, setLandmark]       = useState('');
   const [notes, setNotes]             = useState('');
+  const [express, setExpress]         = useState(false);
+  // Live server quote (the fee is never computed on the device)
+  const [quote, setQuote]               = useState<DeliveryQuote | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [quoteError, setQuoteError]     = useState<string | null>(null);
+  const [quoteNonce, setQuoteNonce]     = useState(0);
+  const quoteReq = useRef(0);
+  const [pricingMode, setPricingMode]   = useState<'zone' | 'distance'>('zone');
   // Misc
   // Without online payment there's no "pay online from abroad" path, so skip the region
   // step entirely and treat everyone as the local (Guinea, COD + wallet) flow.
@@ -768,7 +819,7 @@ export function ScreenCheckout() {
 
   useEffect(() => {
     checkoutApi.zones()
-      .then(d => { setZones(d.zones ?? []); })
+      .then(d => { setZones(d.zones ?? []); setPricingMode(d.pricing_mode ?? 'zone'); })
       .catch(() => {});
     configApi.get().then(c => setMapsKey(c.google_maps_key ?? '')).catch(() => {});
   }, []);
@@ -781,9 +832,9 @@ export function ScreenCheckout() {
       if (!alive || !d) return;
       if (d.first_name)   setFirstName(p => p || d.first_name);
       if (d.last_name)    setLastName(p => p || d.last_name);
-      if (d.phone)        setPhone(p => p || d.phone);
-      if (d.whatsapp)     setWhatsapp(p => p || d.whatsapp);
-      else if (d.phone)   setWhatsapp(p => p || d.phone);
+      if (d.phone)        setPhone(p => p || toE164(d.phone));
+      if (d.whatsapp)     setWhatsapp(p => p || toE164(d.whatsapp));
+      else if (d.phone)   setWhatsapp(p => p || toE164(d.phone));
       if (d.zone)         setZoneKey(p => p || d.zone);
       if (d.commune)      setCommuneKey(p => p || d.commune);
       if (d.neighborhood) setNeighborhood(p => p || d.neighborhood);
@@ -796,9 +847,46 @@ export function ScreenCheckout() {
   const communes = zone?.communes ?? [];
   const commune  = communes.find(c => c.key === communeKey);
   const hoods    = commune?.neighborhoods ?? [];
-  const delivery = zone?.price ?? 0;
+  const subsectors = commune?.areas?.find(a => a.name === neighborhood)?.subsectors ?? [];
+  const expressOption = quote?.express_option?.enabled ? quote.express_option : null;
+  const addressReady = !!zoneKey && !!communeKey && !!neighborhood;
+  const delivery = quote?.total ?? 0;
   const subtotal = cart.subtotal;
   const total    = subtotal + delivery - (cart.discount_total || 0);
+  const itemsKey = cart.items.map(i => `${i.product_id}x${i.qty}`).join(',');
+
+  // Debounced live quote whenever the address, pin, cart or express choice changes
+  useEffect(() => {
+    if (!addressReady || cart.items.length === 0) {
+      quoteReq.current++;
+      setQuote(null); setQuoteError(null); setQuoteLoading(false);
+      return;
+    }
+    const id = ++quoteReq.current;
+    setQuoteLoading(true);
+    setQuoteError(null);
+    const timer = setTimeout(() => {
+      checkoutApi.quote({
+        items: cart.items.map(i => ({ product_id: i.product_id, qty: i.qty })),
+        zone: zoneKey, commune: communeKey, neighborhood,
+        ...(subsector ? { subsector } : {}),
+        ...(pickedLoc ? { dest_lat: pickedLoc.lat, dest_lng: pickedLoc.lng } : {}),
+        express,
+      })
+        .then(q => { if (id === quoteReq.current) { setQuote(q); setQuoteError(null); } })
+        .catch(e => { if (id === quoteReq.current) { setQuote(null); setQuoteError(friendlyError(e, t('Impossible de calculer les frais de livraison.'))); } })
+        .finally(() => { if (id === quoteReq.current) setQuoteLoading(false); });
+    }, 400);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [addressReady, zoneKey, communeKey, neighborhood, subsector, pickedLoc?.lat, pickedLoc?.lng, express, itemsKey, quoteNonce]);
+
+  // Express no longer offered for this quote: drop the choice
+  useEffect(() => {
+    if (quote && !quote.express_option?.enabled && express) setExpress(false);
+  }, [quote, express]);
+
+  const quoteBlocking = addressReady && cart.items.length > 0 && (quoteLoading || (!quote && !quoteError));
   const walletBalance = user?.wallet ?? 0;
   // Wallet is account-only — guests can't use it
   const paymentMethods = PAYMENT_METHODS.filter(m => {
@@ -813,13 +901,16 @@ export function ScreenCheckout() {
     const z = zones.find(zz => zz.key === key);
     setCommuneKey(z && z.communes.length === 1 ? z.communes[0].key : '');
     setNeighborhood('');
+    setSubsector('');
   };
-  const onCommuneChange = (key: string) => { setCommuneKey(key); setNeighborhood(''); };
+  const onCommuneChange = (key: string) => { setCommuneKey(key); setNeighborhood(''); setSubsector(''); };
+  const onHoodChange = (name: string) => { setNeighborhood(name); setSubsector(''); };
 
   const placeOrder = async () => {
     // Guests are allowed — no login gate. Order goes through the guest endpoint.
-    if (cart.items.length === 0) { Alert.alert('Panier vide'); return; }
-    if (!region) { Alert.alert('Localisation requise', 'Indiquez si vous êtes en Guinée ou à l\'étranger.'); return; }
+    if (cart.items.length === 0) { Alert.alert(t('Panier vide')); return; }
+    if (quoteBlocking) return;
+    if (!region) { Alert.alert(t('Localisation requise'), t("Indiquez si vous êtes en Guinée ou à l'étranger.")); return; }
     const missing =
       !firstName.trim() ? 'le prénom' :
       !phone.trim()     ? 'le téléphone' :
@@ -828,7 +919,7 @@ export function ScreenCheckout() {
       !communeKey       ? 'la commune' :
       !neighborhood     ? 'le quartier' :
       !landmark.trim()  ? 'le point de repère' : '';
-    if (missing) { Alert.alert('Champ requis', `Veuillez renseigner ${missing}.`); return; }
+    if (missing) { Alert.alert(t('Champ requis'), t('Veuillez renseigner {field}.', { field: t(missing) })); return; }
 
     setPlacing(true);
     try {
@@ -839,7 +930,11 @@ export function ScreenCheckout() {
         recipient_same: recipientSame,
         recipient_phone: recipientSame ? phone : recipientPhone.trim(),
       };
-      const locParams = pickedLoc ? { dest_lat: pickedLoc.lat, dest_lng: pickedLoc.lng } : {};
+      const locParams = {
+        ...(pickedLoc ? { dest_lat: pickedLoc.lat, dest_lng: pickedLoc.lng } : {}),
+        ...(subsector ? { subsector } : {}),
+        express: !!(express && expressOption),
+      };
 
       let res;
       if (isGuest) {
@@ -867,7 +962,7 @@ export function ScreenCheckout() {
         nav.navigate('OrderSuccess', { orderId: res.order.id, orderNumber: res.order.number, guestEmail: isGuest ? billing.email : '' });
       }
     } catch (e: any) {
-      Alert.alert('Erreur', e.message ?? 'Impossible de passer la commande. Réessayez.');
+      Alert.alert(t('Erreur'), friendlyError(e, t('Impossible de passer la commande. Réessayez.')));
     } finally {
       setPlacing(false);
     }
@@ -877,7 +972,7 @@ export function ScreenCheckout() {
   if (payUrl) {
     return (
       <Screen scroll={false} padTop={false}>
-        <AppBar left={<IconBtn icon="close" onPress={() => { setPayUrl(null); nav.navigate(isGuest ? 'Main' : 'OrdersList'); }} />} title="Paiement sécurisé" />
+        <AppBar left={<IconBtn icon="close" onPress={() => { setPayUrl(null); nav.navigate(isGuest ? 'Main' : 'OrdersList'); }} />} title={t('Paiement sécurisé')} />
         <WebView
           source={{ uri: payUrl }}
           startInLoadingState
@@ -900,25 +995,27 @@ export function ScreenCheckout() {
 
   return (
     <Screen footer={
-      <Button full variant="accent" size="lg" onPress={placeOrder} disabled={placing || !region}>
+      <Button full variant="accent" size="lg" onPress={placeOrder} disabled={placing || !region || quoteBlocking}>
         {placing
           ? <ActivityIndicator color="#fff" />
+          : region && quoteBlocking
+            ? <Text style={{ color: '#fff', fontFamily: sans(600), fontSize: 15 }}>{t('Calcul des frais…')}</Text>
           : !region
-            ? <Text style={{ color: '#fff', fontFamily: sans(600), fontSize: 15 }}>Choisissez votre localisation</Text>
-            : <><Icon name="shield" size={16} color="#fff" /><Text style={{ color: '#fff', fontFamily: sans(600), fontSize: 15 }}> Commander · {gnfShort(total)} GNF</Text></>
+            ? <Text style={{ color: '#fff', fontFamily: sans(600), fontSize: 15 }}>{t('Choisissez votre localisation')}</Text>
+            : <><Icon name="shield" size={16} color="#fff" /><Text style={{ color: '#fff', fontFamily: sans(600), fontSize: 15 }}>{' ' + t('Commander · {amount} GNF', { amount: gnfShort(total) })}</Text></>
         }
       </Button>
     }>
-      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title="Commander" />
+      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title={t('Commander')} />
 
       {/* Region selector — only relevant when online payment is available */}
       {ONLINE_PAYMENT_ENABLED && (
       <View style={{ paddingHorizontal: 16, paddingTop: 6, paddingBottom: 6 }}>
-        <Text style={{ fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600), marginBottom: 10 }}>Où êtes-vous ?</Text>
+        <Text style={{ fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600), marginBottom: 10 }}>{t('Où êtes-vous ?')}</Text>
         <View style={{ flexDirection: 'row', gap: 10 }}>
           {([
-            { id: 'guinea',        icon: '🇬🇳', title: 'Je suis en Guinée',     sub: 'Payez les frais de livraison pour réserver le livreur — produit payé à la livraison.' },
-            { id: 'international',  icon: '🌍', title: "Je suis à l'étranger",  sub: 'Pour un proche en Guinée — payez le montant total en ligne.' },
+            { id: 'guinea',        icon: '🇬🇳', title: t('Je suis en Guinée'),     sub: t('Payez les frais de livraison pour réserver le livreur — produit payé à la livraison.') },
+            { id: 'international',  icon: '🌍', title: t("Je suis à l'étranger"),  sub: t('Pour un proche en Guinée — payez le montant total en ligne.') },
           ] as const).map(r => {
             const active = region === r.id;
             return (
@@ -941,23 +1038,23 @@ export function ScreenCheckout() {
 
       {/* Billing details */}
       <View style={{ paddingHorizontal: 16, paddingBottom: 6 }}>
-        <Text style={{ fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600), marginBottom: 10 }}>Coordonnées</Text>
+        <Text style={{ fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600), marginBottom: 10 }}>{t('Coordonnées')}</Text>
         <View style={{ gap: 12 }}>
           <View style={{ flexDirection: 'row', gap: 10 }}>
-            <View style={{ flex: 1 }}><Field label="Prénom *" value={firstName} onChangeText={setFirstName} /></View>
-            <View style={{ flex: 1 }}><Field label="Nom" value={lastName} onChangeText={setLastName} /></View>
+            <View style={{ flex: 1 }}><Field label={t('Prénom *')} value={firstName} onChangeText={setFirstName} /></View>
+            <View style={{ flex: 1 }}><Field label={t('Nom')} value={lastName} onChangeText={setLastName} /></View>
           </View>
-          <Field label="Numéro de téléphone *" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
-          <Field label="Numéro WhatsApp" value={whatsapp} onChangeText={setWhatsapp} keyboardType="phone-pad" />
+          <PhoneInput label={t('Numéro de téléphone *')} value={phone} onChange={setPhone} />
+          <PhoneInput label={t('Numéro WhatsApp')} value={whatsapp} onChange={setWhatsapp} />
           {isGuest && (
-            <Field label="Email (optionnel — pour le lien de suivi)" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+            <Field label={t('Email (optionnel — pour le lien de suivi)')} value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
           )}
         </View>
       </View>
 
       {/* Recipient — often a relative or friend rather than the buyer */}
       <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 6 }}>
-        <Text style={{ fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600), marginBottom: 10 }}>Destinataire</Text>
+        <Text style={{ fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600), marginBottom: 10 }}>{t('Destinataire')}</Text>
         <View style={{ gap: 12 }}>
           <Pressable
             onPress={() => setRecipientSame(v => !v)}
@@ -972,70 +1069,106 @@ export function ScreenCheckout() {
               {recipientSame && <Icon name="check" size={13} color="#fff" />}
             </View>
             <Text style={{ flex: 1, fontSize: 12.5, color: LMX.ink70, fontFamily: sans(500) }}>
-              Le destinataire est la même personne que le client
+              {t('Le destinataire est la même personne que le client')}
             </Text>
           </Pressable>
 
           {!recipientSame && (
-            <Field
-              label="Téléphone du destinataire *"
+            <PhoneInput
+              label={t('Téléphone du destinataire *')}
               value={recipientPhone}
-              onChangeText={setRecipientPhone}
-              keyboardType="phone-pad"
+              onChange={setRecipientPhone}
             />
           )}
 
           <Text style={{ fontSize: 11, color: LMX.ink50, lineHeight: 15 }}>
             {recipientSame
-              ? 'Le livreur vous appellera sur votre numéro et le code de livraison vous sera envoyé.'
-              : 'Ce numéro sera utilisé pour les appels du livreur, le code de livraison (OTP) et la demande de position.'}
+              ? t('Le livreur vous appellera sur votre numéro et le code de livraison vous sera envoyé.')
+              : t('Ce numéro sera utilisé pour les appels du livreur, le code de livraison (OTP) et la demande de position.')}
           </Text>
         </View>
       </View>
 
       {/* Delivery details */}
       <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 6 }}>
-        <Text style={{ fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600), marginBottom: 10 }}>Livraison</Text>
+        <Text style={{ fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600), marginBottom: 10 }}>{t('Livraison')}</Text>
         <View style={{ gap: 12 }}>
           <View>
-            <Text style={{ fontSize: 12, color: LMX.ink70, fontFamily: sans(500), marginBottom: 8 }}>Pays / Région</Text>
+            <Text style={{ fontSize: 12, color: LMX.ink70, fontFamily: sans(500), marginBottom: 8 }}>{t('Pays / Région')}</Text>
             <View style={{ height: 54, borderRadius: 14, borderWidth: 1, borderColor: LMX.border, backgroundColor: LMX.surfaceAlt, justifyContent: 'center', paddingHorizontal: 16 }}>
-              <Text style={{ fontSize: 14.5, fontFamily: sans(500), color: LMX.ink }}>Guinée</Text>
+              <Text style={{ fontSize: 14.5, fontFamily: sans(500), color: LMX.ink }}>{t('Guinée')}</Text>
             </View>
           </View>
           <Picker
-            label="Zone de livraison" required value={zoneKey} onChange={onZoneChange}
-            placeholder="Sélectionner une zone"
-            options={zones.map(z => ({ value: z.key, label: `${z.label} — ${fr(z.price)} GNF` }))}
+            label={t('Zone de livraison')} required value={zoneKey} onChange={onZoneChange}
+            placeholder={t('Sélectionner une zone')}
+            options={zones.map(z => ({ value: z.key, label: pricingMode === 'distance' ? z.label : `${z.label} — ${fr(z.price)} GNF` }))}
           />
           <Picker
-            label="Commune" required value={communeKey} onChange={onCommuneChange}
-            placeholder={zoneKey ? 'Sélectionner une commune' : 'Choisissez d’abord une zone'}
+            label={t('Commune')} required value={communeKey} onChange={onCommuneChange}
+            placeholder={zoneKey ? t('Sélectionner une commune') : t('Choisissez d’abord une zone')}
             disabled={!zoneKey}
             options={communes.map(c => ({ value: c.key, label: c.label }))}
           />
           <Picker
-            label="Quartier" required value={neighborhood} onChange={setNeighborhood}
-            placeholder={communeKey ? 'Sélectionner un quartier' : 'Choisissez d’abord une commune'}
+            label={t('Quartier')} required value={neighborhood} onChange={onHoodChange}
+            placeholder={communeKey ? t('Sélectionner un quartier') : t('Choisissez d’abord une commune')}
             disabled={!communeKey}
             options={hoods.map(h => ({ value: h, label: h }))}
           />
-          <Field label="Point de repère *" value={landmark} onChangeText={setLandmark} placeholder="Près de la mosquée, portail bleu…" />
+          {subsectors.length > 0 && (
+            <Picker
+              label={t('Sous-secteur (optionnel)')} value={subsector} onChange={setSubsector}
+              placeholder={t('Sélectionner un sous-secteur')}
+              options={[{ value: '', label: t('Aucun / je ne sais pas') }, ...subsectors.map(ss => ({ value: ss.key, label: ss.name }))]}
+            />
+          )}
+          <Field label={t('Point de repère *')} value={landmark} onChangeText={setLandmark} placeholder={t('Près de la mosquée, portail bleu…')} />
           {mapsKey ? (
             <View>
               <Text style={{ fontSize: 12, color: LMX.ink70, fontFamily: sans(500), marginBottom: 8 }}>
-                Position exacte <Text style={{ color: LMX.ink50 }}>(optionnel)</Text>
+                {t('Position exacte')} <Text style={{ color: LMX.ink50 }}>{t('(optionnel)')}</Text>
               </Text>
               <LocationPicker mapsKey={mapsKey} value={pickedLoc} onChange={setPickedLoc} />
             </View>
           ) : null}
-          <Field label="Notes de commande (optionnel)" value={notes} onChangeText={setNotes} placeholder="Instructions spéciales pour la livraison" />
+          {expressOption && (
+            <Pressable
+              onPress={() => setExpress(v => !v)}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: LMX.r.lg, borderWidth: express ? 2 : 1, borderColor: express ? LMX.brand : LMX.border, backgroundColor: express ? LMX.brandSoft : LMX.surface }}
+            >
+              <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: LMX.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name="flame" size={18} color={LMX.accent} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 13.5, fontFamily: sans(600), color: LMX.ink }}>{t('Livraison express')}</Text>
+                <Text style={{ fontSize: 11.5, color: LMX.ink50, marginTop: 2 }}>{t('+ {amount} GNF · livraison prioritaire', { amount: fr(expressOption.fee) })}</Text>
+              </View>
+              <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: express ? LMX.brand : LMX.border, backgroundColor: express ? LMX.brand : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
+                {express && <Icon name="check" size={13} color="#fff" />}
+              </View>
+            </Pressable>
+          )}
+          {addressReady && (
+            <View>
+              <FeeBreakdown
+                quote={quote}
+                loading={quoteLoading}
+                error={quoteError}
+                onRetry={() => setQuoteNonce(n => n + 1)}
+              />
+              {!quote && !!quoteError && !quoteLoading && (
+                <Notice text={t('Frais à confirmer par le service client. Vous pouvez tout de même commander.')} />
+              )}
+            </View>
+          )}
+          <Field label={t('Notes de commande (optionnel)')} value={notes} onChangeText={setNotes} placeholder={t('Instructions spéciales pour la livraison')} />
         </View>
       </View>
 
       {/* Payment methods */}
       <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 14 }}>
-        <Text style={{ fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600), marginBottom: 10 }}>Mode de paiement</Text>
+        <Text style={{ fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600), marginBottom: 10 }}>{t('Mode de paiement')}</Text>
         <View style={{ gap: 10 }}>
           {(region === 'international' ? paymentMethods.filter(m => m.id === 'card') : paymentMethods).map(m => (
             <Pressable key={m.id} onPress={() => setPayMethod(m.id)}>
@@ -1043,11 +1176,11 @@ export function ScreenCheckout() {
                 <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: LMX.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}><Icon name={m.icon} size={20} color={LMX.ink} /></View>
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Text style={{ fontSize: 13.5, fontFamily: sans(600) }}>{m.title}</Text>
-                    {m.badge && <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: LMX.emerald }}><Text style={{ fontSize: 9, fontFamily: sans(700), color: '#fff' }}>{m.badge}</Text></View>}
+                    <Text style={{ fontSize: 13.5, fontFamily: sans(600) }}>{t(m.title)}</Text>
+                    {m.badge && <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: LMX.emerald }}><Text style={{ fontSize: 9, fontFamily: sans(700), color: '#fff' }}>{t(m.badge)}</Text></View>}
                   </View>
                   <Text style={{ fontSize: 11.5, color: m.id === 'wallet' && walletBalance < total ? LMX.rose : LMX.ink50, marginTop: 2 }}>
-                    {m.id === 'wallet' ? `Solde : ${fr(walletBalance)} GNF${total > 0 && walletBalance < total ? ' · insuffisant' : ''}` : m.sub}
+                    {m.id === 'wallet' ? t('Solde : {amount} GNF', { amount: fr(walletBalance) }) + (total > 0 && walletBalance < total ? ' · ' + t('insuffisant') : '') : t(m.sub)}
                   </Text>
                 </View>
                 <View style={{ width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: payMethod === m.id ? LMX.brand : LMX.border, backgroundColor: payMethod === m.id ? LMX.brand : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
@@ -1073,17 +1206,17 @@ export function ScreenCheckout() {
                 'Livraison rapide à Conakry (3h–48h)',
                 'Livraison sécurisée vérifiée par OTP',
               ]
-          ).map(t => (
-            <View key={t} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+          ).map(line => (
+            <View key={line} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
               <Icon name="checkCircle" size={14} color={LMX.emerald} />
-              <Text style={{ flex: 1, fontSize: 11.5, color: LMX.ink70, lineHeight: 16 }}>{t}</Text>
+              <Text style={{ flex: 1, fontSize: 11.5, color: LMX.ink70, lineHeight: 16 }}>{t(line)}</Text>
             </View>
           ))}
         </View>
 
         {/* Accepted payment methods — only what the app actually supports */}
         <View style={{ marginTop: 14 }}>
-          <Text style={{ fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600), marginBottom: 8 }}>Paiements acceptés</Text>
+          <Text style={{ fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600), marginBottom: 8 }}>{t('Paiements acceptés')}</Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
             {[
               'Paiement à la livraison',
@@ -1092,7 +1225,7 @@ export function ScreenCheckout() {
             ].map(m => (
               <View key={m} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: LMX.surfaceAlt, borderRadius: 8, borderWidth: 1, borderColor: LMX.border, paddingHorizontal: 9, paddingVertical: 6 }}>
                 <Icon name={m === 'Portefeuille Loomodex' ? 'wallet' : m === 'Carte bancaire' ? 'card' : 'money'} size={12} color={LMX.ink50} />
-                <Text style={{ fontSize: 11, fontFamily: sans(500), color: LMX.ink70 }}>{m}</Text>
+                <Text style={{ fontSize: 11, fontFamily: sans(500), color: LMX.ink70 }}>{t(m)}</Text>
               </View>
             ))}
           </View>
@@ -1104,13 +1237,13 @@ export function ScreenCheckout() {
           Hidden for guests: coupons need server-side cart validation (account only). */}
       {!isGuest && (
       <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
-        <Text style={{ fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600), marginBottom: 10 }}>Code promo</Text>
+        <Text style={{ fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600), marginBottom: 10 }}>{t('Code promo')}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: LMX.surface, borderRadius: 14, borderWidth: 1, borderColor: LMX.border, borderStyle: 'dashed', paddingLeft: 14, paddingRight: 6, height: 52 }}>
           <Icon name="tag" size={16} color={LMX.ink70} />
           <TextInput
             value={coupon}
             onChangeText={setCoupon}
-            placeholder="Entrez un code promo"
+            placeholder={t('Entrez un code promo')}
             placeholderTextColor={LMX.ink50}
             autoCapitalize="characters"
             style={{ flex: 1, fontSize: 13.5, color: LMX.ink, fontFamily: sans(500), padding: 0 }}
@@ -1120,13 +1253,13 @@ export function ScreenCheckout() {
               if (!coupon.trim()) return;
               setCouponBusy(true);
               try { await applyCoupon(coupon.trim()); setCoupon(''); }
-              catch (e: any) { Alert.alert('Code promo', e?.message ?? 'Code invalide.'); }
+              catch (e: any) { Alert.alert(t('Code promo'), friendlyError(e, t('Code invalide.'))); }
               finally { setCouponBusy(false); }
             }}
             disabled={couponBusy}
             style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10, backgroundColor: LMX.brand }}
           >
-            <Text style={{ color: '#fff', fontFamily: sans(600), fontSize: 12.5 }}>{couponBusy ? '...' : 'Appliquer'}</Text>
+            <Text style={{ color: '#fff', fontFamily: sans(600), fontSize: 12.5 }}>{couponBusy ? '...' : t('Appliquer')}</Text>
           </Pressable>
         </View>
         {cart.coupons.length > 0 && (
@@ -1144,7 +1277,7 @@ export function ScreenCheckout() {
 
       {/* Order summary */}
       <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
-        <Text style={{ fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600), marginBottom: 8 }}>Votre commande</Text>
+        <Text style={{ fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600), marginBottom: 8 }}>{t('Votre commande')}</Text>
         <View style={{ backgroundColor: LMX.surface, borderRadius: LMX.r.lg, padding: 14, borderWidth: 1, borderColor: LMX.border }}>
           {cart.items.map(item => (
             <View key={item.key} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 }}>
@@ -1153,12 +1286,21 @@ export function ScreenCheckout() {
             </View>
           ))}
           <View style={{ borderTopWidth: 1, borderTopColor: LMX.hairline, marginTop: 8, paddingTop: 10 }}>
-            <SummaryRow label="Sous-total" value={subtotal} />
-            <SummaryRow label={zone ? `Livraison · ${zone.label}` : 'Livraison'} value={delivery} />
-            {cart.discount_total > 0 && <SummaryRow label="Réduction" value={-cart.discount_total} accent />}
+            <SummaryRow label={t('Sous-total')} value={subtotal} />
+            {quote
+              ? <SummaryRow label={zone ? t('Livraison · {zone}', { zone: zone.label }) : t('Livraison')} value={delivery} />
+              : (
+                <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', paddingVertical: 6 }}>
+                  <Text style={{ fontSize: 13, color: LMX.ink70 }}>{t('Livraison')}</Text>
+                  <Text style={{ fontSize: 12, color: quoteError ? LMX.amber : LMX.ink50, fontFamily: sans(500) }}>
+                    {quoteLoading ? t('Calcul…') : quoteError ? t('Frais à confirmer par le service client') : '—'}
+                  </Text>
+                </View>
+              )}
+            {cart.discount_total > 0 && <SummaryRow label={t('Réduction')} value={-cart.discount_total} accent />}
             <View style={{ height: 1, backgroundColor: LMX.hairline, marginVertical: 10 }} />
             <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
-              <Text style={{ fontSize: 13, fontFamily: sans(600) }}>Total</Text>
+              <Text style={{ fontSize: 13, fontFamily: sans(600) }}>{t('Total')}</Text>
               <Price value={total} size="md" />
             </View>
           </View>

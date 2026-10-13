@@ -9,6 +9,8 @@ export interface User {
   phone: string;
   roles: string[];
   avatar: string;
+  /** True when the user uploaded their own photo (otherwise `avatar` is a generic default). */
+  has_avatar?: boolean;
   wallet: number;
   store: null | {
     name: string;

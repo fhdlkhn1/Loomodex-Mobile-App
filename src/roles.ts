@@ -9,6 +9,7 @@
 export function staffHomeRoute(roles?: string[]): string | null {
   const r = roles ?? [];
   if (r.includes('delivery_driver'))   return 'Driver';
+  if (r.includes('logistics_partner')) return 'Partner';
   if (r.includes('logistics_manager')) return 'Logistics';
   if (r.includes('customer_support'))  return 'CS';
   if (r.some(x => ['seller', 'dokandar', 'vendor', 'wcfm_vendor'].includes(x))) return 'Seller';

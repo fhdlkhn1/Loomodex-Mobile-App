@@ -6,6 +6,7 @@ import { Icon } from '../Icon';
 import { Screen, AppBar, IconBtn } from '../components';
 import { configApi, AppConfig } from '../api/config';
 import { useAuth } from '../context/AuthContext';
+import { t } from '../i18n';
 
 function ContactCard({ icon, title, sub, accent, onPress }: { icon: any; title: string; sub: string; accent?: boolean; onPress: () => void }) {
   return (
@@ -36,7 +37,7 @@ export function ScreenHelp() {
     // Build a proper wa.me link (with a greeting) from the configured number — works whether
     // the setting is a plain number or a full URL.
     const digits = (support?.whatsapp || '').replace(/[^0-9]/g, '');
-    const msg = encodeURIComponent("Bonjour Loomodex, j'ai besoin d'aide.");
+    const msg = encodeURIComponent(t("Bonjour Loomodex, j'ai besoin d'aide."));
     const url = digits ? `https://wa.me/${digits}?text=${msg}` : 'https://wa.me/';
     Linking.openURL(url).catch(() => {});
   };
@@ -56,28 +57,28 @@ export function ScreenHelp() {
 
   return (
     <Screen>
-      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.canGoBack() ? nav.goBack() : nav.navigate('Main')} />} title="Aide & support" />
+      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.canGoBack() ? nav.goBack() : nav.navigate('Main')} />} title={t('Aide & support')} />
 
       <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
         <Text style={{ fontFamily: FONT.display, fontSize: 24, lineHeight: 28, color: LMX.ink }}>
-          Comment pouvons-nous{firstName ? '\n' : ' '}<Text style={{ color: LMX.accent }}>vous aider{firstName ? `, ${firstName} ?` : ' ?'}</Text>
+          {t('Comment pouvons-nous')}{firstName ? '\n' : ' '}<Text style={{ color: LMX.accent }}>{firstName ? t('vous aider, {name} ?', { name: firstName }) : t('vous aider ?')}</Text>
         </Text>
       </View>
 
       {/* Contact channels (match website: WhatsApp + Email) */}
       <View style={{ paddingHorizontal: 16, gap: 10 }}>
-        <ContactCard icon="phone" title="WhatsApp" sub="Réponse rapide · le plus rapide" accent onPress={openWhatsApp} />
-        <ContactCard icon="receipt" title="Email" sub={support?.email || 'support@loomodex.com'} onPress={openEmail} />
+        <ContactCard icon="phone" title="WhatsApp" sub={t('Réponse rapide · le plus rapide')} accent onPress={openWhatsApp} />
+        <ContactCard icon="receipt" title={t('Email')} sub={support?.email || 'support@loomodex.com'} onPress={openEmail} />
       </View>
 
       {/* Quick topics */}
       <View style={{ paddingHorizontal: 16, paddingTop: 22 }}>
-        <Text style={{ fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600), marginBottom: 10 }}>Sujets fréquents</Text>
+        <Text style={{ fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600), marginBottom: 10 }}>{t('Sujets fréquents')}</Text>
         <View style={{ backgroundColor: LMX.surface, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.border, overflow: 'hidden' }}>
-          {topics.map((t, i) => (
-            <Pressable key={t.label} onPress={t.onPress} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 15, borderBottomWidth: i < topics.length - 1 ? 1 : 0, borderBottomColor: LMX.hairline }}>
-              <View style={{ width: 32, height: 32, borderRadius: 9, backgroundColor: LMX.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}><Icon name={t.icon as any} size={16} color={LMX.ink} /></View>
-              <Text style={{ flex: 1, fontSize: 13.5, fontFamily: sans(500) }}>{t.label}</Text>
+          {topics.map((tp, i) => (
+            <Pressable key={tp.label} onPress={tp.onPress} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 15, borderBottomWidth: i < topics.length - 1 ? 1 : 0, borderBottomColor: LMX.hairline }}>
+              <View style={{ width: 32, height: 32, borderRadius: 9, backgroundColor: LMX.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}><Icon name={tp.icon as any} size={16} color={LMX.ink} /></View>
+              <Text style={{ flex: 1, fontSize: 13.5, fontFamily: sans(500) }}>{t(tp.label)}</Text>
               <Icon name="chevR" size={14} color={LMX.ink50} />
             </Pressable>
           ))}
@@ -90,8 +91,8 @@ export function ScreenHelp() {
           <Pressable onPress={openHelpCenter} style={{ backgroundColor: LMX.ink, borderRadius: LMX.r.lg, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
             <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' }}><Icon name="headset" size={18} color="#fff" /></View>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 13.5, fontFamily: sans(600), color: '#fff' }}>Centre d'aide complet</Text>
-              <Text style={{ fontSize: 11.5, color: '#fff', opacity: 0.65, marginTop: 2 }}>Articles, FAQ et politiques</Text>
+              <Text style={{ fontSize: 13.5, fontFamily: sans(600), color: '#fff' }}>{t("Centre d'aide complet")}</Text>
+              <Text style={{ fontSize: 11.5, color: '#fff', opacity: 0.65, marginTop: 2 }}>{t('Articles, FAQ et politiques')}</Text>
             </View>
             <Icon name="arrowR" size={16} color="#fff" />
           </Pressable>

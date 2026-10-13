@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, Pressable, ActivityIndicator, Alert, Linking } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, Text, Pressable, ActivityIndicator, Alert, Linking, RefreshControl } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { useQuery } from '@tanstack/react-query';
 import { queryClient } from '../queryClient';
@@ -10,7 +10,13 @@ import { Icon } from '../Icon';
 import { Screen, AppBar, IconBtn, Button, Price, Chip, SummaryRow, SettingRow, MapVisual, Field } from '../components';
 import { LiveMap } from '../components/LiveMap';
 import { ordersApi, Order, OrderTracking } from '../api/orders';
+import type { TrackedOrder } from '../api/orders';
+import { t, locale } from '../i18n';
 import { useAuth } from '../context/AuthContext';
+import { friendlyError, isApiError } from '../api/client';
+import { ErrorState } from '../components/StateViews';
+import { FeeBreakdown, Notice } from '../components/FeeBreakdown';
+import { AddressChangeModal } from '../components/AddressChangeModal';
 
 function HelpTile({ icon, title, onPress }: { icon: any; title: string; onPress?: () => void }) {
   return (
@@ -39,13 +45,13 @@ export function ScreenOrderSuccess() {
 
   const createAccount = async () => {
     if (!orderId) return;
-    if (acctPass.trim().length < 6) { Alert.alert('Mot de passe', 'Au moins 6 caractères.'); return; }
+    if (acctPass.trim().length < 6) { Alert.alert(t('Mot de passe'), t('Au moins 6 caractères.')); return; }
     setAcctBusy(true);
     try {
       await claimOrder(orderId, acctPass.trim(), acctEmail.trim() || undefined);
       setAcctDone(true);
     } catch (e: any) {
-      Alert.alert('Création du compte', e?.message ?? 'Impossible de créer le compte.');
+      Alert.alert(t('Création du compte'), friendlyError(e, t('Impossible de créer le compte.')));
     } finally {
       setAcctBusy(false);
     }
@@ -54,13 +60,13 @@ export function ScreenOrderSuccess() {
   return (
     <Screen footer={
       <View style={{ flexDirection: 'row', gap: 10 }}>
-        <Button variant="ghost" size="lg" style={{ flex: 1 }} onPress={() => nav.navigate('Main')}>Continuer</Button>
+        <Button variant="ghost" size="lg" style={{ flex: 1 }} onPress={() => nav.navigate('Main')}>{t('Continuer')}</Button>
         {/* Order detail needs an account; guests get public tracking (by order number) */}
         <Button variant="accent" size="lg" style={{ flex: 1 }}
           onPress={() => isLoggedIn
             ? nav.navigate('OrderDetails', { orderId })
             : nav.navigate('TrackEntry', { number: (orderNumber ?? '').replace(/^#/, '') })}>
-          {isLoggedIn ? 'Voir la commande' : 'Suivre la commande'}
+          {isLoggedIn ? t('Voir la commande') : t('Suivre la commande')}
         </Button>
       </View>
     }>
@@ -69,15 +75,17 @@ export function ScreenOrderSuccess() {
         <View style={{ width: 96, height: 96, borderRadius: 48, backgroundColor: LMX.emeraldSoft, alignItems: 'center', justifyContent: 'center' }}>
           <Icon name="check" size={42} color={LMX.emerald} />
         </View>
-        <Text style={{ fontFamily: FONT.display, fontSize: 34, marginTop: 24, color: LMX.ink }}>Commande passée !</Text>
+        <Text style={{ fontFamily: FONT.display, fontSize: 34, marginTop: 24, color: LMX.ink }}>{t('Commande passée !')}</Text>
         <Text style={{ marginTop: 12, fontSize: 14, lineHeight: 21, color: LMX.ink70, textAlign: 'center', maxWidth: 280 }}>
-          Votre commande est en cours de préparation. Nous vous notifierons dès qu'elle est en route.
+          {t("Votre commande est en cours de préparation. Nous vous notifierons dès qu'elle est en route.")}
         </Text>
         {!isLoggedIn && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 14, backgroundColor: LMX.brandSoft, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10 }}>
             <Icon name="truck" size={16} color={LMX.brand} />
             <Text style={{ flex: 1, fontSize: 12, color: LMX.brandDeep, lineHeight: 16 }}>
-              Gardez votre numéro de commande {orderNumber ?? ''} pour suivre votre colis à tout moment. Un lien de suivi vous est aussi envoyé par SMS{guestEmail ? ' et email' : ''}.
+              {guestEmail
+                ? t('Gardez votre numéro de commande {n} pour suivre votre colis à tout moment. Un lien de suivi vous est aussi envoyé par SMS et email.', { n: orderNumber ?? '' })
+                : t('Gardez votre numéro de commande {n} pour suivre votre colis à tout moment. Un lien de suivi vous est aussi envoyé par SMS.', { n: orderNumber ?? '' })}
             </Text>
           </View>
         )}
@@ -86,17 +94,17 @@ export function ScreenOrderSuccess() {
         <View style={{ backgroundColor: LMX.surface, borderRadius: LMX.r.lg, padding: 18, borderWidth: 1, borderColor: LMX.border }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <View>
-              <Text style={{ fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600) }}>Numéro de commande</Text>
+              <Text style={{ fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600) }}>{t('Numéro de commande')}</Text>
               <Text style={{ fontFamily: mono(600), fontSize: 15, marginTop: 4 }}>{orderNumber ?? `#${orderId}`}</Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
-              <Text style={{ fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600) }}>Livraison</Text>
-              <Text style={{ fontSize: 13, fontFamily: sans(600), marginTop: 4 }}>3h–48h · Conakry</Text>
+              <Text style={{ fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600) }}>{t('Livraison')}</Text>
+              <Text style={{ fontSize: 13, fontFamily: sans(600), marginTop: 4 }}>{t('3h–48h · Conakry')}</Text>
             </View>
           </View>
           <View style={{ borderTopWidth: 1, borderColor: LMX.border, borderStyle: 'dashed', paddingTop: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <Icon name="money" size={16} color={LMX.emerald} />
-            <Text style={{ flex: 1, fontSize: 12.5 }}>Paiement à la livraison · Inspectez avant de payer</Text>
+            <Text style={{ flex: 1, fontSize: 12.5 }}>{t('Paiement à la livraison · Inspectez avant de payer')}</Text>
             <Icon name="shield" size={16} color={LMX.ink50} />
           </View>
         </View>
@@ -108,22 +116,22 @@ export function ScreenOrderSuccess() {
             {acctDone ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                 <Icon name="checkCircle" size={20} color={LMX.emerald} />
-                <Text style={{ flex: 1, fontSize: 13.5, fontFamily: sans(600), color: LMX.ink }}>Compte créé — vous êtes connecté.</Text>
+                <Text style={{ flex: 1, fontSize: 13.5, fontFamily: sans(600), color: LMX.ink }}>{t('Compte créé — vous êtes connecté.')}</Text>
               </View>
             ) : (
               <>
-                <Text style={{ fontSize: 14.5, fontFamily: sans(700), color: LMX.ink }}>Créer un compte ?</Text>
+                <Text style={{ fontSize: 14.5, fontFamily: sans(700), color: LMX.ink }}>{t('Créer un compte ?')}</Text>
                 <Text style={{ fontSize: 12.5, color: LMX.ink70, lineHeight: 18, marginTop: 5 }}>
-                  Suivez vos commandes, enregistrez vos adresses et payez plus vite la prochaine fois.
+                  {t('Suivez vos commandes, enregistrez vos adresses et payez plus vite la prochaine fois.')}
                 </Text>
                 <View style={{ gap: 10, marginTop: 12 }}>
-                  <Field label="Email (optionnel)" value={acctEmail} onChangeText={setAcctEmail} keyboardType="email-address" autoCapitalize="none" />
-                  <Field label="Choisir un mot de passe" value={acctPass} onChangeText={setAcctPass} secure />
+                  <Field label={t('Email (optionnel)')} value={acctEmail} onChangeText={setAcctEmail} keyboardType="email-address" autoCapitalize="none" />
+                  <Field label={t('Choisir un mot de passe')} value={acctPass} onChangeText={setAcctPass} secure />
                   <Button variant="accent" onPress={createAccount} disabled={acctBusy}>
-                    {acctBusy ? 'Création…' : 'Créer mon compte'}
+                    {acctBusy ? t('Création…') : t('Créer mon compte')}
                   </Button>
                   <Pressable onPress={() => setShowAccount(false)} style={{ alignItems: 'center', paddingVertical: 4 }}>
-                    <Text style={{ fontSize: 12.5, color: LMX.ink50, fontFamily: sans(500) }}>Plus tard</Text>
+                    <Text style={{ fontSize: 12.5, color: LMX.ink50, fontFamily: sans(500) }}>{t('Plus tard')}</Text>
                   </Pressable>
                 </View>
               </>
@@ -139,19 +147,19 @@ export function ScreenOrderSuccess() {
             <Icon name="key" size={17} color={LMX.brand} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 13, fontFamily: sans(700), color: LMX.brandDeep }}>Vérification de la livraison</Text>
+            <Text style={{ fontSize: 13, fontFamily: sans(700), color: LMX.brandDeep }}>{t('Vérification de la livraison')}</Text>
             <Text style={{ fontSize: 12, color: LMX.ink70, lineHeight: 18, marginTop: 4 }}>
-              Quand un livreur est assigné à votre commande, vous recevrez un code de vérification (OTP) par email/SMS. Communiquez ce code au livreur pour confirmer la livraison.
+              {t('Quand un livreur est assigné à votre commande, vous recevrez un code de vérification (OTP) par email/SMS. Communiquez ce code au livreur pour confirmer la livraison.')}
             </Text>
           </View>
         </View>
       </View>
 
       <View style={{ paddingHorizontal: 16, paddingTop: 16, flexDirection: 'row', gap: 10 }}>
-        <HelpTile icon="truck" title="Suivre" onPress={() => isLoggedIn
+        <HelpTile icon="truck" title={t('Suivre')} onPress={() => isLoggedIn
           ? nav.navigate('Tracking', { orderId })
           : nav.navigate('TrackEntry', { number: (orderNumber ?? '').replace(/^#/, '') })} />
-        <HelpTile icon="headset" title="Aide" onPress={() => nav.navigate('Help')} />
+        <HelpTile icon="headset" title={t('Aide')} onPress={() => nav.navigate('Help')} />
       </View>
     </Screen>
   );
@@ -189,7 +197,34 @@ function Timeline({ status }: { status: string }) {
               {i < TRACK_FLOW.length - 1 && <View style={{ width: 1.5, flex: 1, backgroundColor: i < current ? LMX.ink : LMX.ink10, marginTop: 2, minHeight: 22 }} />}
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 13, fontFamily: active ? sans(600) : sans(500), color: done ? LMX.ink : LMX.ink50 }}>{s.label}</Text>
+              <Text style={{ fontSize: 13, fontFamily: active ? sans(600) : sans(500), color: done ? LMX.ink : LMX.ink50 }}>{t(s.label)}</Text>
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+type TrackStep = { status: string; label: string; done: boolean; current: boolean };
+
+/** Timeline driven by the server's tracking_steps (public tracking payload). */
+function StepsTimeline({ steps }: { steps: TrackStep[] }) {
+  return (
+    <View style={{ backgroundColor: LMX.surface, borderRadius: LMX.r.lg, paddingHorizontal: 18, paddingTop: 14, paddingBottom: 6, borderWidth: 1, borderColor: LMX.border }}>
+      {steps.map((s, i) => {
+        const next = steps[i + 1];
+        return (
+          <View key={`${s.status}-${i}`} style={{ flexDirection: 'row', gap: 14, paddingBottom: i === steps.length - 1 ? 12 : 18 }}>
+            <View style={{ alignItems: 'center' }}>
+              <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: s.done ? LMX.ink : LMX.surface, borderWidth: s.done ? 0 : 1.5, borderColor: s.current ? LMX.brand : LMX.border, alignItems: 'center', justifyContent: 'center' }}>
+                {s.done && <Icon name="check" size={9} color="#fff" strokeWidth={2.5} />}
+              </View>
+              {i < steps.length - 1 && <View style={{ width: 1.5, flex: 1, backgroundColor: next?.done ? LMX.ink : LMX.ink10, marginTop: 2, minHeight: 22 }} />}
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 13, fontFamily: s.current ? sans(700) : sans(500), color: s.done || s.current ? LMX.ink : LMX.ink50 }}>{t(s.label)}</Text>
+              {s.current && <Text style={{ fontSize: 11, color: LMX.brand, marginTop: 2, fontFamily: sans(600) }}>{t('Étape actuelle')}</Text>}
             </View>
           </View>
         );
@@ -201,23 +236,49 @@ function Timeline({ status }: { status: string }) {
 export function ScreenTracking() {
   const nav = useNavigation<any>();
   const route = useRoute<any>();
-  const orderId: number | undefined = route.params?.orderId;
-  const preloaded: Order | undefined = route.params?.order;
+  const { isLoggedIn } = useAuth();
+  const preloaded: TrackedOrder | undefined = route.params?.order;
+  const contact: string = route.params?.contact ?? '';
+  const orderId: number | undefined = route.params?.orderId ?? preloaded?.id;
+  // Live tracking (authenticated order + driver position) is for signed-in owners only;
+  // guests see the public tracking payload and never hit the account endpoints.
+  const live = isLoggedIn && !!orderId;
 
-  const [order, setOrder]   = useState<Order | null>(preloaded ?? null);
+  const [order, setOrder]   = useState<TrackedOrder | null>(preloaded ?? null);
   const [track, setTrack]   = useState<OrderTracking | null>(null);
   const [loading, setLoad]  = useState(!preloaded);
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const [eta, setEta]       = useState<{ duration: string; distance: string } | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  // Public payload refresh (guests, or a signed-in user tracking someone else's order)
+  const refreshPublic = useCallback(async () => {
+    const number = (preloaded?.number ?? order?.number ?? '').replace(/^#/, '');
+    if (!number) return;
+    try {
+      const o = await ordersApi.track(number, contact || undefined);
+      setOrder(o);
+      setLoadError(null);
+    } catch (e) {
+      if (!order) setLoadError(e);
+    }
+  }, [preloaded?.number, order, contact]);
 
   useEffect(() => {
-    if (!orderId) { setLoad(false); return; }
     let alive = true;
-    const fetchOrder = () => ordersApi.get(orderId)
-      .then(o => { if (alive) setOrder(o); })
-      .catch(() => {})
+    if (!live) {
+      setLoad(false);
+      if (!preloaded) return;
+      const iv = setInterval(() => { if (alive) refreshPublic(); }, 30000);
+      return () => { alive = false; clearInterval(iv); };
+    }
+    const fetchOrder = () => ordersApi.get(orderId as number)
+      .then(o => { if (alive) { setOrder(o); setLoadError(null); } })
+      .catch(e => { if (alive && !preloaded) setLoadError(e); })
       .finally(() => { if (alive) setLoad(false); });
-    const fetchTrack = () => ordersApi.tracking(orderId)
-      .then(t => { if (alive) setTrack(t); })
+    const fetchTrack = () => ordersApi.tracking(orderId as number)
+      .then(tr => { if (alive) setTrack(tr); })
       .catch(() => {});
     fetchOrder();
     fetchTrack();
@@ -225,13 +286,35 @@ export function ScreenTracking() {
     const t1 = setInterval(fetchOrder, 30000);
     const t2 = setInterval(fetchTrack, 15000);
     return () => { alive = false; clearInterval(t1); clearInterval(t2); };
-  }, [orderId]);
+  }, [orderId, live, reloadKey]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      if (live) {
+        const [o, tr] = await Promise.allSettled([ordersApi.get(orderId as number), ordersApi.tracking(orderId as number)]);
+        if (o.status === 'fulfilled') setOrder(o.value);
+        if (tr.status === 'fulfilled') setTrack(tr.value);
+      } else {
+        await refreshPublic();
+      }
+    } finally { setRefreshing(false); }
+  };
 
   if (loading) {
     return (
       <Screen>
-        <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title="Suivi de commande" right={<IconBtn icon="headset" onPress={() => nav.navigate('Help')} />} />
+        <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title={t('Suivi de commande')} right={<IconBtn icon="headset" onPress={() => nav.navigate('Help')} />} />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={LMX.brand} size="large" /></View>
+      </Screen>
+    );
+  }
+
+  if (!order && loadError && !(isApiError(loadError) && loadError.kind === 'notfound')) {
+    return (
+      <Screen>
+        <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title={t('Suivi de commande')} right={<IconBtn icon="headset" onPress={() => nav.navigate('Help')} />} />
+        <ErrorState message={friendlyError(loadError)} onRetry={() => { setLoad(true); setLoadError(null); setReloadKey(k => k + 1); }} style={{ paddingTop: 80 }} />
       </Screen>
     );
   }
@@ -239,11 +322,11 @@ export function ScreenTracking() {
   if (!order) {
     return (
       <Screen>
-        <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title="Suivi de commande" right={<IconBtn icon="headset" onPress={() => nav.navigate('Help')} />} />
+        <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title={t('Suivi de commande')} right={<IconBtn icon="headset" onPress={() => nav.navigate('Help')} />} />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
           <Icon name="package" size={48} color={LMX.ink30} />
-          <Text style={{ fontSize: 15, color: LMX.ink70 }}>Commande introuvable</Text>
-          <Button variant="ghost" onPress={() => nav.navigate('TrackEntry')}>Suivre avec un numéro</Button>
+          <Text style={{ fontSize: 15, color: LMX.ink70 }}>{t('Commande introuvable')}</Text>
+          <Button variant="ghost" onPress={() => nav.navigate('TrackEntry')}>{t('Suivre avec un numéro')}</Button>
         </View>
       </Screen>
     );
@@ -259,15 +342,19 @@ export function ScreenTracking() {
   // fall back to the order's driver field.
   const drvName  = track?.driver?.name  || order.driver?.name  || '';
   const drvPhone = track?.driver?.phone || order.driver?.phone || '';
+  const drvAvatar = track?.driver?.avatar || '';
   const drvWa    = track?.driver?.whatsapp || '';
   const hasDriver = !!(drvName || drvPhone);
   const initials = drvName ? drvName.split(' ').map(n => n[0]).join('').slice(0, 2) : '?';
   const liveTracking = !!(track?.active && track.maps_key && track.driver && track.driver.lat != null && track.driver.lng != null);
   const waLink = (num: string) => `https://wa.me/${num.replace(/[^0-9]/g, '')}`;
 
+  const steps = order.tracking_steps ?? [];
+  const items = order.items ?? [];
+
   return (
-    <Screen>
-      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title="Suivi de commande" right={<IconBtn icon="headset" onPress={() => nav.navigate('Help')} />} />
+    <Screen refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[LMX.brand]} tintColor={LMX.brand} />}>
+      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title={t('Suivi de commande')} right={<IconBtn icon="headset" onPress={() => nav.navigate('Help')} />} />
 
       {/* Map + live status banner */}
       <View style={{ paddingHorizontal: 16 }}>
@@ -286,24 +373,25 @@ export function ScreenTracking() {
                 <Icon name={delivered ? 'checkCircle' : failed ? 'close' : 'pin'} size={24} color={delivered ? LMX.emerald : failed ? LMX.rose : LMX.brand} />
               </View>
               <Text style={{ fontSize: 12.5, color: LMX.ink70, textAlign: 'center', lineHeight: 18 }}>
-                {delivered ? 'Commande livrée.'
-                  : failed ? 'Cette commande n\'est plus active.'
-                  : (track?.active && hasDriver) ? 'En attente de la position du livreur en direct…'
-                  : status === 'assigned-driver' ? 'Livreur assigné — la carte en direct s\'activera dès qu\'il sera en route.'
-                  : 'Le suivi en direct s\'affichera dès que votre commande sera en cours de livraison.'}
+                {delivered ? t('Commande livrée.')
+                  : failed ? t("Cette commande n'est plus active.")
+                  : !live ? (hasDriver ? (drvName ? t("Votre livreur {name} s'occupe de votre commande.", { name: drvName }) : t("Votre livreur s'occupe de votre commande.")) : t('Suivez ici chaque étape de votre commande.'))
+                  : (track?.active && hasDriver) ? t('En attente de la position du livreur en direct…')
+                  : status === 'assigned-driver' ? t("Livreur assigné — la carte en direct s'activera dès qu'il sera en route.")
+                  : t("Le suivi en direct s'affichera dès que votre commande sera en cours de livraison.")}
               </Text>
             </View>
           )}
           <View style={{ position: 'absolute', top: 12, left: 12, right: 12, flexDirection: 'row', justifyContent: 'space-between' }} pointerEvents="none">
             <View style={{ backgroundColor: 'rgba(255,255,255,0.95)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: failed ? LMX.rose : delivered ? LMX.emerald : LMX.amber }} />
-              <Text style={{ fontSize: 11.5, fontFamily: sans(600) }}>{order.status_label}</Text>
+              <Text style={{ fontSize: 11.5, fontFamily: sans(600) }}>{t(order.status_label)}</Text>
             </View>
             {liveTracking && (
               <View style={{ alignItems: 'flex-end', gap: 6 }}>
                 <View style={{ backgroundColor: LMX.brand, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' }} />
-                  <Text style={{ fontSize: 10.5, fontFamily: sans(700), color: '#fff' }}>EN DIRECT</Text>
+                  <Text style={{ fontSize: 10.5, fontFamily: sans(700), color: '#fff' }}>{t('EN DIRECT')}</Text>
                 </View>
                 {!!eta && (
                   <View style={{ backgroundColor: 'rgba(255,255,255,0.96)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, flexDirection: 'row', alignItems: 'center', gap: 5 }}>
@@ -321,10 +409,12 @@ export function ScreenTracking() {
       {hasDriver && !delivered && (
         <View style={{ paddingHorizontal: 16, paddingTop: 14 }}>
           <View style={{ backgroundColor: LMX.surface, borderRadius: LMX.r.lg, padding: 16, borderWidth: 1, borderColor: LMX.border, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <View style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: LMX.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 14, fontFamily: sans(600) }}>{initials}</Text></View>
+            {drvAvatar
+              ? <ExpoImage source={{ uri: drvAvatar }} style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: LMX.surfaceAlt }} contentFit="cover" transition={150} />
+              : <View style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: LMX.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 14, fontFamily: sans(600) }}>{initials}</Text></View>}
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 13.5, fontFamily: sans(600) }}>{drvName || 'Votre livreur'}</Text>
-              <Text style={{ fontSize: 11, color: LMX.ink50, marginTop: 2 }}>{enRoute ? (eta ? `Arrive dans ~${eta.duration} · ${eta.distance}` : 'En route vers vous') : arrived ? 'Arrivé à destination' : 'Votre livreur'}</Text>
+              <Text style={{ fontSize: 13.5, fontFamily: sans(600) }}>{drvName || t('Votre livreur')}</Text>
+              <Text style={{ fontSize: 11, color: LMX.ink50, marginTop: 2 }}>{enRoute ? (eta ? t('Arrive dans ~{d} · {dist}', { d: eta.duration, dist: eta.distance }) : t('En route vers vous')) : arrived ? t('Arrivé à destination') : t('Votre livreur')}</Text>
             </View>
             {!!drvWa && (
               <Pressable onPress={() => Linking.openURL(waLink(drvWa))} style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: '#25D366', alignItems: 'center', justifyContent: 'center' }}><Icon name="phone" size={18} color="#fff" /></Pressable>
@@ -342,20 +432,22 @@ export function ScreenTracking() {
           {delivered ? (
             <View style={{ backgroundColor: LMX.emeraldSoft, borderRadius: LMX.r.lg, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
               <Icon name="checkCircle" size={22} color={LMX.emerald} />
-              <Text style={{ flex: 1, fontSize: 13, fontFamily: sans(600), color: LMX.emerald }}>Livraison confirmée. Merci pour votre commande !</Text>
+              <Text style={{ flex: 1, fontSize: 13, fontFamily: sans(600), color: LMX.emerald }}>{t('Livraison confirmée. Merci pour votre commande !')}</Text>
             </View>
           ) : (
             <View style={{ backgroundColor: LMX.ink, borderRadius: LMX.r.lg, padding: 16, gap: 12 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
                 <Icon name="shield" size={22} color="#fff" />
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 11, color: '#fff', opacity: 0.65, textTransform: 'uppercase', fontFamily: sans(600) }}>Code de confirmation</Text>
+                  <Text style={{ fontSize: 11, color: '#fff', opacity: 0.65, textTransform: 'uppercase', fontFamily: sans(600) }}>{t('Code de confirmation')}</Text>
                   <Text style={{ fontSize: 12.5, color: '#fff', marginTop: 4, lineHeight: 17 }}>
                     {track?.otp
-                      ? 'Communiquez ce code au livreur après avoir inspecté votre commande.'
+                      ? t('Communiquez ce code au livreur après avoir inspecté votre commande.')
+                      : !live
+                        ? t('Quand un livreur est assigné, vous recevez un code de confirmation par SMS/email. Communiquez-le au livreur après inspection.')
                       : arrived
-                        ? 'Votre code de confirmation s\'affichera ici. Communiquez-le au livreur après inspection.'
-                        : 'Un code unique s\'affichera ici à l\'arrivée du livreur.'}
+                        ? t("Votre code de confirmation s'affichera ici. Communiquez-le au livreur après inspection.")
+                        : t("Un code unique s'affichera ici à l'arrivée du livreur.")}
                   </Text>
                 </View>
               </View>
@@ -373,7 +465,7 @@ export function ScreenTracking() {
         <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
           <View style={{ backgroundColor: '#FFF5F5', borderRadius: LMX.r.lg, padding: 16, borderWidth: 1, borderColor: LMX.rose + '44', flexDirection: 'row', alignItems: 'center', gap: 12 }}>
             <Icon name="close" size={20} color={LMX.rose} />
-            <Text style={{ flex: 1, fontSize: 13, fontFamily: sans(600), color: LMX.rose }}>{order.status_label}</Text>
+            <Text style={{ flex: 1, fontSize: 13, fontFamily: sans(600), color: LMX.rose }}>{t(order.status_label)}</Text>
           </View>
         </View>
       )}
@@ -381,11 +473,40 @@ export function ScreenTracking() {
       {/* Order summary + timeline */}
       <View style={{ paddingHorizontal: 16, paddingTop: 20 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 14 }}>
-          <Text style={{ fontSize: 13, fontFamily: sans(600) }}>Commande {order.number}</Text>
-          <Text style={{ color: LMX.ink50, fontFamily: mono(400), fontSize: 12 }}>{fr(order.total)} GNF</Text>
+          <Text style={{ fontSize: 13, fontFamily: sans(600) }}>{t('Commande {n}', { n: order.number })}</Text>
+          {order.total != null && <Text style={{ color: LMX.ink50, fontFamily: mono(400), fontSize: 12 }}>{fr(order.total)} GNF</Text>}
         </View>
-        {!failed && <Timeline status={status} />}
+        {!failed && (steps.length > 0 ? <StepsTimeline steps={steps} /> : <Timeline status={status} />)}
       </View>
+
+      {/* Items */}
+      {items.length > 0 && (
+        <View style={{ paddingHorizontal: 16, paddingTop: 18 }}>
+          <Text style={{ fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600), marginBottom: 8 }}>{t('Articles · {n}', { n: items.length })}</Text>
+          <View style={{ borderRadius: LMX.r.lg, backgroundColor: LMX.surface, borderWidth: 1, borderColor: LMX.border, overflow: 'hidden' }}>
+            {items.map((it, i) => (
+              <View key={`${it.id ?? i}-${i}`} style={{ flexDirection: 'row', gap: 12, padding: 12, alignItems: 'center', borderBottomWidth: i < items.length - 1 ? 1 : 0, borderBottomColor: LMX.hairline }}>
+                {it.image
+                  ? <ExpoImage source={{ uri: it.image }} style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: LMX.surfaceAlt }} />
+                  : <View style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: LMX.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}><Icon name="bag" size={18} color={LMX.ink30} /></View>}
+                <Text numberOfLines={2} style={{ flex: 1, fontSize: 12.5, fontFamily: sans(500), color: LMX.ink }}>{it.name}</Text>
+                <Text style={{ fontFamily: mono(600), fontSize: 12, color: LMX.ink70 }}>×{it.qty}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
+
+      {!live && (
+        <View style={{ paddingHorizontal: 16, paddingTop: 16 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: LMX.brandSoft, borderRadius: 12, padding: 12 }}>
+            <Icon name="user" size={16} color={LMX.brand} />
+            <Text style={{ flex: 1, fontSize: 12, color: LMX.brandDeep, lineHeight: 17 }}>
+              {t('Connectez-vous avec le compte de la commande pour voir le livreur en direct sur la carte.')}
+            </Text>
+          </View>
+        </View>
+      )}
     </Screen>
   );
 }
@@ -410,39 +531,64 @@ function RecentTrack({ id, date, status, emerald, last, onPress }: { id: string;
 export function ScreenTrackEntry() {
   const nav = useNavigation<any>();
   const route = useRoute<any>();
-  const [number, setNumber] = useState(route.params?.number ?? '');
-  const [email, setEmail]   = useState('');
-  const [loading, setLoad]  = useState(false);
+  const [number, setNumber]   = useState(route.params?.number ?? '');
+  const [contact, setContact] = useState('');
+  const [loading, setLoad]    = useState(false);
+  const [error, setError]     = useState<unknown>(null);
 
   const track = async () => {
-    if (!number.trim()) { Alert.alert('Numéro requis', 'Veuillez entrer votre numéro de commande.'); return; }
+    const num = number.trim().replace(/^#/, '');
+    if (!num) { Alert.alert(t('Numéro requis'), t('Veuillez entrer votre numéro de commande.')); return; }
     setLoad(true);
+    setError(null);
     try {
-      const order = await ordersApi.track(number.trim().replace(/^#/, ''), email.trim() || undefined);
-      nav.navigate('Tracking', { order });
-    } catch (e: any) {
-      Alert.alert('Introuvable', e?.message ?? 'Aucune commande trouvée avec ce numéro.');
+      const c = contact.trim();
+      const order = await ordersApi.track(num, c || undefined);
+      nav.navigate('Tracking', { order, contact: c });
+    } catch (e) {
+      setError(e);
     } finally { setLoad(false); }
   };
 
+  const notFound = isApiError(error) && error.kind === 'notfound';
+
   return (
     <Screen>
-      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title="Suivre une commande" right={<IconBtn icon="headset" onPress={() => nav.navigate('Help')} />} />
+      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title={t('Suivre une commande')} right={<IconBtn icon="headset" onPress={() => nav.navigate('Help')} />} />
       <View style={{ paddingHorizontal: 24, alignItems: 'center', paddingTop: 12 }}>
         <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: LMX.surfaceAlt, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: LMX.border, marginTop: 20 }}>
           <Icon name="package" size={36} color={LMX.ink} strokeWidth={1.5} />
         </View>
-        <Text style={{ fontFamily: FONT.display, fontSize: 28, marginTop: 20, color: LMX.ink }}>Où est ma commande ?</Text>
-        <Text style={{ marginTop: 12, fontSize: 13, color: LMX.ink70, lineHeight: 20, textAlign: 'center', maxWidth: 280 }}>Entrez votre numéro de commande — aucun compte requis.</Text>
+        <Text style={{ fontFamily: FONT.display, fontSize: 28, marginTop: 20, color: LMX.ink }}>{t('Où est ma commande ?')}</Text>
+        <Text style={{ marginTop: 12, fontSize: 13, color: LMX.ink70, lineHeight: 20, textAlign: 'center', maxWidth: 280 }}>{t('Entrez votre numéro de commande — aucun compte requis.')}</Text>
       </View>
       <View style={{ paddingHorizontal: 20, paddingTop: 24, gap: 14 }}>
-        <Field label="Numéro de commande" value={number} onChangeText={setNumber} prefix="#" placeholder="204-882" />
-        <Field label="Email (optionnel)" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" placeholder="Pour vérifier votre identité" />
+        <Field label={t('Numéro de commande')} value={number} onChangeText={v => { setNumber(v); setError(null); }} prefix="#" placeholder="204-882" autoCapitalize="none" />
+        <Field label={t('Email ou téléphone (facultatif)')} value={contact} onChangeText={setContact} keyboardType="email-address" autoCapitalize="none" placeholder={t('Pour voir le détail complet')} />
       </View>
+
+      {!!error && !loading && (
+        <View style={{ paddingHorizontal: 20, paddingTop: 16 }}>
+          {notFound ? (
+            <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start', backgroundColor: '#FFF5F5', borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.rose + '44', padding: 14 }}>
+              <Icon name="search" size={18} color={LMX.rose} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 13.5, fontFamily: sans(700), color: LMX.ink }}>{t('Commande introuvable')}</Text>
+                <Text style={{ fontSize: 12.5, color: LMX.ink70, marginTop: 3, lineHeight: 18 }}>{t('Vérifiez le numéro de commande.')}</Text>
+              </View>
+            </View>
+          ) : (
+            <View style={{ backgroundColor: LMX.surface, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.border }}>
+              <ErrorState title={t('Problème de connexion')} message={friendlyError(error)} onRetry={track} style={{ paddingVertical: 20 }} />
+            </View>
+          )}
+        </View>
+      )}
+
       <View style={{ paddingHorizontal: 20, paddingTop: 20 }}>
         {loading
           ? <ActivityIndicator color={LMX.brand} size="large" />
-          : <Button full variant="accent" size="lg" icon="arrowR" onPress={track}>Suivre la commande</Button>
+          : <Button full variant="accent" size="lg" icon="arrowR" onPress={track}>{t('Suivre la commande')}</Button>
         }
       </View>
     </Screen>
@@ -470,14 +616,14 @@ function OrderCard({ order, onPress }: { order: any; onPress?: () => void }) {
           ))}
         </View>
         <View style={{ flex: 1 }}>
-          <Text numberOfLines={1} style={{ fontSize: 12.5, fontFamily: sans(500) }}>{order.items[0].name}{order.count > 1 ? ` + ${order.count - 1} more` : ''}</Text>
+          <Text numberOfLines={1} style={{ fontSize: 12.5, fontFamily: sans(500) }}>{order.items[0].name}{order.count > 1 ? t(' + {n} autres', { n: order.count - 1 }) : ''}</Text>
           <Text style={{ fontFamily: mono(400), fontSize: 12, color: LMX.ink70, marginTop: 4 }}>{fr(order.total)} <Text style={{ fontSize: 10, color: LMX.ink50 }}>GNF</Text></Text>
         </View>
       </View>
       <View style={{ marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: LMX.hairline, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Text style={{ fontSize: 11.5, color: LMX.ink50 }}>{order.count} article{order.count > 1 ? 's' : ''}</Text>
+        <Text style={{ fontSize: 11.5, color: LMX.ink50 }}>{order.count > 1 ? t('{n} articles', { n: order.count }) : t('{n} article', { n: order.count })}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          <Text style={{ fontSize: 12, color: LMX.brand, fontFamily: sans(600) }}>Voir les détails</Text>
+          <Text style={{ fontSize: 12, color: LMX.brand, fontFamily: sans(600) }}>{t('Voir les détails')}</Text>
           <Icon name="chevR" size={13} color={LMX.brand} />
         </View>
       </View>
@@ -509,29 +655,29 @@ export function ScreenOrdersList() {
   // Map API order to local OrderCard shape
   const toCard = (o: Order) => ({
     id: o.number,
-    date: o.date ? new Date(o.date).toLocaleDateString('fr-FR') : '',
+    date: o.date ? new Date(o.date).toLocaleDateString(locale()) : '',
     total: o.total,
     items: o.items.map(i => ({ slug: '', image: i.image, name: i.name })),
     count: o.item_count,
-    status: o.status_label,
+    status: t(o.status_label),
     variant: statusVariant(o.status),
     orderId: o.id,
   });
 
   return (
     <Screen>
-      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title="Mes commandes" right={<IconBtn icon="search" />} />
+      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title={t('Mes commandes')} right={<IconBtn icon="search" />} />
 
       {!isLoggedIn ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 14 }}>
           <Icon name="package" size={48} color={LMX.ink30} />
-          <Text style={{ fontSize: 18, fontFamily: sans(600), color: LMX.ink, textAlign: 'center' }}>Suivre vos commandes</Text>
+          <Text style={{ fontSize: 18, fontFamily: sans(600), color: LMX.ink, textAlign: 'center' }}>{t('Suivre vos commandes')}</Text>
           <Text style={{ fontSize: 13, color: LMX.ink70, textAlign: 'center', lineHeight: 19 }}>
-            Suivez une commande passée en tant qu'invité avec votre numéro de commande, ou connectez-vous pour retrouver tout votre historique.
+            {t("Suivez une commande passée en tant qu'invité avec votre numéro de commande, ou connectez-vous pour retrouver tout votre historique.")}
           </Text>
-          <Button variant="accent" onPress={() => nav.navigate('TrackEntry')}>Suivre une commande</Button>
+          <Button variant="accent" onPress={() => nav.navigate('TrackEntry')}>{t('Suivre une commande')}</Button>
           <Pressable onPress={() => nav.navigate('SignIn')}>
-            <Text style={{ fontSize: 13.5, color: LMX.brand, fontFamily: sans(600) }}>Se connecter</Text>
+            <Text style={{ fontSize: 13.5, color: LMX.brand, fontFamily: sans(600) }}>{t('Se connecter')}</Text>
           </Pressable>
         </View>
       ) : loading ? (
@@ -541,16 +687,16 @@ export function ScreenOrdersList() {
       ) : orders.length === 0 ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 16 }}>
           <Icon name="package" size={48} color={LMX.ink30} />
-          <Text style={{ fontSize: 18, fontFamily: sans(600), color: LMX.ink, textAlign: 'center' }}>Aucune commande pour l'instant</Text>
-          <Button variant="accent" onPress={() => nav.navigate('Main')}>Commencer vos achats</Button>
+          <Text style={{ fontSize: 18, fontFamily: sans(600), color: LMX.ink, textAlign: 'center' }}>{t("Aucune commande pour l'instant")}</Text>
+          <Button variant="accent" onPress={() => nav.navigate('Main')}>{t('Commencer vos achats')}</Button>
         </View>
       ) : (
         <>
           <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: 16, paddingBottom: 14, flexWrap: 'wrap' }}>
-            <Chip active={filter === 'all'} onPress={() => setFilter('all')}>Tout · {orders.length}</Chip>
-            <Chip active={filter === 'processing'} onPress={() => setFilter('processing')}>En prépa.</Chip>
-            <Chip active={filter === 'out-delivery'} onPress={() => setFilter('out-delivery')}>En route</Chip>
-            <Chip active={filter === 'completed'} onPress={() => setFilter('completed')}>Livré</Chip>
+            <Chip active={filter === 'all'} onPress={() => setFilter('all')}>{t('Tout · {n}', { n: orders.length })}</Chip>
+            <Chip active={filter === 'processing'} onPress={() => setFilter('processing')}>{t('En prépa.')}</Chip>
+            <Chip active={filter === 'out-delivery'} onPress={() => setFilter('out-delivery')}>{t('En route')}</Chip>
+            <Chip active={filter === 'completed'} onPress={() => setFilter('completed')}>{t('Livré')}</Chip>
           </View>
           <View style={{ paddingHorizontal: 16, gap: 10 }}>
             {orders
@@ -579,24 +725,62 @@ export function ScreenOrderDetails() {
   const orderId: number | undefined = route.params?.orderId;
 
   const [cancelling, setC]  = useState(false);
+  const [feeBusy, setFeeBusy] = useState<'accept' | 'decline' | null>(null);
+  const [addrOpen, setAddrOpen] = useState(false);
   const { data: order = null, isLoading: loading, refetch } = useQuery({
     queryKey: ['order', orderId],
     queryFn: () => ordersApi.get(orderId as number),
     enabled: !!orderId,
   });
 
+  const afterChange = async () => {
+    await refetch();
+    queryClient.invalidateQueries({ queryKey: ['orders'] });
+  };
+
+  const acceptFee = async () => {
+    if (!order) return;
+    setFeeBusy('accept');
+    try {
+      await ordersApi.acceptFee(order.id);
+      await afterChange();
+    } catch (e) {
+      Alert.alert(t('Erreur'), friendlyError(e, t("Impossible d'accepter les frais.")));
+    } finally { setFeeBusy(null); }
+  };
+
+  const declineFee = () => {
+    if (!order) return;
+    Alert.alert(
+      t('Refuser les nouveaux frais ?'),
+      t('Refuser les nouveaux frais de livraison annulera votre commande.'),
+      [
+        { text: t('Retour'), style: 'cancel' },
+        { text: t('Refuser et annuler'), style: 'destructive', onPress: async () => {
+          setFeeBusy('decline');
+          try {
+            await ordersApi.declineFee(order.id);
+            await afterChange();
+          } catch (e) {
+            Alert.alert(t('Erreur'), friendlyError(e, t('Impossible de refuser les frais.')));
+          } finally { setFeeBusy(null); }
+        } },
+      ],
+    );
+  };
+
   const handleCancel = () => {
     if (!order) return;
-    Alert.alert('Annuler la commande', 'Êtes-vous sûr de vouloir annuler ?', [
-      { text: 'Non', style: 'cancel' },
-      { text: 'Oui, annuler', style: 'destructive', onPress: async () => {
+    Alert.alert(t('Annuler la commande'), t('Êtes-vous sûr de vouloir annuler ?'), [
+      { text: t('Non'), style: 'cancel' },
+      { text: t('Oui, annuler'), style: 'destructive', onPress: async () => {
         setC(true);
         try {
           await ordersApi.cancel(order.id, 'Annulation client via app');
           await refetch();
           queryClient.invalidateQueries({ queryKey: ['orders'] });
         } catch (e: any) {
-          Alert.alert('Erreur', e.message ?? 'Annulation impossible à ce stade.');
+          Alert.alert(t('Erreur'), friendlyError(e, t('Annulation impossible à ce stade.')));
         } finally { setC(false); }
       }}
     ]);
@@ -621,10 +805,10 @@ export function ScreenOrderDetails() {
 
   if (!order) return (
     <Screen>
-      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title="Commande" />
+      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title={t('Commande')} />
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
         <Icon name="package" size={48} color={LMX.ink30} />
-        <Text style={{ fontSize: 15, color: LMX.ink70 }}>Commande introuvable</Text>
+        <Text style={{ fontSize: 15, color: LMX.ink70 }}>{t('Commande introuvable')}</Text>
       </View>
     </Screen>
   );
@@ -634,14 +818,14 @@ export function ScreenOrderDetails() {
       <View style={{ flexDirection: 'row', gap: 10 }}>
         {canCancel && (
           <Button variant="ghost" size="md" style={{ flex: 1 }} onPress={handleCancel} disabled={cancelling}>
-            {cancelling ? 'Annulation...' : 'Annuler'}
+            {cancelling ? t('Annulation...') : t('Annuler')}
           </Button>
         )}
         {isActive && (
-          <Button variant="primary" size="md" style={{ flex: 1 }} icon="truck" onPress={() => nav.navigate('Tracking', { orderId: order.id })}>Suivre</Button>
+          <Button variant="primary" size="md" style={{ flex: 1 }} icon="truck" onPress={() => nav.navigate('Tracking', { orderId: order.id })}>{t('Suivre')}</Button>
         )}
         {!canCancel && !isActive && (
-          <Button full variant="ghost" size="md" onPress={() => nav.navigate('Help')}>Besoin d'aide ?</Button>
+          <Button full variant="ghost" size="md" onPress={() => nav.navigate('Help')}>{t("Besoin d'aide ?")}</Button>
         )}
       </View>
     }>
@@ -649,29 +833,29 @@ export function ScreenOrderDetails() {
 
       {/* Header */}
       <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
-        <Text style={{ fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600) }}>Commande</Text>
+        <Text style={{ fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600) }}>{t('Commande')}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
           <Text style={{ fontFamily: mono(600), fontSize: 20 }}>{order.number}</Text>
           <View style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, backgroundColor: statusColor(order.status) + '22' }}>
-            <Text style={{ color: statusColor(order.status), fontSize: 11, fontFamily: sans(700), textTransform: 'uppercase' }}>{order.status_label}</Text>
+            <Text style={{ color: statusColor(order.status), fontSize: 11, fontFamily: sans(700), textTransform: 'uppercase' }}>{t(order.status_label)}</Text>
           </View>
         </View>
         {order.date && (
           <Text style={{ fontSize: 12, color: LMX.ink50, marginTop: 6 }}>
-            {new Date(order.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+            {new Date(order.date).toLocaleDateString(locale(), { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
           </Text>
         )}
       </View>
 
       {/* Quick actions */}
       <View style={{ paddingHorizontal: 16, paddingBottom: 16, flexDirection: 'row', gap: 8 }}>
-        <QuickActionTile icon="truck" label="Suivre" accent onPress={() => nav.navigate('Tracking', { orderId: order.id })} />
-        <QuickActionTile icon="headset" label="Contact" onPress={() => nav.navigate('Help')} />
+        <QuickActionTile icon="truck" label={t('Suivre')} accent onPress={() => nav.navigate('Tracking', { orderId: order.id })} />
+        <QuickActionTile icon="headset" label={t('Contact')} onPress={() => nav.navigate('Help')} />
       </View>
 
       {/* Items */}
       <Text style={{ paddingHorizontal: 16, fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600) }}>
-        Articles · {order.item_count}
+        {t('Articles · {n}', { n: order.item_count })}
       </Text>
       <View style={{ margin: 16, marginTop: 8, borderRadius: LMX.r.lg, backgroundColor: LMX.surface, borderWidth: 1, borderColor: LMX.border, overflow: 'hidden' }}>
         {order.items.map((it, i) => (
@@ -691,7 +875,7 @@ export function ScreenOrderDetails() {
       </View>
 
       {/* Delivery & payment */}
-      <Text style={{ paddingHorizontal: 16, fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600) }}>Livraison & paiement</Text>
+      <Text style={{ paddingHorizontal: 16, fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600) }}>{t('Livraison & paiement')}</Text>
       <View style={{ margin: 16, marginTop: 8, borderRadius: LMX.r.lg, backgroundColor: LMX.surface, borderWidth: 1, borderColor: LMX.border, overflow: 'hidden' }}>
         <SettingRow icon="pin" label={`${order.billing.city || 'Conakry'}`} sub={`${order.billing.first_name} ${order.billing.last_name} · ${order.billing.phone || ''}`} />
         <SettingRow icon="money" label={order.payment_method} sub={`${fr(order.total)} GNF`} last />
@@ -700,21 +884,68 @@ export function ScreenOrderDetails() {
       {/* Driver info */}
       {order.driver && (
         <>
-          <Text style={{ paddingHorizontal: 16, fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600) }}>Livreur</Text>
+          <Text style={{ paddingHorizontal: 16, fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600) }}>{t('Livreur')}</Text>
           <View style={{ margin: 16, marginTop: 8, borderRadius: LMX.r.lg, backgroundColor: LMX.surface, borderWidth: 1, borderColor: LMX.border, overflow: 'hidden' }}>
             <SettingRow icon="bike" label={order.driver.name} sub={order.driver.phone} last />
           </View>
         </>
       )}
 
+      {/* Delivery fee (server breakdown + customer-service review state) */}
+      {(!!order.delivery_quote || order.fee_status === 'pending_review' || order.fee_status === 'awaiting_customer') && (
+        <View style={{ paddingHorizontal: 16, paddingBottom: 16, gap: 10 }}>
+          {order.fee_status === 'awaiting_customer' && (
+            <View style={{ padding: 16, borderRadius: LMX.r.lg, backgroundColor: '#FFF6E8', borderWidth: 1.5, borderColor: LMX.amber }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Icon name="money" size={18} color={LMX.amber} />
+                <Text style={{ flex: 1, fontSize: 14, fontFamily: sans(700), color: LMX.ink }}>
+                  {t('Nouveaux frais de livraison : {amount} GNF', { amount: fr(order.delivery_quote?.total ?? order.shipping_total) })}
+                </Text>
+              </View>
+              <Text style={{ fontSize: 12, color: LMX.ink70, marginTop: 6, lineHeight: 17 }}>
+                {t('Le service client a ajusté les frais de livraison. Acceptez-les pour poursuivre la commande.')}
+              </Text>
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
+                <Button variant="ghost" size="md" style={{ flex: 1 }} onPress={declineFee} disabled={!!feeBusy}>
+                  {feeBusy === 'decline' ? t('Annulation...') : t('Refuser')}
+                </Button>
+                <Button variant="accent" size="md" style={{ flex: 1 }} onPress={acceptFee} disabled={!!feeBusy}>
+                  {feeBusy === 'accept' ? '...' : t('Accepter')}
+                </Button>
+              </View>
+            </View>
+          )}
+          {order.fee_status === 'pending_review' && (
+            <Notice tone="brand" text={t('Frais de livraison en cours de vérification par le service client')} />
+          )}
+          {!!order.delivery_quote && (
+            <FeeBreakdown quote={order.delivery_quote} showReviewNotice={false} />
+          )}
+        </View>
+      )}
+
+      {order.can_change_address && (
+        <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
+          <Button full variant="soft" size="md" icon="pin" onPress={() => setAddrOpen(true)}>{t("Modifier l'adresse de livraison")}</Button>
+        </View>
+      )}
+      {order.can_change_address && (
+        <AddressChangeModal
+          visible={addrOpen}
+          order={order}
+          onClose={() => setAddrOpen(false)}
+          onApplied={async () => { setAddrOpen(false); await afterChange(); }}
+        />
+      )}
+
       {/* Summary */}
-      <Text style={{ paddingHorizontal: 16, fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600) }}>Récapitulatif</Text>
+      <Text style={{ paddingHorizontal: 16, fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600) }}>{t('Récapitulatif')}</Text>
       <View style={{ margin: 16, marginTop: 8, padding: 16, borderRadius: LMX.r.lg, backgroundColor: LMX.surface, borderWidth: 1, borderColor: LMX.border }}>
-        <SummaryRow label={`Sous-total (${order.item_count} articles)`} value={order.total - order.shipping_total} />
-        <SummaryRow label="Livraison" value={order.shipping_total} />
+        <SummaryRow label={t('Sous-total ({n} articles)', { n: order.item_count })} value={order.total - order.shipping_total} />
+        <SummaryRow label={t('Livraison')} value={order.shipping_total} />
         <View style={{ height: 1, backgroundColor: LMX.hairline, marginVertical: 10 }} />
         <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
-          <Text style={{ fontSize: 13, fontFamily: sans(600) }}>Total</Text>
+          <Text style={{ fontSize: 13, fontFamily: sans(600) }}>{t('Total')}</Text>
           <Price value={order.total} size="md" />
         </View>
       </View>

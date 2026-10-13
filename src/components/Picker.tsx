@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, Pressable, Modal, ScrollView } from 'react-native';
 import { LMX, sans } from '../theme';
 import { Icon } from '../Icon';
+import { t } from '../i18n';
 
 export interface PickerOption { value: string; label: string; }
 
@@ -33,7 +34,7 @@ export function Picker({ label, value, options, placeholder, onChange, disabled,
         }}
       >
         <Text numberOfLines={1} style={{ flex: 1, fontFamily: sans(selected ? 500 : 400), fontSize: 14.5, color: selected ? LMX.ink : LMX.ink50 }}>
-          {selected ? selected.label : (placeholder ?? 'Sélectionner…')}
+          {selected ? selected.label : (placeholder ?? t('Sélectionner…'))}
         </Text>
         <Icon name="chevD" size={16} color={LMX.ink50} />
       </Pressable>

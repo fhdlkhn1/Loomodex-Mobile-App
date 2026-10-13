@@ -8,6 +8,7 @@ import { Icon, IconName } from './Icon';
 import { useAuth } from './context/AuthContext';
 import { staffHomeRoute } from './roles';
 import { useCart } from './context/CartContext';
+import { t as tr } from './i18n';
 
 import { ScreenSplash } from './screens/splash';
 import { ScreenOnboarding, ScreenSignIn, ScreenSignUp, ScreenOTP, ScreenForgot, ScreenResetPassword } from './screens/auth';
@@ -15,11 +16,12 @@ import { ScreenHome, ScreenCategories, ScreenCategory, ScreenSearch, ScreenSearc
 import { ScreenProductDetail, ScreenSellerStorefront, ScreenCart, ScreenCheckout } from './screens/buy';
 import { ScreenOrderSuccess, ScreenTracking, ScreenTrackEntry, ScreenOrdersList, ScreenOrderDetails } from './screens/orders';
 import { ScreenWishlist, ScreenListeSouhaits, ScreenAccount, ScreenAccountDetails, ScreenAddresses, ScreenAddressForm } from './screens/account';
+import { ScreenPartner, ScreenPartnerIncidents, ScreenPartnerLedger, ScreenLogisticsIncidents, ScreenLogisticsPartners } from './screens/partner';
 import { ScreenWallet, ScreenWalletTopup } from './screens/wallet';
 import { ScreenHelp } from './screens/support';
 import { ScreenNotifications } from './screens/notifications';
 import { ScreenUsaStore } from './screens/usastore';
-import { ScreenSeller, ScreenAddProduct, ScreenDriver, ScreenDriverOrder, ScreenLogistics, ScreenCS, ScreenVendorProducts, ScreenVendorEditProduct, ScreenVendorOrders, ScreenVendorOrder, ScreenVendorStore, ScreenDriverLocate } from './screens/business';
+import { ScreenSeller, ScreenAddProduct, ScreenDriver, ScreenDriverOrder, ScreenLogistics, ScreenCS, ScreenVendorProducts, ScreenVendorEditProduct, ScreenVendorOrders, ScreenVendorOrder, ScreenVendorStore, ScreenDriverLocate, ScreenDriversMap } from './screens/business';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -60,7 +62,7 @@ function LoomodexTabBar({ state, navigation }: BottomTabBarProps) {
                 </View>
               )}
             </View>
-            <Text style={{ fontSize: 10, fontFamily: isActive ? sans(600) : sans(400), color: isActive ? LMX.brand : LMX.ink50 }}>{t.label}</Text>
+            <Text style={{ fontSize: 10, fontFamily: isActive ? sans(600) : sans(400), color: isActive ? LMX.brand : LMX.ink50 }}>{tr(t.label)}</Text>
           </Pressable>
         );
       })}
@@ -146,7 +148,14 @@ export function RootNavigator() {
       <Stack.Screen name="DriverOrder" component={ScreenDriverOrder} />
       <Stack.Screen name="Logistics" component={ScreenLogistics} />
       <Stack.Screen name="DriverLocate" component={ScreenDriverLocate} />
+      <Stack.Screen name="DriversMap" component={ScreenDriversMap} />
       <Stack.Screen name="CS" component={ScreenCS} />
+      <Stack.Screen name="LogisticsIncidents" component={ScreenLogisticsIncidents} />
+      <Stack.Screen name="LogisticsPartners" component={ScreenLogisticsPartners} />
+      <Stack.Screen name="Partner" component={ScreenPartner} />
+      <Stack.Screen name="PartnerIncidents" component={ScreenPartnerIncidents} />
+      <Stack.Screen name="PartnerLedger" component={ScreenPartnerLedger} />
+      <Stack.Screen name="PartnerDriversMap" component={ScreenDriversMap} initialParams={{ scope: 'partner' }} />
     </Stack.Navigator>
   );
 }

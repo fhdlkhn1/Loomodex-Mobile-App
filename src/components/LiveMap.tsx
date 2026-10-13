@@ -2,6 +2,7 @@ import React, { useMemo, useRef, useEffect } from 'react';
 import { View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { LMX } from '../theme';
+import { t } from '../i18n';
 
 export interface LatLng { lat: number; lng: number; }
 
@@ -10,6 +11,10 @@ interface LiveMapProps {
   driver: LatLng | null;
   destination: { lat?: number | null; lng?: number | null; address?: string; city?: string };
   height?: number;
+  /** Name shown on the destination pin (e.g. the store name). */
+  destinationLabel?: string;
+  /** Destination pin colour (default green = customer). */
+  destinationColor?: string;
   onEta?: (eta: { duration: string; distance: string }) => void;
 }
 
@@ -19,11 +24,11 @@ interface LiveMapProps {
  * ETA + distance back to React Native via postMessage. Driver moves are injected
  * so the map never reloads.
  */
-export function LiveMap({ mapsKey, driver, destination, height = 240, onEta }: LiveMapProps) {
+export function LiveMap({ mapsKey, driver, destination, height = 240, destinationLabel, destinationColor, onEta }: LiveMapProps) {
   const ref = useRef<WebView>(null);
   const initial = useRef(driver);
 
-  const html = useMemo(() => buildHtml(mapsKey, initial.current, destination), [mapsKey]);
+  const html = useMemo(() => buildHtml(mapsKey, initial.current, destination, destinationLabel, destinationColor, t('Livreur'), t('Destination')), [mapsKey]);
   // Stable source object — prevents the WebView from reloading the map on every re-render (polling)
   const source = useMemo(() => ({ html }), [html]);
 
@@ -62,7 +67,7 @@ export function LiveMap({ mapsKey, driver, destination, height = 240, onEta }: L
   );
 }
 
-function buildHtml(key: string, driver: LatLng | null, dest: LiveMapProps['destination']): string {
+function buildHtml(key: string, driver: LatLng | null, dest: LiveMapProps['destination'], destLabel?: string, destColor?: string, driverTitle = 'Livreur', destTitle = 'Destination'): string {
   const destAddress = `${dest.address ?? ''} ${dest.city ?? 'Conakry'}, Guinée`.trim();
   const d = driver ? `{lat:${driver.lat},lng:${driver.lng}}` : 'null';
   const destLL = (dest.lat != null && dest.lng != null) ? `{lat:${dest.lat},lng:${dest.lng}}` : 'null';
@@ -76,6 +81,10 @@ function buildHtml(key: string, driver: LatLng | null, dest: LiveMapProps['desti
   var DRIVER = ${d};
   var DEST_LL = ${destLL};
   var DEST_ADDR = ${JSON.stringify(destAddress)};
+  var DEST_LABEL = ${JSON.stringify(destLabel ?? '').replace(/</g, '\\u003c')};
+  var DRIVER_TITLE = ${JSON.stringify(driverTitle).replace(/</g, '\\u003c')};
+  var DEST_TITLE = ${JSON.stringify(destTitle).replace(/</g, '\\u003c')};
+  var DEST_COLOR = ${JSON.stringify(destColor ?? '#10B981')};
   var CONAKRY = {lat:9.6412,lng:-13.5784};
   var lastDir = 0;
   var useFallback = false; // true once Directions is unavailable (billing/quota/denied)
@@ -130,13 +139,20 @@ function buildHtml(key: string, driver: LatLng | null, dest: LiveMapProps['desti
     });
   }
   function placeDest(pos){
-    if(!destMarker){ destMarker = new google.maps.Marker({position:pos, map:map, icon:dot('#10B981'), title:'Destination'}); }
+    if(!destMarker){
+      destMarker = new google.maps.Marker({position:pos, map:map, icon:dot(DEST_COLOR), title:DEST_LABEL || DEST_TITLE});
+      if(DEST_LABEL){
+        var iw = new google.maps.InfoWindow({content:'<div style="font:600 12px sans-serif;padding:2px 4px">'+DEST_LABEL.replace(/[<>&]/g,'')+'</div>', disableAutoPan:true});
+        iw.open({map:map, anchor:destMarker});
+        destMarker.addListener('click', function(){ iw.open({map:map, anchor:destMarker}); });
+      }
+    }
     else { destMarker.setPosition(pos); }
     fit(); route();
   }
   function lmxUpdateDriver(lat,lng){
     var p = {lat:lat,lng:lng};
-    if(!driverMarker){ driverMarker = new google.maps.Marker({position:p, map:map, icon:dot('#1E6BFF'), title:'Livreur'}); }
+    if(!driverMarker){ driverMarker = new google.maps.Marker({position:p, map:map, icon:dot('#1E6BFF'), title:DRIVER_TITLE}); }
     else { driverMarker.setPosition(p); }
     fit(); route();
   }

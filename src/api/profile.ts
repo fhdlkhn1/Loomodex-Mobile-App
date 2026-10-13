@@ -1,4 +1,4 @@
-import { get, post } from './client';
+import { get, post, uploadFile } from './client';
 import { User } from './auth';
 import { Product } from './products';
 
@@ -56,6 +56,11 @@ export const profileApi = {
     post<{ message: string }>('/profile/change-password', { current_password, new_password }, true),
 
   stats: () => get<ProfileStats>('/profile/stats', true),
+
+  /** Upload a new profile photo (drivers: themselves or their vehicle). Returns the new URL. */
+  uploadAvatar: (uri: string) => uploadFile<{ success: boolean; avatar: string }>('/profile/avatar', uri),
+
+  removeAvatar: () => post<{ success: boolean; avatar: string | null }>('/profile/avatar/remove', {}, true),
 
   checkout: () => get<CheckoutDetails>('/profile/checkout', true),
 

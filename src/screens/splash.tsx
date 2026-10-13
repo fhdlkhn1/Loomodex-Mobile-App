@@ -5,6 +5,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { LMX, FONT, sans, mono, shadow } from '../theme';
 import { Icon } from '../Icon';
+import { t } from '../i18n';
+import { LangToggle } from '../components';
 
 const ICON = require('../../assets/icon.png');
 
@@ -35,6 +37,11 @@ export function ScreenSplash() {
       <View style={{ position: 'absolute', top: -60, right: -60, width: 280, height: 280, borderRadius: 140, backgroundColor: '#0EA5E9', opacity: 0.18 }} />
       <View style={{ position: 'absolute', bottom: 40, left: -70, width: 300, height: 300, borderRadius: 150, backgroundColor: '#F37524', opacity: 0.16 }} />
 
+      {/* language switch — lets a non-French speaker pick English before anything else */}
+      <View style={{ position: 'absolute', top: 54, right: 20, zIndex: 5 }}>
+        <LangToggle light />
+      </View>
+
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
         <Animated.View style={{ alignItems: 'center', opacity: fade, transform: [{ translateY: rise }] }}>
           <View style={{ ...shadow('lg'), shadowColor: '#0EA5E9', shadowOpacity: 0.35, borderRadius: 36 }}>
@@ -48,7 +55,7 @@ export function ScreenSplash() {
           <LinearGradient colors={['#F37524', '#0EA5E9']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ height: 3, width: 150, borderRadius: 2, marginTop: 4 }} />
 
           <Text style={{ fontFamily: FONT.displayItalic, fontSize: 18, color: 'rgba(237,241,247,0.72)', marginTop: 20, textAlign: 'center' }}>
-            Le marché de Guinée, à votre porte.
+            {t('Le marché de Guinée, à votre porte.')}
           </Text>
         </Animated.View>
       </View>
@@ -64,12 +71,12 @@ export function ScreenSplash() {
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 18, marginTop: 22 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Icon name="shield" size={14} color="rgba(237,241,247,0.6)" />
-            <Text style={{ fontSize: 12, color: 'rgba(237,241,247,0.6)', fontFamily: sans(500) }}>Paiement à la livraison</Text>
+            <Text style={{ fontSize: 12, color: 'rgba(237,241,247,0.6)', fontFamily: sans(500) }}>{t('Paiement à la livraison')}</Text>
           </View>
           <Text style={{ color: 'rgba(237,241,247,0.3)' }}>·</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Icon name="truck" size={14} color="rgba(237,241,247,0.6)" />
-            <Text style={{ fontSize: 12, color: 'rgba(237,241,247,0.6)', fontFamily: sans(500) }}>Livraison 3h–48h</Text>
+            <Text style={{ fontSize: 12, color: 'rgba(237,241,247,0.6)', fontFamily: sans(500) }}>{t('Livraison 3h–48h')}</Text>
           </View>
         </View>
         <Text style={{ textAlign: 'center', marginTop: 14, fontSize: 11, color: 'rgba(237,241,247,0.32)', fontFamily: mono(400), letterSpacing: 1 }}>v1.0 · Conakry</Text>

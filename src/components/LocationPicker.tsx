@@ -1,7 +1,8 @@
-import React, { useMemo, useRef } from 'react';
+import React, { useMemo, useRef, useEffect } from 'react';
 import { View, Text } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { LMX } from '../theme';
+import { t } from '../i18n';
 
 export interface LatLng { lat: number; lng: number; }
 
@@ -10,6 +11,10 @@ interface Props {
   value: LatLng | null;
   onChange: (ll: LatLng) => void;
   height?: number;
+  /** Replaces the checkout hint under the map. */
+  hint?: string;
+  /** Pin colour (defaults to brand blue). */
+  pinColor?: string;
 }
 
 /**
@@ -21,18 +26,32 @@ interface Props {
  * delivery address. The address is entered manually instead.
  *
  * Optional — the order can still be placed without a pin.
+ *
+ * When `value` is changed from outside (e.g. a "use my current location" button on the
+ * store form), the pin moves there without reloading the map.
  */
-export function LocationPicker({ mapsKey, value, onChange, height = 220 }: Props) {
+export function LocationPicker({ mapsKey, value, onChange, height = 220, hint, pinColor = '#1E6BFF' }: Props) {
+  const ref = useRef<WebView>(null);
   const initial = useRef(value);
+  const lastReported = useRef<string>(value ? `${value.lat},${value.lng}` : '');
 
-  const html = useMemo(() => buildHtml(mapsKey, initial.current), [mapsKey]);
+  const html = useMemo(() => buildHtml(mapsKey, initial.current, pinColor, t('Rechercher une adresse ou un lieu…')), [mapsKey]);
   // Stable source object — prevents the WebView from reloading the map on every re-render
   const source = useMemo(() => ({ html }), [html]);
+
+  useEffect(() => {
+    if (!value || !ref.current) return;
+    const k = `${value.lat},${value.lng}`;
+    if (k === lastReported.current) return;
+    lastReported.current = k;
+    ref.current.injectJavaScript(`window.lmxSetPin && window.lmxSetPin(${value.lat}, ${value.lng}); true;`);
+  }, [value?.lat, value?.lng]);
 
   return (
     <View style={{ gap: 8 }}>
       <View style={{ height, borderRadius: LMX.r.lg, overflow: 'hidden', borderWidth: 1, borderColor: LMX.border, backgroundColor: '#EAE6DA' }}>
         <WebView
+          ref={ref}
           originWhitelist={['*']}
           source={source}
           style={{ flex: 1, backgroundColor: 'transparent' }}
@@ -44,6 +63,7 @@ export function LocationPicker({ mapsKey, value, onChange, height = 220 }: Props
             try {
               const m = JSON.parse(e.nativeEvent.data);
               if (m?.type === 'pick' && typeof m.lat === 'number' && typeof m.lng === 'number') {
+                lastReported.current = `${m.lat},${m.lng}`;
                 onChange({ lat: m.lat, lng: m.lng });
               }
             } catch {}
@@ -51,15 +71,15 @@ export function LocationPicker({ mapsKey, value, onChange, height = 220 }: Props
         />
       </View>
       <Text style={{ fontSize: 11, color: LMX.ink50, textAlign: 'center' }}>
-        {value
-          ? 'Position enregistrée · touchez la carte pour ajuster'
-          : "Recherchez l'adresse de livraison ou touchez la carte pour aider le livreur"}
+        {hint ?? (value
+          ? t('Position enregistrée · touchez la carte pour ajuster')
+          : t("Recherchez l'adresse de livraison ou touchez la carte pour aider le livreur"))}
       </Text>
     </View>
   );
 }
 
-function buildHtml(key: string, value: LatLng | null): string {
+function buildHtml(key: string, value: LatLng | null, color: string, searchPlaceholder: string): string {
   const start = value ? `{lat:${value.lat},lng:${value.lng}}` : 'null';
   return `<!DOCTYPE html><html><head>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
@@ -69,7 +89,7 @@ function buildHtml(key: string, value: LatLng | null): string {
   .pac-container{z-index:9999}
 </style>
 </head><body>
-<input id="search" type="text" autocomplete="off" placeholder="Rechercher une adresse ou un lieu…" />
+<input id="search" type="text" autocomplete="off" placeholder="${searchPlaceholder.replace(/[<>&"]/g, '')}" />
 <div id="map"></div>
 <script>
   var map, marker;
@@ -78,10 +98,11 @@ function buildHtml(key: string, value: LatLng | null): string {
   function post(o){ try { window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify(o)); } catch(e){} }
   function pin(color){ return {path:google.maps.SymbolPath.CIRCLE, scale:10, fillColor:color, fillOpacity:1, strokeColor:'#fff', strokeWeight:3}; }
   function place(pos){
-    if(!marker){ marker = new google.maps.Marker({position:pos, map:map, draggable:true, icon:pin('#1E6BFF')});
+    if(!marker){ marker = new google.maps.Marker({position:pos, map:map, draggable:true, icon:pin(${JSON.stringify(color)})});
       marker.addListener('dragend', function(){ var p = marker.getPosition(); post({type:'pick', lat:p.lat(), lng:p.lng()}); });
     } else { marker.setPosition(pos); }
   }
+  window.lmxSetPin = function(lat,lng){ if(!map){ START={lat:lat,lng:lng}; return; } var p={lat:lat,lng:lng}; place(p); map.panTo(p); if(map.getZoom()<16) map.setZoom(16); };
   function initMap(){
     var c = START || CONAKRY;
     map = new google.maps.Map(document.getElementById('map'), {center:c, zoom: START?16:13, disableDefaultUI:true, zoomControl:true, gestureHandling:'greedy'});

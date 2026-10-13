@@ -18,6 +18,7 @@ interface AuthState {
   isVendor: boolean;
   isDriver: boolean;
   isLogistics: boolean;
+  isPartner: boolean;
   isSupport: boolean;
   isAdmin: boolean;
 }
@@ -106,11 +107,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const isVendor   = hasRole('seller', 'dokandar', 'vendor', 'wcfm_vendor');
   const isDriver   = hasRole('delivery_driver');
   const isLogistics= hasRole('logistics_manager');
+  const isPartner  = hasRole('logistics_partner');
   const isSupport  = hasRole('customer_support');
   const isAdmin    = hasRole('administrator');
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, claimOrder, logout, refreshUser, setUser, isLoggedIn, isVendor, isDriver, isLogistics, isSupport, isAdmin }}>
+    <AuthContext.Provider value={{ user, token, loading, login, register, claimOrder, logout, refreshUser, setUser, isLoggedIn, isVendor, isDriver, isLogistics, isPartner, isSupport, isAdmin }}>
       {children}
     </AuthContext.Provider>
   );

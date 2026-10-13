@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE } from './client';
+import { t } from '../i18n';
 
 // Official WCFM Marketplace REST API (wcfmmp/v1). Authenticated with the same app
 // Bearer token — the plugin's determine_current_user bridge resolves the vendor.
@@ -73,7 +74,7 @@ export async function uploadMedia(uri: string, filename = `photo-${Date.now()}.j
     body: form,
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data?.message || 'Échec du téléversement de l\'image.');
+  if (!res.ok) throw new Error(data?.message || t("Échec du téléversement de l'image."));
   return data.id as number;
 }
 

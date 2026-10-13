@@ -9,6 +9,7 @@ import { Screen, AppBar, IconBtn, Toggle, Button, Field } from '../components';
 import { get } from '../api/client';
 import { profileApi } from '../api/profile';
 import { useAuth } from '../context/AuthContext';
+import { t } from '../i18n';
 
 function WalletAction({ icon, label, highlight }: { icon: any; label: string; highlight?: boolean }) {
   return (
@@ -41,7 +42,7 @@ function WalletTx({ tx, last }: any) {
     <View style={{ paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 12, borderBottomWidth: last ? 0 : 1, borderBottomColor: LMX.hairline }}>
       <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: credit ? LMX.emeraldSoft : LMX.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}><Icon name={credit ? 'arrowD' : 'bag'} size={15} color={credit ? LMX.emerald : LMX.ink70} /></View>
       <View style={{ flex: 1 }}>
-        <Text numberOfLines={1} style={{ fontSize: 12.5, fontFamily: sans(600) }}>{tx.description || (credit ? 'Crédit' : 'Débit')}</Text>
+        <Text numberOfLines={1} style={{ fontSize: 12.5, fontFamily: sans(600) }}>{tx.description || (credit ? t('Crédit') : t('Débit'))}</Text>
         <Text style={{ fontSize: 10.5, color: LMX.ink50, marginTop: 2 }}>{(tx.date || '').slice(0, 10)}</Text>
       </View>
       <Text style={{ fontFamily: mono(600), fontSize: 13, color: credit ? LMX.emerald : LMX.ink }}>{credit ? '+' : '−'}{fr(Math.abs(tx.amount || 0))}<Text style={{ fontSize: 9, color: LMX.ink50 }}> GNF</Text></Text>
@@ -71,21 +72,21 @@ export function ScreenWallet() {
 
   if (!isLoggedIn) return (
     <Screen>
-      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title="Mon portefeuille" />
+      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title={t('Mon portefeuille')} />
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
         <Icon name="wallet" size={48} color={LMX.ink30} />
-        <Text style={{ fontSize: 15, color: LMX.ink70 }}>Connectez-vous pour voir votre solde</Text>
+        <Text style={{ fontSize: 15, color: LMX.ink70 }}>{t('Connectez-vous pour voir votre solde')}</Text>
       </View>
     </Screen>
   );
 
   return (
     <Screen>
-      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title="Mon portefeuille" right={<IconBtn icon="receipt" />} />
+      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title={t('Mon portefeuille')} right={<IconBtn icon="receipt" />} />
       <View style={{ paddingHorizontal: 16 }}>
         <LinearGradient colors={['#0B1F3A', '#1E6BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ borderRadius: 22, padding: 22, overflow: 'hidden' }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Text style={{ fontSize: 11, color: '#fff', opacity: 0.65, textTransform: 'uppercase', fontFamily: sans(600) }}>Solde disponible</Text>
+            <Text style={{ fontSize: 11, color: '#fff', opacity: 0.65, textTransform: 'uppercase', fontFamily: sans(600) }}>{t('Solde disponible')}</Text>
             <Icon name="eye" size={16} color="#fff" />
           </View>
           {loading
@@ -101,18 +102,18 @@ export function ScreenWallet() {
       </View>
       {/* Recharge */}
       <View style={{ paddingHorizontal: 16, paddingTop: 14 }}>
-        <Button full variant="accent" size="lg" icon="plus" onPress={() => nav.navigate('WalletTopup')}>Recharger le portefeuille</Button>
+        <Button full variant="accent" size="lg" icon="plus" onPress={() => nav.navigate('WalletTopup')}>{t('Recharger le portefeuille')}</Button>
       </View>
       <View style={{ paddingHorizontal: 16, paddingTop: 20 }}>
-        <Text style={{ fontSize: 13, fontFamily: sans(600), marginBottom: 10 }}>Activité récente</Text>
+        <Text style={{ fontSize: 13, fontFamily: sans(600), marginBottom: 10 }}>{t('Activité récente')}</Text>
         {tx.length === 0 ? (
           <View style={{ alignItems: 'center', paddingVertical: 32, gap: 8 }}>
             <Icon name="receipt" size={32} color={LMX.ink30} />
-            <Text style={{ fontSize: 13, color: LMX.ink50 }}>Aucune transaction</Text>
+            <Text style={{ fontSize: 13, color: LMX.ink50 }}>{t('Aucune transaction')}</Text>
           </View>
         ) : (
           <View style={{ backgroundColor: LMX.surface, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.border, overflow: 'hidden' }}>
-            {tx.map((t: any, i: number) => <WalletTx key={i} tx={t} last={i === tx.length - 1} />)}
+            {tx.map((x: any, i: number) => <WalletTx key={i} tx={x} last={i === tx.length - 1} />)}
           </View>
         )}
       </View>
@@ -133,13 +134,13 @@ export function ScreenWalletTopup() {
 
   const start = async () => {
     const amt = parseInt(amount.replace(/[^0-9]/g, ''), 10);
-    if (!amt || amt < 1000) { Alert.alert('Montant invalide', 'Le minimum de recharge est 1 000 GNF.'); return; }
+    if (!amt || amt < 1000) { Alert.alert(t('Montant invalide'), t('Le minimum de recharge est 1 000 GNF.')); return; }
     setLoading(true);
     try {
       const res = await profileApi.topup(amt);
       setPayUrl(res.pay_url);
     } catch (e: any) {
-      Alert.alert('Erreur', e?.message ?? 'Impossible de démarrer la recharge.');
+      Alert.alert(t('Erreur'), e?.message ?? t('Impossible de démarrer la recharge.'));
     } finally { setLoading(false); }
   };
 
@@ -149,7 +150,7 @@ export function ScreenWalletTopup() {
     if (!done && url.includes('order-received')) {
       setDone(true);
       refreshUser();
-      Alert.alert('Recharge réussie', 'Votre portefeuille a été crédité.', [
+      Alert.alert(t('Recharge réussie'), t('Votre portefeuille a été crédité.'), [
         { text: 'OK', onPress: () => nav.goBack() },
       ]);
     }
@@ -159,7 +160,7 @@ export function ScreenWalletTopup() {
   if (payUrl) {
     return (
       <Screen scroll={false} padTop={false}>
-        <AppBar left={<IconBtn icon="close" onPress={() => nav.goBack()} />} title="Paiement sécurisé" />
+        <AppBar left={<IconBtn icon="close" onPress={() => nav.goBack()} />} title={t('Paiement sécurisé')} />
         <WebView
           source={{ uri: payUrl }}
           onNavigationStateChange={onNav}
@@ -178,12 +179,12 @@ export function ScreenWalletTopup() {
   return (
     <Screen footer={
       <Button full variant="accent" size="lg" icon="arrowR" onPress={start} disabled={loading}>
-        {loading ? 'Préparation...' : 'Continuer vers le paiement'}
+        {loading ? t('Préparation...') : t('Continuer vers le paiement')}
       </Button>
     }>
-      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title="Recharger le portefeuille" />
+      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title={t('Recharger le portefeuille')} />
       <View style={{ paddingHorizontal: 16, paddingTop: 8 }}>
-        <Text style={{ fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600), marginBottom: 10 }}>Montant rapide</Text>
+        <Text style={{ fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600), marginBottom: 10 }}>{t('Montant rapide')}</Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 18 }}>
           {TOPUP_PRESETS.map(p => {
             const active = parseInt(amount, 10) === p;
@@ -194,11 +195,11 @@ export function ScreenWalletTopup() {
             );
           })}
         </View>
-        <Field label="Montant (GNF)" value={amount} onChangeText={setAmount} keyboardType="number-pad" placeholder="ex. 50000" />
+        <Field label={t('Montant (GNF)')} value={amount} onChangeText={setAmount} keyboardType="number-pad" placeholder={t('ex. 50000')} />
         <View style={{ marginTop: 16, backgroundColor: LMX.surfaceAlt, borderRadius: 14, padding: 14, flexDirection: 'row', gap: 10, alignItems: 'flex-start', borderWidth: 1, borderColor: LMX.hairline }}>
           <Icon name="shield" size={18} color={LMX.brand} />
           <Text style={{ flex: 1, fontSize: 11.5, color: LMX.ink70, lineHeight: 17 }}>
-            Le paiement est traité de façon sécurisée. Votre solde est crédité automatiquement dès la confirmation du paiement.
+            {t('Le paiement est traité de façon sécurisée. Votre solde est crédité automatiquement dès la confirmation du paiement.')}
           </Text>
         </View>
       </View>

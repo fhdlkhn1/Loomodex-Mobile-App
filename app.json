@@ -49,7 +49,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Loomodex accède à vos photos pour ajouter des images à vos produits.",
+          "photosPermission": "Loomodex accède à vos photos pour ajouter des images et vidéos à vos produits et votre photo de profil.",
+          "cameraPermission": "Loomodex utilise l'appareil photo pour prendre votre photo de profil.",
           "microphonePermission": false
         }
       ],

@@ -6,6 +6,7 @@ import { Icon, IconName } from '../Icon';
 import { Screen, AppBar, IconBtn } from '../components';
 import { useNotifications } from '../context/NotificationsContext';
 import { AppNotification, NotificationType } from '../api/notifications';
+import { t, locale } from '../i18n';
 
 // Icon + tint per notification type (types come from the plugin)
 const LOOK: Record<NotificationType, { icon: IconName; color: string; bg: string }> = {
@@ -30,17 +31,17 @@ const fallback = { icon: 'bell' as IconName, color: LMX.ink70, bg: LMX.surfaceAl
  * parse that with a space, so normalise to ISO and treat it as device-local.
  */
 function timeAgo(mysql: string): string {
-  const t = Date.parse(mysql.replace(' ', 'T'));
-  if (Number.isNaN(t)) return '';
-  const mins = Math.floor((Date.now() - t) / 60000);
-  if (mins < 1) return "À l'instant";
-  if (mins < 60) return `Il y a ${mins} min`;
+  const ts = Date.parse(mysql.replace(' ', 'T'));
+  if (Number.isNaN(ts)) return '';
+  const mins = Math.floor((Date.now() - ts) / 60000);
+  if (mins < 1) return t("À l'instant");
+  if (mins < 60) return t('Il y a {n} min', { n: mins });
   const h = Math.floor(mins / 60);
-  if (h < 24) return `Il y a ${h} h`;
+  if (h < 24) return t('Il y a {n} h', { n: h });
   const d = Math.floor(h / 24);
-  if (d === 1) return 'Hier';
-  if (d < 7) return `Il y a ${d} j`;
-  return new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+  if (d === 1) return t('Hier');
+  if (d < 7) return t('Il y a {n} j', { n: d });
+  return new Date(ts).toLocaleDateString(locale(), { day: 'numeric', month: 'short' });
 }
 
 function Row({ n, highlight, onPress }: { n: AppNotification; highlight: boolean; onPress: () => void }) {
@@ -93,7 +94,7 @@ export function ScreenNotifications() {
     <Screen scroll={!empty}>
       <AppBar
         left={<IconBtn icon="chevL" onPress={() => (nav.canGoBack() ? nav.goBack() : nav.navigate('Main'))} />}
-        title="Notifications"
+        title={t('Notifications')}
         bell={false}
         right={<View style={{ width: 38 }} />}
       />
@@ -103,9 +104,9 @@ export function ScreenNotifications() {
           <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: LMX.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
             <Icon name="bell" size={30} color={LMX.ink30} />
           </View>
-          <Text style={{ fontSize: 15, fontFamily: sans(700), color: LMX.ink, marginTop: 4 }}>Aucune notification</Text>
+          <Text style={{ fontSize: 15, fontFamily: sans(700), color: LMX.ink, marginTop: 4 }}>{t('Aucune notification')}</Text>
           <Text style={{ fontSize: 12.5, color: LMX.ink50, textAlign: 'center', lineHeight: 18 }}>
-            Vous serez informé ici du suivi de vos commandes, des offres flash et des annonces.
+            {t('Vous serez informé ici du suivi de vos commandes, des offres flash et des annonces.')}
           </Text>
         </View>
       ) : (
@@ -124,7 +125,7 @@ export function ScreenNotifications() {
 
           {hasMore && !loading && (
             <Pressable onPress={loadMore} style={{ alignSelf: 'center', marginTop: 16, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 999, backgroundColor: LMX.surfaceAlt }}>
-              <Text style={{ fontSize: 12.5, fontFamily: sans(600), color: LMX.ink }}>Afficher plus</Text>
+              <Text style={{ fontSize: 12.5, fontFamily: sans(600), color: LMX.ink }}>{t('Afficher plus')}</Text>
             </Pressable>
           )}
         </>

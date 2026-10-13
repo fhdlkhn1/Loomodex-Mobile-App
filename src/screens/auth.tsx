@@ -4,10 +4,13 @@ import { useNavigation } from '@react-navigation/native';
 import { LMX, FONT, sans, mono, shadow } from '../theme';
 import { IMG } from '../data';
 import { Icon } from '../Icon';
-import { Screen, AppBar, IconBtn, Button, Field, Wordmark } from '../components';
+import { Screen, AppBar, IconBtn, Button, Field, Wordmark, LangToggle } from '../components';
 import { useAuth } from '../context/AuthContext';
 import { authApi } from '../api';
+import { friendlyError } from '../api/client';
+import { PhoneInput } from '../components/PhoneInput';
 import { staffHomeRoute } from '../roles';
+import { t } from '../i18n';
 
 // ── Helpers ───────────────────────────────────────────────────────
 function Dot({ active }: { active?: boolean }) {
@@ -32,9 +35,12 @@ export function ScreenOnboarding() {
     <Screen padTop>
       <View style={{ paddingHorizontal: 24, paddingTop: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <Wordmark />
-        <Pressable onPress={() => nav.navigate('Main')}>
-          <Text style={{ color: LMX.ink70, fontSize: 13, fontFamily: sans(500) }}>Passer</Text>
-        </Pressable>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+          <LangToggle />
+          <Pressable onPress={() => nav.navigate('Main')}>
+            <Text style={{ color: LMX.ink70, fontSize: 13, fontFamily: sans(500) }}>{t('Passer')}</Text>
+          </Pressable>
+        </View>
       </View>
 
       <View style={{ paddingHorizontal: 24, paddingTop: 30 }}>
@@ -50,29 +56,29 @@ export function ScreenOnboarding() {
           </View>
           <View style={{ position: 'absolute', top: 120, right: 20, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: LMX.surface, borderRadius: 999, flexDirection: 'row', alignItems: 'center', gap: 6, ...shadow('md') }}>
             <Icon name="truck" size={12} color={LMX.emerald} />
-            <Text style={{ fontSize: 11.5, fontFamily: sans(600), color: LMX.ink }}>3h–48h Conakry</Text>
+            <Text style={{ fontSize: 11.5, fontFamily: sans(600), color: LMX.ink }}>{t('3h–48h Conakry')}</Text>
           </View>
           <View style={{ position: 'absolute', bottom: 100, right: 10, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: LMX.brand, borderRadius: 999, flexDirection: 'row', alignItems: 'center', gap: 6, ...shadow('md') }}>
             <Icon name="shield" size={12} color="#fff" />
-            <Text style={{ fontSize: 11.5, fontFamily: sans(600), color: '#fff' }}>Paiement à livraison</Text>
+            <Text style={{ fontSize: 11.5, fontFamily: sans(600), color: '#fff' }}>{t('Paiement à livraison')}</Text>
           </View>
         </View>
       </View>
 
       <View style={{ paddingHorizontal: 28, paddingTop: 16 }}>
         <Text style={{ fontFamily: FONT.display, fontSize: 38, lineHeight: 42, color: LMX.ink }}>
-          Le marché de la Guinée,{' '}
-          <Text style={{ fontFamily: FONT.displayItalic, color: LMX.accent }}>à votre porte.</Text>
+          {t('Le marché de la Guinée,')}{' '}
+          <Text style={{ fontFamily: FONT.displayItalic, color: LMX.accent }}>{t('à votre porte.')}</Text>
         </Text>
         <Text style={{ marginTop: 14, fontSize: 14, lineHeight: 21, color: LMX.ink70 }}>
-          Découvrez des milliers de produits de vendeurs vérifiés à Conakry. Inspectez avant de payer — votre confiance est notre règle.
+          {t('Découvrez des milliers de produits de vendeurs vérifiés à Conakry. Inspectez avant de payer — votre confiance est notre règle.')}
         </Text>
       </View>
 
       <View style={{ paddingHorizontal: 24, paddingTop: 28, paddingBottom: 20, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
         <View style={{ flexDirection: 'row', gap: 5 }}><Dot active /><Dot /><Dot /></View>
         <View style={{ flex: 1 }} />
-        <Button variant="accent" size="lg" icon="arrowR" onPress={() => nav.navigate('SignIn')}>Commencer</Button>
+        <Button variant="accent" size="lg" icon="arrowR" onPress={() => nav.navigate('SignIn')}>{t('Commencer')}</Button>
       </View>
     </Screen>
   );
@@ -90,7 +96,7 @@ export function ScreenSignIn() {
 
   const handleLogin = async () => {
     if (!email.trim() || !password) {
-      Alert.alert('Champs manquants', 'Veuillez renseigner votre email et mot de passe.');
+      Alert.alert(t('Champs manquants'), t('Veuillez renseigner votre email et mot de passe.'));
       return;
     }
     setLoading(true);
@@ -101,7 +107,7 @@ export function ScreenSignIn() {
       const dash = staffHomeRoute(u?.roles);
       nav.reset({ index: 0, routes: [{ name: dash ?? 'Main' }] });
     } catch (e: any) {
-      Alert.alert('Connexion échouée', e.message ?? 'Email ou mot de passe incorrect.');
+      Alert.alert(t('Connexion échouée'), friendlyError(e, t('Email ou mot de passe incorrect.')));
     } finally {
       setLoading(false);
     }
@@ -109,20 +115,20 @@ export function ScreenSignIn() {
 
   return (
     <Screen>
-      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} />
+      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} right={<LangToggle />} />
       <View style={{ paddingHorizontal: 24, paddingTop: 12 }}>
-        <Text style={{ fontSize: 11, color: LMX.ink50, letterSpacing: 0.6, textTransform: 'uppercase', fontFamily: sans(600) }}>Bienvenue</Text>
+        <Text style={{ fontSize: 11, color: LMX.ink50, letterSpacing: 0.6, textTransform: 'uppercase', fontFamily: sans(600) }}>{t('Bienvenue')}</Text>
         <Text style={{ fontFamily: FONT.display, fontSize: 36, lineHeight: 40, marginTop: 8, color: LMX.ink }}>
-          Connectez-vous à{'\n'}<Text style={{ color: LMX.accent }}>Loomodex</Text>
+          {t('Connectez-vous à')}{'\n'}<Text style={{ color: LMX.accent }}>Loomodex</Text>
         </Text>
       </View>
 
       <View style={{ paddingHorizontal: 24, paddingTop: 28, gap: 16 }}>
-        <Field label="Adresse email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+        <Field label={t('Adresse email')} value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
         <Field
-          label="Mot de passe"
+          label={t('Mot de passe')}
           leadingIcon="key"
-          placeholder="Votre mot de passe"
+          placeholder={t('Votre mot de passe')}
           value={password}
           onChangeText={setPassword}
           trailingIcon="eye"
@@ -130,27 +136,27 @@ export function ScreenSignIn() {
           secure={!showPass}
         />
         <Pressable style={{ alignSelf: 'flex-end' }} onPress={() => nav.navigate('Forgot')}>
-          <Text style={{ fontSize: 12, color: LMX.brand, fontFamily: sans(500), textDecorationLine: 'underline' }}>Mot de passe oublié ?</Text>
+          <Text style={{ fontSize: 12, color: LMX.brand, fontFamily: sans(500), textDecorationLine: 'underline' }}>{t('Mot de passe oublié ?')}</Text>
         </Pressable>
       </View>
 
       <View style={{ paddingHorizontal: 24, paddingTop: 20 }}>
         {loading
           ? <ActivityIndicator color={LMX.brand} size="large" />
-          : <Button full variant="accent" size="lg" icon="arrowR" onPress={handleLogin}>Se connecter</Button>
+          : <Button full variant="accent" size="lg" icon="arrowR" onPress={handleLogin}>{t('Se connecter')}</Button>
         }
       </View>
 
       <View style={{ paddingHorizontal: 24, paddingTop: 28, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' }}>
-        <Text style={{ fontSize: 13, color: LMX.ink70 }}>Nouveau sur Loomodex ? </Text>
+        <Text style={{ fontSize: 13, color: LMX.ink70 }}>{t('Nouveau sur Loomodex ?')} </Text>
         <Pressable onPress={() => nav.navigate('SignUp')}>
-          <Text style={{ fontSize: 13, color: LMX.brand, fontFamily: sans(600), textDecorationLine: 'underline' }}>Créer un compte</Text>
+          <Text style={{ fontSize: 13, color: LMX.brand, fontFamily: sans(600), textDecorationLine: 'underline' }}>{t('Créer un compte')}</Text>
         </Pressable>
       </View>
 
       <View style={{ paddingHorizontal: 24, paddingTop: 28, alignItems: 'center' }}>
         <Pressable onPress={() => nav.navigate('Main')}>
-          <Text style={{ fontSize: 12, color: LMX.ink50, textDecorationLine: 'underline' }}>Continuer sans compte</Text>
+          <Text style={{ fontSize: 12, color: LMX.ink50, textDecorationLine: 'underline' }}>{t('Continuer sans compte')}</Text>
         </Pressable>
       </View>
     </Screen>
@@ -179,27 +185,27 @@ export function ScreenSignUp() {
 
   const handleRegister = async () => {
     if (!firstName.trim() || !phone.trim() || !password) {
-      Alert.alert('Champs manquants', 'Le prénom, le téléphone et le mot de passe sont obligatoires.');
+      Alert.alert(t('Champs manquants'), t('Le prénom, le téléphone et le mot de passe sont obligatoires.'));
       return;
     }
     if (!passLen) {
-      Alert.alert('Mot de passe trop court', 'Minimum 6 caractères.');
+      Alert.alert(t('Mot de passe trop court'), t('Minimum 6 caractères.'));
       return;
     }
     if (password !== confirmPass) {
-      Alert.alert('Mots de passe différents', 'Les deux mots de passe ne correspondent pas.');
+      Alert.alert(t('Mots de passe différents'), t('Les deux mots de passe ne correspondent pas.'));
       return;
     }
     if (!agreed) {
-      Alert.alert('Conditions', "Veuillez accepter les conditions d'utilisation.");
+      Alert.alert(t('Conditions'), t("Veuillez accepter les conditions d'utilisation."));
       return;
     }
     setLoading(true);
     try {
-      await register({ email: email.trim().toLowerCase(), password, first_name: firstName, last_name: lastName, phone: phone.trim() });
+      await register({ email: email.trim().toLowerCase(), password, first_name: firstName, last_name: lastName, phone });
       nav.reset({ index: 0, routes: [{ name: 'Main' }] });
     } catch (e: any) {
-      Alert.alert('Erreur', e.message ?? "L'inscription a échoué.");
+      Alert.alert(t('Erreur'), friendlyError(e, t("L'inscription a échoué.")));
     } finally {
       setLoading(false);
     }
@@ -209,24 +215,24 @@ export function ScreenSignUp() {
     <Screen>
       <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} />
       <View style={{ paddingHorizontal: 24, paddingTop: 12 }}>
-        <Text style={{ fontSize: 11, color: LMX.ink50, letterSpacing: 0.6, textTransform: 'uppercase', fontFamily: sans(600) }}>Nouveau compte</Text>
+        <Text style={{ fontSize: 11, color: LMX.ink50, letterSpacing: 0.6, textTransform: 'uppercase', fontFamily: sans(600) }}>{t('Nouveau compte')}</Text>
         <Text style={{ fontFamily: FONT.display, fontSize: 34, lineHeight: 38, marginTop: 8, color: LMX.ink }}>
-          Rejoignez{'\n'}<Text style={{ color: LMX.accent }}>Loomodex</Text>
+          {t('Rejoignez')}{'\n'}<Text style={{ color: LMX.accent }}>Loomodex</Text>
         </Text>
-        <Text style={{ fontSize: 13, color: LMX.ink70, marginTop: 10, lineHeight: 19 }}>Remplissez les informations ci-dessous pour créer votre compte.</Text>
+        <Text style={{ fontSize: 13, color: LMX.ink70, marginTop: 10, lineHeight: 19 }}>{t('Remplissez les informations ci-dessous pour créer votre compte.')}</Text>
       </View>
 
       <View style={{ paddingHorizontal: 24, paddingTop: 24, gap: 14 }}>
-        <Field label="Prénom *" leadingIcon="user" placeholder="Votre prénom" value={firstName} onChangeText={setFirstName} />
-        <Field label="Nom" leadingIcon="user" placeholder="Votre nom" value={lastName} onChangeText={setLastName} />
-        <Field label="Email (optionnel)" placeholder="Votre email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
-        <Field label="Téléphone *" leadingIcon="phone" prefix="+224" placeholder="Numéro de téléphone" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
-        <Field label="Mot de passe *" leadingIcon="key" placeholder="Mot de passe" value={password} onChangeText={setPassword} secure={!showPass} trailingIcon="eye" onTrailingPress={() => setShowPass(v => !v)} />
-        <Field label="Confirmer le mot de passe *" leadingIcon="key" placeholder="Confirmez votre mot de passe" value={confirmPass} onChangeText={setConfirmPass} secure={!showConfirm} trailingIcon="eye" onTrailingPress={() => setShowConfirm(v => !v)} />
+        <Field label={t('Prénom *')} leadingIcon="user" placeholder={t('Votre prénom')} value={firstName} onChangeText={setFirstName} />
+        <Field label={t('Nom')} leadingIcon="user" placeholder={t('Votre nom')} value={lastName} onChangeText={setLastName} />
+        <Field label={t('Email (optionnel)')} placeholder={t('Votre email')} value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+        <PhoneInput label={t('Téléphone *')} value={phone} onChange={setPhone} />
+        <Field label={t('Mot de passe *')} leadingIcon="key" placeholder={t('Mot de passe')} value={password} onChangeText={setPassword} secure={!showPass} trailingIcon="eye" onTrailingPress={() => setShowPass(v => !v)} />
+        <Field label={t('Confirmer le mot de passe *')} leadingIcon="key" placeholder={t('Confirmez votre mot de passe')} value={confirmPass} onChangeText={setConfirmPass} secure={!showConfirm} trailingIcon="eye" onTrailingPress={() => setShowConfirm(v => !v)} />
         <View style={{ gap: 2, paddingLeft: 4 }}>
-          <Requirement label="Au moins 6 caractères" met={passLen} />
-          <Requirement label="Contient un chiffre" met={passNum} />
-          <Requirement label="Les mots de passe correspondent" met={passMatch} />
+          <Requirement label={t('Au moins 6 caractères')} met={passLen} />
+          <Requirement label={t('Contient un chiffre')} met={passNum} />
+          <Requirement label={t('Les mots de passe correspondent')} met={passMatch} />
         </View>
       </View>
 
@@ -238,24 +244,24 @@ export function ScreenSignUp() {
           {agreed && <Icon name="check" size={12} color="#fff" />}
         </View>
         <Text style={{ fontSize: 12, color: LMX.ink70, lineHeight: 18, flex: 1 }}>
-          J'accepte les{' '}
-          <Text style={{ color: LMX.brand, fontFamily: sans(600) }}>Conditions d'utilisation</Text>
-          {' '}et la{' '}
-          <Text style={{ color: LMX.brand, fontFamily: sans(600) }}>Politique de confidentialité</Text>.
+          {t("J'accepte les")}{' '}
+          <Text style={{ color: LMX.brand, fontFamily: sans(600) }}>{t("Conditions d'utilisation")}</Text>
+          {' '}{t('et la')}{' '}
+          <Text style={{ color: LMX.brand, fontFamily: sans(600) }}>{t('Politique de confidentialité')}</Text>.
         </Text>
       </Pressable>
 
       <View style={{ paddingHorizontal: 24, paddingTop: 20 }}>
         {loading
           ? <ActivityIndicator color={LMX.brand} size="large" />
-          : <Button full variant="accent" size="lg" icon="arrowR" onPress={handleRegister}>Créer mon compte</Button>
+          : <Button full variant="accent" size="lg" icon="arrowR" onPress={handleRegister}>{t('Créer mon compte')}</Button>
         }
       </View>
 
       <View style={{ paddingHorizontal: 24, paddingTop: 20, flexDirection: 'row', justifyContent: 'center' }}>
-        <Text style={{ fontSize: 13, color: LMX.ink70 }}>Déjà un compte ? </Text>
+        <Text style={{ fontSize: 13, color: LMX.ink70 }}>{t('Déjà un compte ?')} </Text>
         <Pressable onPress={() => nav.navigate('SignIn')}>
-          <Text style={{ fontSize: 13, color: LMX.brand, fontFamily: sans(600), textDecorationLine: 'underline' }}>Se connecter</Text>
+          <Text style={{ fontSize: 13, color: LMX.brand, fontFamily: sans(600), textDecorationLine: 'underline' }}>{t('Se connecter')}</Text>
         </Pressable>
       </View>
     </Screen>
@@ -269,8 +275,8 @@ export function ScreenOTP() {
     <Screen>
       <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} />
       <View style={{ paddingHorizontal: 24, paddingTop: 12 }}>
-        <Text style={{ fontSize: 11, color: LMX.ink50, letterSpacing: 0.6, textTransform: 'uppercase', fontFamily: sans(600) }}>Vérification</Text>
-        <Text style={{ fontFamily: FONT.display, fontSize: 34, lineHeight: 38, marginTop: 8, color: LMX.ink }}>Entrez le code{'\n'}reçu par SMS</Text>
+        <Text style={{ fontSize: 11, color: LMX.ink50, letterSpacing: 0.6, textTransform: 'uppercase', fontFamily: sans(600) }}>{t('Vérification')}</Text>
+        <Text style={{ fontFamily: FONT.display, fontSize: 34, lineHeight: 38, marginTop: 8, color: LMX.ink }}>{t('Entrez le code\nreçu par SMS')}</Text>
       </View>
       <View style={{ paddingHorizontal: 24, paddingTop: 28, flexDirection: 'row', gap: 10, justifyContent: 'space-between' }}>
         {[0,1,2,3,4,5].map(i => (
@@ -280,11 +286,11 @@ export function ScreenOTP() {
         ))}
       </View>
       <View style={{ paddingHorizontal: 24, paddingTop: 20 }}>
-        <Button full variant="accent" size="lg" icon="arrowR" onPress={() => nav.navigate('Main')}>Vérifier</Button>
+        <Button full variant="accent" size="lg" icon="arrowR" onPress={() => nav.navigate('Main')}>{t('Vérifier')}</Button>
       </View>
       <View style={{ paddingHorizontal: 24, paddingTop: 16, flexDirection: 'row', justifyContent: 'center' }}>
-        <Text style={{ fontSize: 12, color: LMX.ink70 }}>Pas reçu ? </Text>
-        <Pressable><Text style={{ fontSize: 12, color: LMX.brand, fontFamily: sans(600) }}>Renvoyer</Text></Pressable>
+        <Text style={{ fontSize: 12, color: LMX.ink70 }}>{t('Pas reçu ?')} </Text>
+        <Pressable><Text style={{ fontSize: 12, color: LMX.brand, fontFamily: sans(600) }}>{t('Renvoyer')}</Text></Pressable>
       </View>
     </Screen>
   );
@@ -299,7 +305,7 @@ export function ScreenForgot() {
 
   const handleSend = async () => {
     if (!email.trim()) {
-      Alert.alert('Email requis', 'Veuillez entrer votre adresse email.');
+      Alert.alert(t('Email requis'), t('Veuillez entrer votre adresse email.'));
       return;
     }
     setLoading(true);
@@ -317,10 +323,10 @@ export function ScreenForgot() {
     <Screen>
       <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} />
       <View style={{ paddingHorizontal: 24, paddingTop: 12 }}>
-        <Text style={{ fontSize: 11, color: LMX.ink50, letterSpacing: 0.6, textTransform: 'uppercase', fontFamily: sans(600) }}>Récupération</Text>
-        <Text style={{ fontFamily: FONT.display, fontSize: 36, lineHeight: 40, marginTop: 8, color: LMX.ink }}>Mot de passe{'\n'}oublié ?</Text>
+        <Text style={{ fontSize: 11, color: LMX.ink50, letterSpacing: 0.6, textTransform: 'uppercase', fontFamily: sans(600) }}>{t('Récupération')}</Text>
+        <Text style={{ fontFamily: FONT.display, fontSize: 36, lineHeight: 40, marginTop: 8, color: LMX.ink }}>{t('Mot de passe\noublié ?')}</Text>
         <Text style={{ fontSize: 13, color: LMX.ink70, marginTop: 12, lineHeight: 20 }}>
-          Entrez l'email lié à votre compte — nous vous enverrons un code de réinitialisation.
+          {t("Entrez l'email lié à votre compte — nous vous enverrons un code de réinitialisation.")}
         </Text>
       </View>
 
@@ -329,12 +335,12 @@ export function ScreenForgot() {
           <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: LMX.emeraldSoft, alignItems: 'center', justifyContent: 'center' }}>
             <Icon name="check" size={28} color={LMX.emerald} />
           </View>
-          <Text style={{ fontSize: 16, fontFamily: sans(600), color: LMX.ink, textAlign: 'center' }}>Email envoyé !</Text>
+          <Text style={{ fontSize: 16, fontFamily: sans(600), color: LMX.ink, textAlign: 'center' }}>{t('Email envoyé !')}</Text>
           <Text style={{ fontSize: 13, color: LMX.ink70, textAlign: 'center', lineHeight: 20 }}>
-            Si cet email existe, vous recevrez un code de réinitialisation sous peu.
+            {t('Si cet email existe, vous recevrez un code de réinitialisation sous peu.')}
           </Text>
-          <Button variant="accent" onPress={() => nav.navigate('Reset', { email: email.trim() })}>J'ai reçu mon code</Button>
-          <Pressable onPress={() => nav.navigate('SignIn')}><Text style={{ fontSize: 12, color: LMX.ink50, textDecorationLine: 'underline' }}>Retour à la connexion</Text></Pressable>
+          <Button variant="accent" onPress={() => nav.navigate('Reset', { email: email.trim() })}>{t("J'ai reçu mon code")}</Button>
+          <Pressable onPress={() => nav.navigate('SignIn')}><Text style={{ fontSize: 12, color: LMX.ink50, textDecorationLine: 'underline' }}>{t('Retour à la connexion')}</Text></Pressable>
         </View>
       ) : (
         <>
@@ -344,7 +350,7 @@ export function ScreenForgot() {
           <View style={{ paddingHorizontal: 24, paddingTop: 20 }}>
             {loading
               ? <ActivityIndicator color={LMX.brand} />
-              : <Button full variant="accent" size="lg" icon="arrowR" onPress={handleSend}>Envoyer le code</Button>
+              : <Button full variant="accent" size="lg" icon="arrowR" onPress={handleSend}>{t('Envoyer le code')}</Button>
             }
           </View>
         </>
@@ -366,17 +372,17 @@ export function ScreenResetPassword({ route }: any) {
   const passMatch  = password === confirm && confirm.length > 0;
 
   const handleReset = async () => {
-    if (!email.trim() || !code.trim()) { Alert.alert('Champs requis', 'Veuillez renseigner votre email et le code reçu.'); return; }
-    if (!passLen) { Alert.alert('Trop court', 'Minimum 6 caractères.'); return; }
-    if (!passMatch) { Alert.alert('Ne correspond pas', 'Les mots de passe ne correspondent pas.'); return; }
+    if (!email.trim() || !code.trim()) { Alert.alert(t('Champs requis'), t('Veuillez renseigner votre email et le code reçu.')); return; }
+    if (!passLen) { Alert.alert(t('Trop court'), t('Minimum 6 caractères.')); return; }
+    if (!passMatch) { Alert.alert(t('Ne correspond pas'), t('Les mots de passe ne correspondent pas.')); return; }
     setLoading(true);
     try {
       await authApi.resetPassword(email.trim().toLowerCase(), code.trim(), password);
-      Alert.alert('Succès', 'Mot de passe mis à jour.', [
+      Alert.alert(t('Succès'), t('Mot de passe mis à jour.'), [
         { text: 'OK', onPress: () => nav.reset({ index: 0, routes: [{ name: 'SignIn' }] }) }
       ]);
     } catch (e: any) {
-      Alert.alert('Échec', e?.message ?? 'Code invalide ou expiré.');
+      Alert.alert(t('Échec'), friendlyError(e, t('Code invalide ou expiré.')));
     } finally {
       setLoading(false);
     }
@@ -386,23 +392,23 @@ export function ScreenResetPassword({ route }: any) {
     <Screen>
       <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} />
       <View style={{ paddingHorizontal: 24, paddingTop: 12 }}>
-        <Text style={{ fontSize: 11, color: LMX.ink50, letterSpacing: 0.6, textTransform: 'uppercase', fontFamily: sans(600) }}>Nouveau mot de passe</Text>
-        <Text style={{ fontFamily: FONT.display, fontSize: 34, lineHeight: 38, marginTop: 8, color: LMX.ink }}>Créer un nouveau{'\n'}mot de passe</Text>
+        <Text style={{ fontSize: 11, color: LMX.ink50, letterSpacing: 0.6, textTransform: 'uppercase', fontFamily: sans(600) }}>{t('Nouveau mot de passe')}</Text>
+        <Text style={{ fontFamily: FONT.display, fontSize: 34, lineHeight: 38, marginTop: 8, color: LMX.ink }}>{t('Créer un nouveau\nmot de passe')}</Text>
       </View>
       <View style={{ paddingHorizontal: 24, paddingTop: 28, gap: 14 }}>
         <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
-        <Field label="Code de réinitialisation" value={code} onChangeText={setCode} autoCapitalize="none" />
-        <Field label="Nouveau mot de passe" value={password} onChangeText={setPassword} secure />
-        <Field label="Confirmer le mot de passe" value={confirm} onChangeText={setConfirm} secure />
+        <Field label={t('Code de réinitialisation')} value={code} onChangeText={setCode} autoCapitalize="none" />
+        <Field label={t('Nouveau mot de passe')} value={password} onChangeText={setPassword} secure />
+        <Field label={t('Confirmer le mot de passe')} value={confirm} onChangeText={setConfirm} secure />
         <View style={{ gap: 2, paddingLeft: 4 }}>
-          <Requirement label="Au moins 6 caractères" met={passLen} />
-          <Requirement label="Les mots de passe correspondent" met={passMatch} />
+          <Requirement label={t('Au moins 6 caractères')} met={passLen} />
+          <Requirement label={t('Les mots de passe correspondent')} met={passMatch} />
         </View>
       </View>
       <View style={{ paddingHorizontal: 24, paddingTop: 20 }}>
         {loading
           ? <ActivityIndicator color={LMX.brand} />
-          : <Button full variant="accent" size="lg" icon="check" onPress={handleReset}>Réinitialiser</Button>
+          : <Button full variant="accent" size="lg" icon="check" onPress={handleReset}>{t('Réinitialiser')}</Button>
         }
       </View>
     </Screen>

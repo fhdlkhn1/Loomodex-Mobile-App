@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { get, post } from '../api/client';
 import { productsApi } from '../api/products';
 import { useAuth } from './AuthContext';
+import { t } from '../i18n';
 
 export interface CartItem {
   key: string;
@@ -199,7 +200,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, [isLoggedIn, guestClear]);
 
   const applyCoupon = useCallback(async (code: string) => {
-    if (!isLoggedIn) { throw new Error('Les codes promo nécessitent un compte.'); }
+    if (!isLoggedIn) { throw new Error(t('Les codes promo nécessitent un compte.')); }
     setLoading(true);
     try {
       const data = await post<Cart>('/cart/coupon', { code }, true);

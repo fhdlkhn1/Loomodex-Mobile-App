@@ -8,7 +8,7 @@ export type IconName =
   | 'arrowDownLeft' | 'eye' | 'grid' | 'list' | 'location' | 'phone' | 'package' | 'refresh'
   | 'sparkle' | 'tag' | 'money' | 'moMo' | 'receipt' | 'settings' | 'storefront' | 'headset'
   | 'wallet' | 'card' | 'bike' | 'key' | 'ticket' | 'msg' | 'chart' | 'pencil' | 'arrowU'
-  | 'arrowD' | 'download';
+  | 'arrowD' | 'download' | 'play' | 'camera' | 'image' | 'trash';
 
 type Props = {
   name: IconName;
@@ -74,6 +74,10 @@ export function Icon({ name, size = 20, color = '#0F1620', strokeWidth = 1.6 }: 
     arrowU: <Path {...s} d="M12 19V5M5 12l7-7 7 7" />,
     arrowD: <Path {...s} d="M12 5v14M5 12l7 7 7-7" />,
     download: <Path {...s} d="M12 4v12M6 12l6 6 6-6M4 20h16" />,
+    play: <Path {...s} d="M7 4.5v15l12-7.5z" />,
+    camera: <><Path {...s} d="M3 8a2 2 0 0 1 2-2h2.5l1.5-2h6l1.5 2H19a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><Circle {...s} cx="12" cy="13" r="3.5" /></>,
+    image: <><Rect {...s} x="3" y="4" width="18" height="16" rx="2" /><Circle {...s} cx="8.5" cy="9.5" r="1.5" /><Path {...s} d="m21 16-5-5-8 8" /></>,
+    trash: <Path {...s} d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />,
   };
   return <Svg {...svg}>{paths[name]}</Svg>;
 }

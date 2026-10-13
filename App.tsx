@@ -20,6 +20,7 @@ import { queryClient } from './src/queryClient';
 import { AuthProvider } from './src/context/AuthContext';
 import { CartProvider } from './src/context/CartContext';
 import { NotificationsProvider } from './src/context/NotificationsContext';
+import { LanguageProvider, t } from './src/i18n';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -44,8 +45,8 @@ class AppErrorBoundary extends React.Component<{ children: React.ReactNode }, { 
     if (this.state.error) {
       return (
         <View style={{ flex: 1, backgroundColor: LMX.bg, alignItems: 'center', justifyContent: 'center', padding: 28, gap: 10 }}>
-          <Text style={{ fontSize: 16, fontWeight: '700', color: LMX.ink, textAlign: 'center' }}>Une erreur est survenue</Text>
-          <Text style={{ fontSize: 13, color: LMX.ink70, textAlign: 'center' }}>Veuillez fermer puis rouvrir l'application.</Text>
+          <Text style={{ fontSize: 16, fontWeight: '700', color: LMX.ink, textAlign: 'center' }}>{t('Une erreur est survenue')}</Text>
+          <Text style={{ fontSize: 13, color: LMX.ink70, textAlign: 'center' }}>{t("Veuillez fermer puis rouvrir l'application.")}</Text>
         </View>
       );
     }
@@ -76,18 +77,20 @@ export default function App() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <AppErrorBoundary>
-          <QueryClientProvider client={queryClient}>
-            <AuthProvider>
-              <CartProvider>
-                <NotificationsProvider>
-                  <NavigationContainer theme={navTheme} onReady={onReady}>
-                    <StatusBar style="dark" />
-                    <RootNavigator />
-                  </NavigationContainer>
-                </NotificationsProvider>
-              </CartProvider>
-            </AuthProvider>
-          </QueryClientProvider>
+          <LanguageProvider>
+            <QueryClientProvider client={queryClient}>
+              <AuthProvider>
+                <CartProvider>
+                  <NotificationsProvider>
+                    <NavigationContainer theme={navTheme} onReady={onReady}>
+                      <StatusBar style="dark" />
+                      <RootNavigator />
+                    </NavigationContainer>
+                  </NotificationsProvider>
+                </CartProvider>
+              </AuthProvider>
+            </QueryClientProvider>
+          </LanguageProvider>
         </AppErrorBoundary>
       </SafeAreaProvider>
     </GestureHandlerRootView>
