@@ -1,14 +1,14 @@
-import React from 'react';
-import { View, Text, Pressable, ActivityIndicator } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import React, { useEffect, useRef } from 'react';
+import { View, ActivityIndicator } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { createBottomTabNavigator, BottomTabBarProps } from '@react-navigation/bottom-tabs';
-import { LMX, sans, mono } from './theme';
-import { Icon, IconName } from './Icon';
+import { useNavigation } from '@react-navigation/native';
+import { LMX } from './theme';
 import { useAuth } from './context/AuthContext';
+import { useNotifications } from './context/NotificationsContext';
 import { staffHomeRoute } from './roles';
-import { useCart } from './context/CartContext';
-import { t as tr } from './i18n';
+import { Notifications } from './notifications';
+import { openNotificationTarget } from './notificationRouting';
+import { RoleScreenLayout } from './components/RoleTabBar';
 
 import { ScreenSplash } from './screens/splash';
 import { ScreenOnboarding, ScreenSignIn, ScreenSignUp, ScreenOTP, ScreenForgot, ScreenResetPassword } from './screens/auth';
@@ -24,60 +24,49 @@ import { ScreenUsaStore } from './screens/usastore';
 import { ScreenSeller, ScreenAddProduct, ScreenDriver, ScreenDriverOrder, ScreenLogistics, ScreenCS, ScreenVendorProducts, ScreenVendorEditProduct, ScreenVendorOrders, ScreenVendorOrder, ScreenVendorStore, ScreenDriverLocate, ScreenDriversMap } from './screens/business';
 
 const Stack = createNativeStackNavigator();
-const Tab = createBottomTabNavigator();
 
-const TABS: { name: string; icon: IconName; label: string; push?: string }[] = [
-  { name: 'Home',       icon: 'home',  label: 'Accueil' },
-  { name: 'Categories', icon: 'grid',  label: 'Catégories' },
-  { name: 'CartTab',    icon: 'bag',   label: 'Panier',   push: 'Cart' },
-  { name: 'OrdersList', icon: 'package', label: 'Commandes', push: 'OrdersList' },
-  { name: 'Account',    icon: 'user',  label: 'Compte' },
-];
+/**
+ * Tapping a push opens the screen it is about (same routing as the in-app inbox).
+ * Covers taps while the app runs and the tap that cold-started the app. Guarded:
+ * expo-notifications is null in Expo Go.
+ */
+function PushResponseHandler() {
+  const nav = useNavigation<any>();
+  const { isLoggedIn, user } = useAuth();
+  const { refresh } = useNotifications();
+  const handled = useRef<Set<string>>(new Set());
+  const roles = useRef<string[] | undefined>(user?.roles);
+  roles.current = user?.roles;
 
-function LoomodexTabBar({ state, navigation }: BottomTabBarProps) {
-  const insets     = useSafeAreaInsets();
-  const activeName = state.routes[state.index].name;
-  const { cart }   = useCart();
+  useEffect(() => {
+    if (!Notifications || !isLoggedIn) return;
+    const mod = Notifications;
 
-  return (
-    <View style={{
-      flexDirection: 'row', justifyContent: 'space-around', alignItems: 'flex-end',
-      backgroundColor: LMX.surface, borderTopWidth: 1, borderTopColor: LMX.hairline,
-      paddingTop: 8, paddingBottom: Math.max(insets.bottom, 10),
-    }}>
-      {TABS.map(t => {
-        const isActive = !t.push && t.name === activeName;
-        const badge = t.push === 'Cart' ? cart.item_count : 0;
-        return (
-          <Pressable
-            key={t.name}
-            onPress={() => (t.push ? navigation.navigate(t.push as never) : navigation.navigate(t.name as never))}
-            style={{ alignItems: 'center', gap: 3, paddingHorizontal: 12, paddingVertical: 4 }}
-          >
-            <View>
-              <Icon name={t.icon} size={22} color={isActive ? LMX.brand : LMX.ink50} />
-              {badge > 0 && (
-                <View style={{ position: 'absolute', top: -4, right: -7, minWidth: 16, height: 16, borderRadius: 8, paddingHorizontal: 4, backgroundColor: LMX.accent, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: LMX.surface }}>
-                  <Text style={{ color: '#fff', fontSize: 9, fontFamily: mono(700) }}>{badge}</Text>
-                </View>
-              )}
-            </View>
-            <Text style={{ fontSize: 10, fontFamily: isActive ? sans(600) : sans(400), color: isActive ? LMX.brand : LMX.ink50 }}>{tr(t.label)}</Text>
-          </Pressable>
-        );
-      })}
-    </View>
-  );
-}
+    const handle = (response: any) => {
+      try {
+        const id: string = response?.notification?.request?.identifier ?? '';
+        if (id && handled.current.has(id)) return;
+        if (id) handled.current.add(id);
+        const data = response?.notification?.request?.content?.data ?? null;
+        refresh();
+        const go = () => { openNotificationTarget(nav, data, roles.current).catch(() => {}); };
+        // On a cold start the navigator may still be mounting its first screen.
+        if (typeof nav.isReady === 'function' && !nav.isReady()) setTimeout(go, 600);
+        else go();
+      } catch {}
+    };
 
-function MainTabs() {
-  return (
-    <Tab.Navigator tabBar={(props) => <LoomodexTabBar {...props} />} screenOptions={{ headerShown: false }}>
-      <Tab.Screen name="Home" component={ScreenHome} />
-      <Tab.Screen name="Account" component={ScreenAccount} />
-      <Tab.Screen name="Categories" component={ScreenCategories} />
-    </Tab.Navigator>
-  );
+    let sub: any;
+    try {
+      sub = mod.addNotificationResponseReceivedListener(handle);
+      mod.getLastNotificationResponseAsync()
+        .then(r => { if (r) { handle(r); mod.clearLastNotificationResponseAsync().catch(() => {}); } })
+        .catch(() => {});
+    } catch {}
+    return () => { try { sub?.remove(); } catch {} };
+  }, [isLoggedIn, nav, refresh]);
+
+  return null;
 }
 
 export function RootNavigator() {
@@ -96,9 +85,14 @@ export function RootNavigator() {
   const initialRoute = !isLoggedIn ? 'Splash' : (staffHomeRoute(user?.roles) ?? 'Main');
 
   return (
+    <>
+    <PushResponseHandler />
     <Stack.Navigator
       initialRouteName={initialRoute}
       screenOptions={{ headerShown: false, contentStyle: { backgroundColor: LMX.bg } }}
+      screenLayout={({ children, route, navigation }) => (
+        <RoleScreenLayout routeName={route.name} navigation={navigation as any}>{children}</RoleScreenLayout>
+      )}
     >
       {/* Always available */}
       <Stack.Screen name="Splash"      component={ScreenSplash} />
@@ -108,7 +102,10 @@ export function RootNavigator() {
       <Stack.Screen name="OTP"         component={ScreenOTP} />
       <Stack.Screen name="Forgot"      component={ScreenForgot} />
       <Stack.Screen name="Reset"       component={ScreenResetPassword} />
-      <Stack.Screen name="Main"        component={MainTabs} />
+      {/* Customer home tabs — plain stack screens; the role tab bar is drawn by RoleScreenLayout */}
+      <Stack.Screen name="Main"        component={ScreenHome} />
+      <Stack.Screen name="Categories"  component={ScreenCategories} />
+      <Stack.Screen name="Account"     component={ScreenAccount} />
 
       <Stack.Screen name="Search" component={ScreenSearch} />
       <Stack.Screen name="SearchResults" component={ScreenSearchResults} />
@@ -157,5 +154,6 @@ export function RootNavigator() {
       <Stack.Screen name="PartnerLedger" component={ScreenPartnerLedger} />
       <Stack.Screen name="PartnerDriversMap" component={ScreenDriversMap} initialParams={{ scope: 'partner' }} />
     </Stack.Navigator>
+    </>
   );
 }

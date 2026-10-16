@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
-import * as Notifications from 'expo-notifications';
+import { Notifications } from '../notifications';
 import { notificationsApi, AppNotification } from '../api/notifications';
 import { useAuth } from './AuthContext';
 
@@ -107,15 +107,29 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     return () => sub.remove();
   }, [refreshCount]);
 
-  // A push landing while the app is open should light the badge immediately.
+  // Light poll of the unread count while signed in and in the foreground, so the tab
+  // badge stays right where pushes are unavailable (Expo Go, permission denied).
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    const i = setInterval(() => {
+      if (AppState.currentState === 'active') refreshCount();
+    }, 60000);
+    return () => clearInterval(i);
+  }, [isLoggedIn, refreshCount]);
+
+  // A push landing while the app is open should light the badge (and inbox) immediately.
   // Guarded: the native module is absent in Expo Go.
   useEffect(() => {
     let sub: any;
     try {
-      sub = Notifications.addNotificationReceivedListener(() => { refreshCount(); });
+      sub = Notifications?.addNotificationReceivedListener(() => {
+        // First page loaded → reload it so the inbox shows the new row; deeper pages keep
+        // their scroll and only the badge updates.
+        if (page.current <= 1) refresh(); else refreshCount();
+      });
     } catch {}
     return () => { try { sub?.remove(); } catch {} };
-  }, [refreshCount]);
+  }, [refresh, refreshCount]);
 
   return (
     <NotificationsContext.Provider

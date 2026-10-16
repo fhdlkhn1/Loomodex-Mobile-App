@@ -15,6 +15,7 @@ import { useAuth } from '../context/AuthContext';
 import { get, post, friendlyError, isApiError } from '../api/client';
 import { ordersApi, Order, OrderTracking } from '../api/orders';
 import { LiveMap } from '../components/LiveMap';
+import { OrderLocationMap, OrderMapSheet, MapButton } from '../components/OrderLocationMap';
 import { configApi } from '../api/config';
 import { Product as ApiProduct } from '../api/products';
 import { driverApi, logisticsApi, csApi, partnerApi, DeliveryOrder, LogisticsDriver, DriverSummary, LogisticsPartner } from '../api/delivery';
@@ -682,6 +683,10 @@ export function ScreenVendorOrder() {
             <LogiRow icon="bike" label={t('Livreur')} value={order.driver.name || '—'} />
             {!!order.pickup_time && <LogiRow icon="check" label={t('Récupéré')} value={new Date(order.pickup_time.replace(' ', 'T')).toLocaleString(locale(), { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })} />}
             {!order.pickup_time && <Text style={{ fontSize: 11.5, color: LMX.ink50 }}>{t('En attente de récupération par le livreur.')}</Text>}
+            {/* Driver assigned and on his way to the store: own pin + his live position (in-app). */}
+            {!order.pickup_time && order.status === 'assigned-driver' && (
+              <OrderLocationMap orderId={order.id} viewer="store" status={order.status} height={240} />
+            )}
             {!!order.driver.phone && (
               <Pressable onPress={() => call(order.driver!.phone)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 40, borderRadius: 10, backgroundColor: LMX.surface, borderWidth: 1, borderColor: LMX.border }}>
                 <Icon name="phone" size={14} color={LMX.ink} /><Text style={{ fontSize: 12, fontFamily: sans(600) }}>{t('Appeler le livreur')}</Text>
@@ -1695,6 +1700,7 @@ function LogisticsCard({ o, drivers, partners, onAssigned }: { o: DeliveryOrder;
   const [open, setOpen]   = useState(false);
   const [busy, setBusy]   = useState(false);
   const [partnerSheet, setPartnerSheet] = useState(false);
+  const [mapOpen, setMapOpen] = useState(false);
   const st = STATUS_STYLE[o.status] ?? { label: o.status_label, color: LMX.ink50 };
   const orderPartner = o.partner_id || '';
   const canTransfer = ['processing', 'ready-dispatch', 'assigned-driver'].includes(o.status) && !o.pickup_time;
@@ -1768,6 +1774,7 @@ function LogisticsCard({ o, drivers, partners, onAssigned }: { o: DeliveryOrder;
         <LogiRow icon="storefront" label={t('Retrait')} value={[o.pickup?.store, o.pickup?.address].filter(Boolean).join(' · ') || t('Vendeur')} />
         <LogiRow icon="pin" label={t('Livraison')} value={o.delivery_address || [o.address, o.neighborhood, o.city].filter(Boolean).join(', ') || 'Conakry'} />
         <LogiRow icon="money" label={t('Paiement')} value={`${o.payment_method} · ${fr(o.total)} GNF`} />
+        <MapButton onPress={() => setMapOpen(true)} />
         {/* OTP status + code (see OTP) */}
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
           <View style={{ width: 26, height: 26, borderRadius: 8, backgroundColor: LMX.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}><Icon name="shield" size={13} color={LMX.ink70} /></View>
@@ -1833,6 +1840,8 @@ function LogisticsCard({ o, drivers, partners, onAssigned }: { o: DeliveryOrder;
         )}
       </View>
 
+      <OrderMapSheet order={mapOpen ? o : null} onClose={() => setMapOpen(false)} />
+
       <Sheet visible={partnerSheet} title={t('Attribuer à un partenaire')} subtitle={t('Commande {n}', { n: o.number })} onClose={() => setPartnerSheet(false)}>
         {[{ id: '', name: t('Loomodex (interne)') }, ...partners.filter(p => p.active || p.id === orderPartner).map(p => ({ id: p.id, name: p.name }))].map(p => {
           const current = p.id === orderPartner;
@@ -1863,34 +1872,22 @@ function LogisticsCard({ o, drivers, partners, onAssigned }: { o: DeliveryOrder;
   );
 }
 
-// Driver live-location viewer (logistics / admin)
+// Order map viewer (logistics / admin): store + customer + the driver's live position.
 export function ScreenDriverLocate() {
   const nav = useNavigation<any>();
   const route = useRoute<any>();
   const orderId: number = route.params?.orderId;
   const number: string = route.params?.number ?? '';
   const [track, setTrack] = useState<OrderTracking | null>(null);
-
-  const load = useCallback(() => { if (orderId) ordersApi.tracking(orderId).then(setTrack).catch(() => {}); }, [orderId]);
-  useEffect(() => { load(); const t = setInterval(load, 15000); return () => clearInterval(t); }, [load]);
+  const [nonce, setNonce] = useState(0);
 
   const d = track?.driver;
-  const live = !!(track?.maps_key && d && d.lat != null && d.lng != null);
 
   return (
     <Screen>
-      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title={`${t('Livreur')} · ${number || '#' + orderId}`} right={<IconBtn icon="refresh" onPress={load} />} />
+      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title={`${t('Livreur')} · ${number || '#' + orderId}`} right={<IconBtn icon="refresh" onPress={() => setNonce(n => n + 1)} />} />
       <View style={{ paddingHorizontal: 16 }}>
-        {live ? (
-          <LiveMap mapsKey={track!.maps_key} driver={{ lat: d!.lat as number, lng: d!.lng as number }} destination={track!.destination} height={300} />
-        ) : (
-          <View style={{ height: 300, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.border, backgroundColor: LMX.surfaceAlt, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28, gap: 12 }}>
-            <Icon name="pin" size={26} color={LMX.brand} />
-            <Text style={{ fontSize: 12.5, color: LMX.ink70, textAlign: 'center', lineHeight: 18 }}>
-              {track?.active ? t('En attente de la position du livreur en direct…') : t("La position en direct s'affiche lorsque le livreur est en route.")}
-            </Text>
-          </View>
-        )}
+        {!!orderId && <OrderLocationMap key={nonce} orderId={orderId} viewer="staff" height={300} pollMs={15000} onTrack={setTrack} />}
       </View>
       {!!d && (
         <View style={{ paddingHorizontal: 16, paddingTop: 14 }}>
@@ -1903,6 +1900,9 @@ export function ScreenDriverLocate() {
             {!!d.phone && <Pressable onPress={() => Linking.openURL(`tel:${d.phone}`)} style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: LMX.ink, alignItems: 'center', justifyContent: 'center' }}><Icon name="phone" size={18} color="#fff" /></Pressable>}
           </View>
         </View>
+      )}
+      {!!track && !d?.lat && track.active && (
+        <Text style={{ fontSize: 11.5, color: LMX.ink50, textAlign: 'center', paddingHorizontal: 24, paddingTop: 12 }}>{t('En attente de la position du livreur en direct…')}</Text>
       )}
     </Screen>
   );

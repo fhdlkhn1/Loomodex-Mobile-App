@@ -81,6 +81,8 @@ export interface OrderTracking {
   };
   maps_key: string;
   otp?: string | null;
+  /** Store pickup point (null when the store has no GPS yet). */
+  store?: { name: string; lat: number | null; lng: number | null; address: string } | null;
 }
 
 /**

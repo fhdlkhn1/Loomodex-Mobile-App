@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Pressable, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, Pressable, ActivityIndicator, Alert, TextInput } from 'react-native';
 import * as Location from 'expo-location';
 import { LMX, sans, mono } from '../theme';
 import { Icon } from '../Icon';
@@ -41,6 +41,17 @@ export function StoreAddressForm({ value, onChange, confirmed, onConfirmedChange
   const [zones, setZones]       = useState<DeliveryZone[]>([]);
   const [zonesErr, setZonesErr] = useState<string | null>(null);
   const [locating, setLocating] = useState(false);
+  const [search, setSearch]     = useState<{ msg: string; kind: 'info' | 'ok' | 'error' } | null>(null);
+  // Editable coordinate fields — follow the pin, and typing / pasting moves the pin.
+  const [latTxt, setLatTxt] = useState(value.lat != null ? String(value.lat) : '');
+  const [lngTxt, setLngTxt] = useState(value.lng != null ? String(value.lng) : '');
+  const [coordMsg, setCoordMsg] = useState<{ msg: string; kind: 'ok' | 'error' } | null>(null);
+  useEffect(() => {
+    if (value.lat == null || value.lng == null) return;
+    if (parseCoord(latTxt) === value.lat && parseCoord(lngTxt) === value.lng) return;
+    setLatTxt(round7(value.lat)); setLngTxt(round7(value.lng));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value.lat, value.lng]);
 
   const loadZones = () => {
     setZonesErr(null);
@@ -64,7 +75,36 @@ export function StoreAddressForm({ value, onChange, confirmed, onConfirmedChange
     set({ commune: key, commune_name: communes.find(c => c.key === key)?.label ?? '', neighborhood: '' });
   };
 
-  const movePin = (ll: LatLng) => { set({ lat: ll.lat, lng: ll.lng }); onConfirmedChange(false); };
+  const movePin = (ll: LatLng) => { set({ lat: ll.lat, lng: ll.lng }); onConfirmedChange(false); setCoordMsg(null); };
+
+  // Selected neighbourhood → the map jumps there while no pin is placed (Conakry centre otherwise).
+  const area = value.neighborhood && value.commune_name ? `${value.neighborhood}, ${value.commune_name}, Conakry, Guinea` : '';
+
+  /** Typed / pasted coordinates → pin. Accepts "9.5091, -13.7122" pasted into the latitude field. */
+  const applyCoords = (latRaw: string, lngRaw: string) => {
+    const pair = latRaw.match(PAIR_RE);
+    if (pair) { latRaw = pair[1]; lngRaw = pair[2]; }
+    setLatTxt(latRaw); setLngTxt(lngRaw);
+    if (latRaw.trim() === '' && lngRaw.trim() === '') { setCoordMsg(null); return; }
+    const lat = parseCoord(latRaw), lng = parseCoord(lngRaw);
+    if (lat == null || lng == null) return; // wait until both are typed
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      setCoordMsg({ msg: t('Coordonnées invalides : latitude entre -90 et 90, longitude entre -180 et 180.'), kind: 'error' });
+      return;
+    }
+    const inGuinea = lat >= 7 && lat <= 12.8 && lng >= -15.2 && lng <= -7.6;
+    setLatTxt(round7(lat)); setLngTxt(round7(lng));
+    set({ lat: Number(round7(lat)), lng: Number(round7(lng)) });
+    // Coordinates typed by hand are an explicit choice — confirmed like the website does.
+    onConfirmedChange(inGuinea);
+    setCoordMsg(inGuinea
+      ? { msg: t('Coordonnées appliquées — le pin a été déplacé.'), kind: 'ok' }
+      : { msg: t('Attention : ces coordonnées sont en dehors de la Guinée. Vérifiez-les puis validez la position.'), kind: 'error' });
+  };
+  const onLatChange = (v: string) => {
+    if (v.length - latTxt.length > 1 && PAIR_RE.test(v)) applyCoords(v, lngTxt); // pasted "lat, lng"
+    else setLatTxt(v);
+  };
 
   const useCurrentPosition = async () => {
     setLocating(true);
@@ -117,8 +157,9 @@ export function StoreAddressForm({ value, onChange, confirmed, onConfirmedChange
         <Text style={{ fontSize: 12, color: LMX.ink70, fontFamily: sans(500) }}>{t('Position GPS du magasin')}</Text>
         {mapsKey ? (
           <LocationPicker
-            mapsKey={mapsKey} value={pin} onChange={movePin} height={240} pinColor="#FF7A00"
-            hint={pin ? t('Faites glisser le pin ou touchez la carte pour ajuster') : t('Activez votre position ou touchez la carte pour placer le magasin')}
+            mapsKey={mapsKey} value={pin} onChange={movePin} height={300} pinColor="#FF7A00"
+            storeSearch area={area} onStatus={setSearch}
+            hint={pin ? t('Faites glisser le pin ou touchez la carte pour ajuster') : t('Recherchez un lieu, activez votre position ou touchez la carte pour placer le magasin')}
           />
         ) : (
           <View style={{ height: 90, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.border, backgroundColor: LMX.surfaceAlt, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20 }}>
@@ -126,6 +167,17 @@ export function StoreAddressForm({ value, onChange, confirmed, onConfirmedChange
               {pin ? t('Position : {lat}, {lng}', { lat: pin.lat.toFixed(5), lng: pin.lng.toFixed(5) }) : t('Carte indisponible — utilisez « Activer ma position actuelle ».')}
             </Text>
           </View>
+        )}
+        {!!search && (
+          <Text style={{ fontSize: 11.5, textAlign: 'center', color: search.kind === 'error' ? LMX.rose : search.kind === 'ok' ? LMX.emerald : LMX.ink70 }}>{search.msg}</Text>
+        )}
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <CoordInput label={t('Latitude')} value={latTxt} onChangeText={onLatChange} onDone={() => applyCoords(latTxt, lngTxt)} placeholder="9.5091" />
+          <CoordInput label={t('Longitude')} value={lngTxt} onChangeText={setLngTxt} onDone={() => applyCoords(latTxt, lngTxt)} placeholder="-13.7122" />
+        </View>
+        <Text style={{ fontSize: 10.5, color: LMX.ink50 }}>{t('Vous pouvez aussi coller « 9.5091, -13.7122 » dans le champ latitude.')}</Text>
+        {!!coordMsg && (
+          <Text style={{ fontSize: 11.5, color: coordMsg.kind === 'error' ? LMX.rose : LMX.emerald }}>{coordMsg.msg}</Text>
         )}
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <Pressable onPress={useCurrentPosition} disabled={locating} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 44, borderRadius: 12, borderWidth: 1, borderColor: LMX.border, backgroundColor: LMX.surface, opacity: locating ? 0.6 : 1 }}>
@@ -142,6 +194,35 @@ export function StoreAddressForm({ value, onChange, confirmed, onConfirmedChange
             {pin.lat.toFixed(5)}, {pin.lng.toFixed(5)} · {confirmed ? t('validée') : t('à valider')}
           </Text>
         )}
+      </View>
+    </View>
+  );
+}
+
+const PAIR_RE = /^\s*(-?\d+(?:\.\d+)?)\s*[,;\s]\s*(-?\d+(?:\.\d+)?)\s*$/;
+
+function round7(v: number): string { return String(Math.round(v * 1e7) / 1e7); }
+
+function parseCoord(raw: string): number | null {
+  const v = raw.trim().replace(',', '.');
+  if (!/^-?\d+(\.\d+)?$/.test(v)) return null;
+  const n = parseFloat(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function CoordInput({ label, value, onChangeText, onDone, placeholder }: {
+  label: string; value: string; onChangeText: (v: string) => void; onDone: () => void; placeholder: string;
+}) {
+  return (
+    <View style={{ flex: 1 }}>
+      <Text style={{ fontSize: 12, color: LMX.ink70, fontFamily: sans(500), marginBottom: 6 }}>{label}</Text>
+      <View style={{ height: 46, borderRadius: 12, borderWidth: 1, borderColor: LMX.border, backgroundColor: LMX.surface, paddingHorizontal: 12, justifyContent: 'center' }}>
+        <TextInput
+          value={value} onChangeText={onChangeText} onEndEditing={onDone} onSubmitEditing={onDone}
+          placeholder={placeholder} placeholderTextColor={LMX.ink30}
+          keyboardType="numbers-and-punctuation" autoCorrect={false} autoCapitalize="none" returnKeyType="done"
+          style={{ fontFamily: mono(500), fontSize: 13.5, color: LMX.ink, padding: 0 }}
+        />
       </View>
     </View>
   );

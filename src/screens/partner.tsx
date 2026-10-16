@@ -10,6 +10,7 @@ import { useAuth } from '../context/AuthContext';
 import { friendlyError, isApiError } from '../api/client';
 import { partnerApi, logisticsApi, DeliveryOrder, LogisticsDriver, Incident, PartnerLedger, LogisticsPartner } from '../api/delivery';
 import { Sheet, TextArea, Pill, ErrorBanner, DriverPickerSheet, todayYmd } from '../components/StaffKit';
+import { OrderMapSheet, MapButton } from '../components/OrderLocationMap';
 import { t } from '../i18n';
 
 const call = (phone?: string) => { if (phone) Linking.openURL(`tel:${phone}`).catch(() => {}); };
@@ -108,7 +109,7 @@ function deliveryCodeStatus(otp: string): { label: string; color: string } {
   return { label: t('Code client : en attente'), color: LMX.amber };
 }
 
-function PartnerOrderCard({ o, onAssign, onIncident }: { o: DeliveryOrder; onAssign: (o: DeliveryOrder) => void; onIncident: (o: DeliveryOrder) => void }) {
+function PartnerOrderCard({ o, onAssign, onIncident, onMap }: { o: DeliveryOrder; onAssign: (o: DeliveryOrder) => void; onIncident: (o: DeliveryOrder) => void; onMap: (o: DeliveryOrder) => void }) {
   const failed = o.status === 'delivery-failed';
   const done = ['otp-verified', 'completed'].includes(o.status);
   const canAssign = !PICKED_UP.includes(o.status) && !o.pickup_time;
@@ -117,6 +118,7 @@ function PartnerOrderCard({ o, onAssign, onIncident }: { o: DeliveryOrder; onAss
   const storeAddr = [p?.address, p?.landmark ? t('Repère : {l}', { l: p.landmark }) : ''].filter(Boolean).join(' · ');
   const destAddr = o.delivery_address || [o.address, o.neighborhood, o.commune, o.city].filter(Boolean).join(', ');
   const statusColor = failed ? LMX.rose : done ? LMX.emerald : o.driver_id ? LMX.brand : LMX.accent;
+  const custGps = (o.customer_lat != null && o.customer_lng != null) || (o.dest_lat != null && o.dest_lng != null);
 
   return (
     <View style={{ backgroundColor: LMX.surface, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: failed ? LMX.rose : LMX.border, overflow: 'hidden' }}>
@@ -143,7 +145,11 @@ function PartnerOrderCard({ o, onAssign, onIncident }: { o: DeliveryOrder; onAss
           {!!(o.recipient_phone || o.customer_phone) && <Text style={{ fontSize: 11.5, color: LMX.ink50, marginTop: 1 }}>{o.recipient_phone || o.customer_phone}</Text>}
           {!!destAddr && <Text style={{ fontSize: 12, color: LMX.ink70, marginTop: 1, lineHeight: 17 }}>{destAddr}</Text>}
           {!!o.landmark && <Text style={{ fontSize: 11.5, color: LMX.ink50, marginTop: 1 }}>{t('Repère : {l}', { l: o.landmark })}</Text>}
+          <Text style={{ fontSize: 11, color: custGps ? LMX.emerald : LMX.ink50, fontFamily: sans(600), marginTop: 3 }}>
+            {custGps ? t('Position GPS du client disponible') : t('Pas de position GPS — adresse uniquement')}
+          </Text>
         </InfoRow>
+        <MapButton onPress={() => onMap(o)} />
         <InfoRow icon="money" label={t('Paiement')}>
           {o.payment === 'cod' ? t('À encaisser à la livraison : {a} GNF', { a: fr(o.total) }) : t('Prépayée · {a} GNF', { a: fr(o.total) })}
         </InfoRow>
@@ -256,6 +262,7 @@ export function ScreenPartner() {
   const [drvLoading, setDrvLoading] = useState(false);
   const [drvError, setDrvError] = useState<string | null>(null);
   const [busy, setBusy]         = useState(false);
+  const [mapFor, setMapFor]     = useState<DeliveryOrder | null>(null);
   const tabRef = useRef(tab);
   tabRef.current = tab;
 
@@ -354,7 +361,7 @@ export function ScreenPartner() {
       ) : (
         <View style={{ paddingHorizontal: 16, paddingTop: 12, gap: 10 }}>
           {orders.map(o => (
-            <PartnerOrderCard key={o.id} o={o} onAssign={openAssign} onIncident={x => nav.navigate('PartnerIncidents', { orderId: x.id })} />
+            <PartnerOrderCard key={o.id} o={o} onAssign={openAssign} onIncident={x => nav.navigate('PartnerIncidents', { orderId: x.id })} onMap={setMapFor} />
           ))}
         </View>
       )}
@@ -367,6 +374,7 @@ export function ScreenPartner() {
         currentId={assignFor?.driver_id ?? null}
         onRetry={loadDrivers} onPick={assign} onClose={() => setAssignFor(null)}
       />
+      <OrderMapSheet order={mapFor} onClose={() => setMapFor(null)} />
     </Screen>
   );
 }

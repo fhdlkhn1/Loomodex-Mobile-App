@@ -1,16 +1,23 @@
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
+import type * as NotificationsModule from 'expo-notifications';
 import { profileApi } from './api/profile';
 
-// Expo Go (SDK 53+) doesn't support remote push, and older dev builds may not
-// include the native module — never let any of this crash app startup.
-const isExpoGo = Constants.executionEnvironment === 'storeClient';
+// Expo Go (SDK 53+) doesn't support remote push and expo-notifications errors as soon as it
+// is loaded there — so it is only required outside Expo Go. Never let any of this crash startup.
+export const isExpoGo = Constants.executionEnvironment === 'storeClient';
+
+let mod: typeof NotificationsModule | null = null;
+if (!isExpoGo) {
+  try { mod = require('expo-notifications'); } catch { mod = null; }
+}
+/** expo-notifications, or null in Expo Go / when the native module is missing. */
+export const Notifications = mod;
 
 // Show notifications while the app is foregrounded (guarded — never throws at import)
 try {
-  if (!isExpoGo) {
+  if (Notifications) {
     Notifications.setNotificationHandler({
       handleNotification: async () => ({
         shouldShowBanner: true,
@@ -26,6 +33,7 @@ const projectId = (Constants.expoConfig as any)?.extra?.eas?.projectId
   ?? (Constants as any)?.easConfig?.projectId;
 
 async function getToken(): Promise<string | null> {
+  if (!Notifications) return null;
   try {
     const res = await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined);
     return res.data ?? null;
@@ -36,7 +44,7 @@ async function getToken(): Promise<string | null> {
 
 /** Ask permission, get the Expo push token, register it with the backend. Always safe. */
 export async function registerForPush(): Promise<void> {
-  if (isExpoGo) return;            // push not available in Expo Go
+  if (!Notifications) return;      // push not available in Expo Go
   try {
     if (!Device.isDevice) return;  // simulators can't get a push token
 
@@ -63,7 +71,7 @@ export async function registerForPush(): Promise<void> {
 
 /** Remove this device's token from the backend (call before logout). Always safe. */
 export async function unregisterForPush(): Promise<void> {
-  if (isExpoGo) return;
+  if (!Notifications) return;
   try {
     const token = await getToken();
     if (token) await profileApi.removePushToken(token);

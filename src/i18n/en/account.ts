@@ -8,6 +8,21 @@ const dict: Record<string, string> = {
   'Panier': 'Cart',
   'Commandes': 'Orders',
   'Compte': 'Account',
+  // role tab bars (staff)
+  'Livraisons': 'Deliveries',
+  'Carte': 'Map',
+  'Incidents': 'Incidents',
+
+  // ── Notifications inbox ──
+  'Vous serez informé ici des commandes et des actions qui vous concernent.': 'Orders and actions that concern you will show up here.',
+  '1 non lue': '1 unread',
+  '{n} non lues': '{n} unread',
+  'Tout marquer comme lu': 'Mark all as read',
+
+  // ── Auth placeholders ──
+  'Votre adresse email': 'Your email address',
+  'Code reçu par email': 'Code received by email',
+  'Votre nouveau mot de passe': 'Your new password',
 
   // ── Shared components / splash ──
   'Produit vérifié': 'Verified product',

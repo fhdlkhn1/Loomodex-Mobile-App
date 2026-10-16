@@ -467,6 +467,32 @@ const dict: Record<string, string> = {
   "Motif (visible par le client)": "Reason (visible to the customer)",
   "Ex. : adresse plus éloignée que prévu": "E.g. address farther than expected",
   "Le client devra accepter ces frais avant que la commande puisse être confirmée.": "The customer will have to accept this fee before the order can be confirmed.",
+  // ── In-app order maps (store / partner / logistics) ──
+  'Carte indisponible pour le moment.': 'Map unavailable right now.',
+  'Aucune position disponible pour cette commande.': 'No location available for this order.',
+  '{name} arrive pour récupérer la commande': '{name} is coming to pick up the order',
+  'Le livreur': 'The driver',
+  'position {ago}': 'position {ago}',
+  "Le client n'a pas partagé de position GPS — pin placé d'après l'adresse.": "The customer hasn't shared a GPS location — pin placed from the address.",
+  'Carte de la commande': 'Order map',
+  'Voir sur la carte': 'View on map',
+  'Position GPS du client disponible': 'Customer GPS location available',
+  'Pas de position GPS — adresse uniquement': 'No GPS location — address only',
+  // ── Store location (Ma boutique) ──
+  'Recherche…': 'Searching…',
+  'Lieu trouvé — ajustez le pin si besoin, puis validez la position.': 'Place found — adjust the pin if needed, then confirm the location.',
+  'Aucun résultat pour cette recherche.': 'No results for this search.',
+  'Recherche indisponible pour le moment. Touchez la carte pour placer le pin.': 'Search is unavailable right now. Tap the map to place the pin.',
+  'Carte centrée sur le quartier choisi — touchez la carte pour placer le magasin.': 'Map centred on the selected neighbourhood — tap the map to place the store.',
+  'Rechercher un lieu, une rue, un quartier…': 'Search a place, street or neighbourhood…',
+  'Rechercher': 'Search',
+  'Coordonnées invalides : latitude entre -90 et 90, longitude entre -180 et 180.': 'Invalid coordinates: latitude must be between -90 and 90, longitude between -180 and 180.',
+  'Coordonnées appliquées — le pin a été déplacé.': 'Coordinates applied — the pin has been moved.',
+  'Attention : ces coordonnées sont en dehors de la Guinée. Vérifiez-les puis validez la position.': 'Warning: these coordinates are outside Guinea. Check them, then confirm the location.',
+  'Latitude': 'Latitude',
+  'Longitude': 'Longitude',
+  'Vous pouvez aussi coller « 9.5091, -13.7122 » dans le champ latitude.': 'You can also paste "9.5091, -13.7122" into the latitude field.',
+  'Recherchez un lieu, activez votre position ou touchez la carte pour placer le magasin': 'Search a place, use your location or tap the map to place the store',
 };
 
 export default dict;

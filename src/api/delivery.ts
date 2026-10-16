@@ -35,6 +35,12 @@ export interface DeliveryOrder {
   pickup: StorePickup;
   /** Customer's profile photo (null if none) — helps the driver recognise them. */
   customer_avatar?: string | null;
+  /** Customer's position: live shared location, else the saved checkout pin (null if none). */
+  customer_lat?: number | null;
+  customer_lng?: number | null;
+  /** Saved delivery pin from checkout (null if none). */
+  dest_lat?: number | null;
+  dest_lng?: number | null;
   track_url: string;
   driver_id: number | null;
   driver_name: string | null;

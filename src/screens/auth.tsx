@@ -124,7 +124,7 @@ export function ScreenSignIn() {
       </View>
 
       <View style={{ paddingHorizontal: 24, paddingTop: 28, gap: 16 }}>
-        <Field label={t('Adresse email')} value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+        <Field label={t('Adresse email')} leadingIcon="user" placeholder={t('Votre adresse email')} value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
         <Field
           label={t('Mot de passe')}
           leadingIcon="key"
@@ -345,7 +345,7 @@ export function ScreenForgot() {
       ) : (
         <>
           <View style={{ paddingHorizontal: 24, paddingTop: 28 }}>
-            <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+            <Field label={t('Email')} placeholder={t('Votre adresse email')} value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
           </View>
           <View style={{ paddingHorizontal: 24, paddingTop: 20 }}>
             {loading
@@ -396,10 +396,10 @@ export function ScreenResetPassword({ route }: any) {
         <Text style={{ fontFamily: FONT.display, fontSize: 34, lineHeight: 38, marginTop: 8, color: LMX.ink }}>{t('Créer un nouveau\nmot de passe')}</Text>
       </View>
       <View style={{ paddingHorizontal: 24, paddingTop: 28, gap: 14 }}>
-        <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
-        <Field label={t('Code de réinitialisation')} value={code} onChangeText={setCode} autoCapitalize="none" />
-        <Field label={t('Nouveau mot de passe')} value={password} onChangeText={setPassword} secure />
-        <Field label={t('Confirmer le mot de passe')} value={confirm} onChangeText={setConfirm} secure />
+        <Field label={t('Email')} placeholder={t('Votre adresse email')} value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+        <Field label={t('Code de réinitialisation')} placeholder={t('Code reçu par email')} value={code} onChangeText={setCode} autoCapitalize="none" />
+        <Field label={t('Nouveau mot de passe')} leadingIcon="key" placeholder={t('Votre nouveau mot de passe')} value={password} onChangeText={setPassword} secure />
+        <Field label={t('Confirmer le mot de passe')} leadingIcon="key" placeholder={t('Confirmez votre mot de passe')} value={confirm} onChangeText={setConfirm} secure />
         <View style={{ gap: 2, paddingLeft: 4 }}>
           <Requirement label={t('Au moins 6 caractères')} met={passLen} />
           <Requirement label={t('Les mots de passe correspondent')} met={passMatch} />

@@ -8,7 +8,7 @@ export type IconName =
   | 'arrowDownLeft' | 'eye' | 'grid' | 'list' | 'location' | 'phone' | 'package' | 'refresh'
   | 'sparkle' | 'tag' | 'money' | 'moMo' | 'receipt' | 'settings' | 'storefront' | 'headset'
   | 'wallet' | 'card' | 'bike' | 'key' | 'ticket' | 'msg' | 'chart' | 'pencil' | 'arrowU'
-  | 'arrowD' | 'download' | 'play' | 'camera' | 'image' | 'trash';
+  | 'arrowD' | 'download' | 'play' | 'camera' | 'image' | 'trash' | 'alert' | 'map';
 
 type Props = {
   name: IconName;
@@ -43,6 +43,8 @@ export function Icon({ name, size = 20, color = '#0F1620', strokeWidth = 1.6 }: 
     checkCircle: <><Circle {...s} cx="12" cy="12" r="9" /><Path {...s} d="m8 12 3 3 5-6" /></>,
     shield: <><Path {...s} d="M12 3 4 6v6c0 5 3.5 8.5 8 9 4.5-.5 8-4 8-9V6z" /><Path {...s} d="m9 12 2 2 4-4" /></>,
     qr: <><Rect {...s} x="3" y="3" width="7" height="7" rx="1" /><Rect {...s} x="14" y="3" width="7" height="7" rx="1" /><Rect {...s} x="3" y="14" width="7" height="7" rx="1" /><Path {...s} d="M14 14h3v3M20 14v3M14 20h3M20 20h0" /></>,
+    alert: <><Path {...s} d="M12 3 2.5 20h19z" /><Path {...s} d="M12 10v4.5M12 17.5h0" /></>,
+    map: <><Path {...s} d="M9 4 3 6.5v13.5l6-2.5 6 2.5 6-2.5V4l-6 2.5z" /><Path {...s} d="M9 4v13.5M15 6.5V20" /></>,
     bell: <><Path {...s} d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2H4.5z" /><Path {...s} d="M10 21a2 2 0 0 0 4 0" /></>,
     mic: <><Rect {...s} x="9" y="3" width="6" height="11" rx="3" /><Path {...s} d="M5 11a7 7 0 0 0 14 0M12 18v3" /></>,
     flame: <Path {...s} d="M12 22c4 0 7-3 7-7 0-3-2-4-3-7-3 2-4 5-6 4-1-1-1-3 0-5-3 1-5 5-5 8 0 4 3 7 7 7z" />,

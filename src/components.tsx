@@ -14,6 +14,17 @@ import { useNotifications } from './context/NotificationsContext';
 import { useAuth } from './context/AuthContext';
 import { t, useLanguage, Lang } from './i18n';
 
+// ── Role tab bar awareness ─────────────────────────────────────
+/**
+ * Set by the navigator's screen layout when the role tab bar is drawn below the screen.
+ * The bar owns the bottom safe-area inset, so Screen must not pad for it a second time,
+ * and the AppBar bell is redundant when the bar already has a Notifications tab.
+ */
+export const TabBarContext = React.createContext<{ visible: boolean; hasNotifications: boolean }>({
+  visible: false,
+  hasNotifications: false,
+});
+
 // ── Screen shell ───────────────────────────────────────────────
 export function Screen({
   children, bg, footer, scroll = true, padTop = true, contentStyle, refreshControl,
@@ -28,8 +39,10 @@ export function Screen({
   refreshControl?: React.ReactElement<RefreshControlProps>;
 }) {
   const insets = useSafeAreaInsets();
+  const tabBar = React.useContext(TabBarContext);
+  const bottomInset = tabBar.visible ? 0 : insets.bottom;
   const top = padTop ? insets.top + 6 : 0;
-  const bottomPad = (footer ? 96 : 24) + insets.bottom;
+  const bottomPad = (footer ? 96 : 24) + bottomInset;
   return (
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: bg || LMX.bg }}
@@ -51,7 +64,7 @@ export function Screen({
       )}
       {footer && (
         <View style={{
-          paddingHorizontal: 16, paddingTop: 12, paddingBottom: insets.bottom + 14,
+          paddingHorizontal: 16, paddingTop: 12, paddingBottom: bottomInset + 14,
           backgroundColor: LMX.bg, borderTopWidth: 1, borderTopColor: LMX.hairline,
         }}>
           {footer}
@@ -95,7 +108,8 @@ export function BellButton({ bg = 'transparent', color = LMX.ink }: { bg?: strin
   const nav = useNavigation<any>();
   const { unread } = useNotifications();
   const { isLoggedIn } = useAuth();
-  if (!isLoggedIn) return null;
+  const tabBar = React.useContext(TabBarContext);
+  if (!isLoggedIn || (tabBar.visible && tabBar.hasNotifications)) return null;
   return (
     <IconBtn
       icon="bell"

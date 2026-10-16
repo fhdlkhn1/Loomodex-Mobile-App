@@ -1,10 +1,16 @@
 import React, { useMemo, useRef, useEffect } from 'react';
-import { View } from 'react-native';
+import { View, Text } from 'react-native';
 import { WebView } from 'react-native-webview';
-import { LMX } from '../theme';
+import { LMX, sans } from '../theme';
 import { t } from '../i18n';
 
 export interface LatLng { lat: number; lng: number; }
+
+/** A labelled pin that is shown on the map but not part of the driving route. */
+export interface MapPin { lat?: number | null; lng?: number | null; label?: string; color?: string; }
+
+/** Pin colours shared by every map (legend + markers). */
+export const PIN_COLOR = { store: '#FF7A00', customer: '#10B981', driver: '#1E6BFF' } as const;
 
 interface LiveMapProps {
   mapsKey: string;
@@ -15,20 +21,31 @@ interface LiveMapProps {
   destinationLabel?: string;
   /** Destination pin colour (default green = customer). */
   destinationColor?: string;
+  /** Third pin (e.g. the store once the parcel is picked up, or the customer before pickup). */
+  extra?: MapPin | null;
+  /** Name shown when the driver pin is tapped. */
+  driverLabel?: string;
   onEta?: (eta: { duration: string; distance: string }) => void;
 }
 
-/**
- * Google Maps live tracking in a WebView (Expo Go compatible). Shows the driver,
- * the destination/customer, draws the driving route between them, and reports the
- * ETA + distance back to React Native via postMessage. Driver moves are injected
- * so the map never reloads.
- */
-export function LiveMap({ mapsKey, driver, destination, height = 240, destinationLabel, destinationColor, onEta }: LiveMapProps) {
-  const ref = useRef<WebView>(null);
-  const initial = useRef(driver);
+const has = (p?: { lat?: number | null; lng?: number | null } | null): p is { lat: number; lng: number } =>
+  !!p && typeof p.lat === 'number' && typeof p.lng === 'number';
 
-  const html = useMemo(() => buildHtml(mapsKey, initial.current, destination, destinationLabel, destinationColor, t('Livreur'), t('Destination')), [mapsKey]);
+/**
+ * Google Maps live tracking in a WebView (Expo Go compatible). Shows up to three pins —
+ * the driver, the destination (store or customer) and an optional extra pin — draws the
+ * driving route driver → destination, and reports the ETA + distance back to React Native
+ * via postMessage. Position changes are injected so the map never reloads.
+ */
+export function LiveMap({ mapsKey, driver, destination, height = 240, destinationLabel, destinationColor, extra, driverLabel, onEta }: LiveMapProps) {
+  const ref = useRef<WebView>(null);
+  const initial = useRef({ driver, destination, extra });
+
+  const html = useMemo(() => buildHtml(mapsKey, initial.current.driver, initial.current.destination, {
+    destLabel: destinationLabel, destColor: destinationColor,
+    extra: initial.current.extra ?? null,
+    driverTitle: driverLabel || t('Livreur'), destTitle: t('Destination'),
+  }), [mapsKey]);
   // Stable source object — prevents the WebView from reloading the map on every re-render (polling)
   const source = useMemo(() => ({ html }), [html]);
 
@@ -44,6 +61,12 @@ export function LiveMap({ mapsKey, driver, destination, height = 240, destinatio
       ref.current.injectJavaScript(`window.lmxUpdateDest && window.lmxUpdateDest(${destination.lat}, ${destination.lng}); true;`);
     }
   }, [destination?.lat, destination?.lng]);
+
+  useEffect(() => {
+    if (has(extra) && ref.current) {
+      ref.current.injectJavaScript(`window.lmxUpdateExtra && window.lmxUpdateExtra(${extra.lat}, ${extra.lng}); true;`);
+    }
+  }, [extra?.lat, extra?.lng]);
 
   return (
     <View style={{ height, borderRadius: LMX.r.lg, overflow: 'hidden', borderWidth: 1, borderColor: LMX.border, backgroundColor: '#EAE6DA' }}>
@@ -67,29 +90,55 @@ export function LiveMap({ mapsKey, driver, destination, height = 240, destinatio
   );
 }
 
-function buildHtml(key: string, driver: LatLng | null, dest: LiveMapProps['destination'], destLabel?: string, destColor?: string, driverTitle = 'Livreur', destTitle = 'Destination'): string {
-  const destAddress = `${dest.address ?? ''} ${dest.city ?? 'Conakry'}, Guinée`.trim();
+/** Colour legend under a map: one chip per pin actually shown. */
+export function MapLegend({ items }: { items: { color: string; label: string }[] }) {
+  if (!items.length) return null;
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingHorizontal: 4 }}>
+      {items.map(it => (
+        <View key={it.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: it.color }} />
+          <Text style={{ fontSize: 11, color: LMX.ink70, fontFamily: sans(500) }}>{it.label}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+const js = (v: unknown) => JSON.stringify(v).replace(/</g, '\\u003c');
+
+function buildHtml(key: string, driver: LatLng | null, dest: LiveMapProps['destination'], o: {
+  destLabel?: string; destColor?: string; extra: MapPin | null; driverTitle: string; destTitle: string;
+}): string {
+  // Only geocode when there is an actual address to look up (no pin and no address = no destination pin).
+  const destAddress = (dest.address || dest.city) ? `${dest.address ?? ''} ${dest.city ?? 'Conakry'}, Guinée`.trim() : '';
   const d = driver ? `{lat:${driver.lat},lng:${driver.lng}}` : 'null';
-  const destLL = (dest.lat != null && dest.lng != null) ? `{lat:${dest.lat},lng:${dest.lng}}` : 'null';
+  const destLL = has(dest) ? `{lat:${dest.lat},lng:${dest.lng}}` : 'null';
+  const extraLL = has(o.extra) ? `{lat:${o.extra.lat},lng:${o.extra.lng}}` : 'null';
   return `<!DOCTYPE html><html><head>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <style>html,body,#map{height:100%;margin:0;padding:0;background:#EAE6DA}</style>
 </head><body>
 <div id="map"></div>
 <script>
-  var map, driverMarker, destMarker, dirSvc, dirRenderer, fallbackLine;
+  var map, driverMarker, destMarker, extraMarker, dirSvc, dirRenderer, fallbackLine;
   var DRIVER = ${d};
   var DEST_LL = ${destLL};
-  var DEST_ADDR = ${JSON.stringify(destAddress)};
-  var DEST_LABEL = ${JSON.stringify(destLabel ?? '').replace(/</g, '\\u003c')};
-  var DRIVER_TITLE = ${JSON.stringify(driverTitle).replace(/</g, '\\u003c')};
-  var DEST_TITLE = ${JSON.stringify(destTitle).replace(/</g, '\\u003c')};
-  var DEST_COLOR = ${JSON.stringify(destColor ?? '#10B981')};
+  var EXTRA_LL = ${extraLL};
+  var DEST_ADDR = ${js(destAddress)};
+  var DEST_LABEL = ${js(o.destLabel ?? '')};
+  var EXTRA_LABEL = ${js(o.extra?.label ?? '')};
+  var EXTRA_COLOR = ${js(o.extra?.color ?? PIN_COLOR.store)};
+  var DRIVER_TITLE = ${js(o.driverTitle)};
+  var DRIVER_COLOR = ${js(PIN_COLOR.driver)};
+  var DEST_TITLE = ${js(o.destTitle)};
+  var DEST_COLOR = ${js(o.destColor ?? PIN_COLOR.customer)};
   var CONAKRY = {lat:9.6412,lng:-13.5784};
   var lastDir = 0;
   var useFallback = false; // true once Directions is unavailable (billing/quota/denied)
 
   function post(o){ try { window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify(o)); } catch(e){} }
+  function esc(s){ return String(s).replace(/[<>&]/g,''); }
 
   // Great-circle distance (km) — no Directions/geometry library needed.
   function haversine(a, b){
@@ -100,13 +149,13 @@ function buildHtml(key: string, driver: LatLng | null, dest: LiveMapProps['desti
     return 2*R*Math.asin(Math.sqrt(h));
   }
   // Straight dashed line between driver and destination — shown whenever the Directions
-  // route can't be drawn, so the customer always sees the connection.
+  // route can't be drawn, so the viewer always sees the connection.
   function drawFallbackLine(){
     if(!driverMarker || !destMarker) return;
     var path=[driverMarker.getPosition(), destMarker.getPosition()];
     if(!fallbackLine){
       fallbackLine = new google.maps.Polyline({ map:map, path:path, geodesic:true, strokeOpacity:0,
-        icons:[{ icon:{ path:'M 0,-1 0,1', strokeOpacity:0.9, strokeColor:'#1E6BFF', scale:3 }, offset:'0', repeat:'14px' }] });
+        icons:[{ icon:{ path:'M 0,-1 0,1', strokeOpacity:0.9, strokeColor:DRIVER_COLOR, scale:3 }, offset:'0', repeat:'14px' }] });
     } else { fallbackLine.setPath(path); fallbackLine.setMap(map); }
     var km=haversine(path[0], path[1]);
     post({type:'eta', duration:'', distance:(km<1 ? Math.round(km*1000)+' m' : km.toFixed(1)+' km')});
@@ -114,12 +163,18 @@ function buildHtml(key: string, driver: LatLng | null, dest: LiveMapProps['desti
   function clearFallbackLine(){ if(fallbackLine){ fallbackLine.setMap(null); } }
   function fit(){
     if(!map) return;
-    var b = new google.maps.LatLngBounds(); var any=false;
-    if(driverMarker){ b.extend(driverMarker.getPosition()); any=true; }
-    if(destMarker){ b.extend(destMarker.getPosition()); any=true; }
-    if(any){ map.fitBounds(b, 70); google.maps.event.addListenerOnce(map,'idle',function(){ if(map.getZoom()>16) map.setZoom(16); }); }
+    var b = new google.maps.LatLngBounds(); var n=0;
+    [driverMarker, destMarker, extraMarker].forEach(function(m){ if(m){ b.extend(m.getPosition()); n++; } });
+    if(n>1){ map.fitBounds(b, 70); google.maps.event.addListenerOnce(map,'idle',function(){ if(map.getZoom()>16) map.setZoom(16); }); }
+    else if(n===1){ map.setCenter(b.getCenter()); if(map.getZoom()<14) map.setZoom(15); }
   }
   function dot(color){ return {path:google.maps.SymbolPath.CIRCLE, scale:9, fillColor:color, fillOpacity:1, strokeColor:'#fff', strokeWeight:3}; }
+  function infoOn(marker, label, open){
+    if(!label) return;
+    var iw = new google.maps.InfoWindow({content:'<div style="font:600 12px sans-serif;padding:2px 4px">'+esc(label)+'</div>', disableAutoPan:true});
+    if(open) iw.open({map:map, anchor:marker});
+    marker.addListener('click', function(){ iw.open({map:map, anchor:marker}); });
+  }
 
   function route(){
     if(!driverMarker || !destMarker || !dirSvc) return;
@@ -140,33 +195,46 @@ function buildHtml(key: string, driver: LatLng | null, dest: LiveMapProps['desti
   }
   function placeDest(pos){
     if(!destMarker){
-      destMarker = new google.maps.Marker({position:pos, map:map, icon:dot(DEST_COLOR), title:DEST_LABEL || DEST_TITLE});
-      if(DEST_LABEL){
-        var iw = new google.maps.InfoWindow({content:'<div style="font:600 12px sans-serif;padding:2px 4px">'+DEST_LABEL.replace(/[<>&]/g,'')+'</div>', disableAutoPan:true});
-        iw.open({map:map, anchor:destMarker});
-        destMarker.addListener('click', function(){ iw.open({map:map, anchor:destMarker}); });
-      }
+      destMarker = new google.maps.Marker({position:pos, map:map, icon:dot(DEST_COLOR), title:DEST_LABEL || DEST_TITLE, zIndex:2});
+      infoOn(destMarker, DEST_LABEL, true);
     }
     else { destMarker.setPosition(pos); }
     fit(); route();
   }
+  // The update functions may be called (injected) before Google Maps has loaded:
+  // keep the latest value and let initMap() place it.
   function lmxUpdateDriver(lat,lng){
     var p = {lat:lat,lng:lng};
-    if(!driverMarker){ driverMarker = new google.maps.Marker({position:p, map:map, icon:dot('#1E6BFF'), title:DRIVER_TITLE}); }
+    if(!map){ DRIVER = p; return; }
+    if(!driverMarker){
+      driverMarker = new google.maps.Marker({position:p, map:map, icon:dot(DRIVER_COLOR), title:DRIVER_TITLE, zIndex:3});
+      infoOn(driverMarker, DRIVER_TITLE, false);
+    }
     else { driverMarker.setPosition(p); }
     fit(); route();
   }
-  function lmxUpdateDest(lat,lng){ placeDest({lat:lat,lng:lng}); }
+  function lmxUpdateDest(lat,lng){ if(!map){ DEST_LL = {lat:lat,lng:lng}; return; } placeDest({lat:lat,lng:lng}); }
+  function lmxUpdateExtra(lat,lng){
+    var p = {lat:lat,lng:lng};
+    if(!map){ EXTRA_LL = p; return; }
+    if(!extraMarker){
+      extraMarker = new google.maps.Marker({position:p, map:map, icon:dot(EXTRA_COLOR), title:EXTRA_LABEL, zIndex:1});
+      infoOn(extraMarker, EXTRA_LABEL, false);
+    } else { extraMarker.setPosition(p); }
+    fit();
+  }
   window.lmxUpdateDriver = lmxUpdateDriver;
   window.lmxUpdateDest = lmxUpdateDest;
+  window.lmxUpdateExtra = lmxUpdateExtra;
 
   function initMap(){
-    var center = DRIVER || DEST_LL || CONAKRY;
+    var center = DRIVER || DEST_LL || EXTRA_LL || CONAKRY;
     map = new google.maps.Map(document.getElementById('map'), {
       center: center, zoom: 14, disableDefaultUI: true, zoomControl: true, gestureHandling: 'greedy',
     });
     dirSvc = new google.maps.DirectionsService();
-    dirRenderer = new google.maps.DirectionsRenderer({map:map, suppressMarkers:true, preserveViewport:true, polylineOptions:{strokeColor:'#1E6BFF', strokeWeight:5, strokeOpacity:0.85}});
+    dirRenderer = new google.maps.DirectionsRenderer({map:map, suppressMarkers:true, preserveViewport:true, polylineOptions:{strokeColor:DRIVER_COLOR, strokeWeight:5, strokeOpacity:0.85}});
+    if(EXTRA_LL){ lmxUpdateExtra(EXTRA_LL.lat, EXTRA_LL.lng); }
     if(DRIVER){ lmxUpdateDriver(DRIVER.lat, DRIVER.lng); }
     if(DEST_LL){ placeDest(DEST_LL); }
     else if(DEST_ADDR){ new google.maps.Geocoder().geocode({address:DEST_ADDR}, function(r,s){ if(s==='OK' && r[0]){ placeDest(r[0].geometry.location); } }); }
