@@ -23,6 +23,9 @@ const common: Record<string, string> = {
   'Non': 'No',
   'Chargement…': 'Loading…',
   'Langue': 'Language',
+  'Confirmée': 'Confirmed',
+  "Colis pas encore emballé par le magasin — le livreur sera prévenu dès qu'il sera prêt.": "Parcel not packed by the store yet — the driver will be notified as soon as it is ready.",
+  "Attendez : le magasin n'a pas encore emballé le colis. Vous serez prévenu dès qu'il sera prêt.": "Wait: the store has not packed the parcel yet. You will be notified as soon as it is ready.",
   'Français': 'French',
   'English': 'English',
 };

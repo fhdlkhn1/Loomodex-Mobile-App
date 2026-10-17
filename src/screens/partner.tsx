@@ -9,7 +9,7 @@ import { ErrorState } from '../components/StateViews';
 import { useAuth } from '../context/AuthContext';
 import { friendlyError, isApiError } from '../api/client';
 import { partnerApi, logisticsApi, DeliveryOrder, LogisticsDriver, Incident, PartnerLedger, LogisticsPartner } from '../api/delivery';
-import { Sheet, TextArea, Pill, ErrorBanner, DriverPickerSheet, todayYmd, PackedPill } from '../components/StaffKit';
+import { Sheet, TextArea, Pill, ErrorBanner, DriverPickerSheet, todayYmd, PackedPill, NotPackedNote } from '../components/StaffKit';
 import { OrderMapSheet, MapButton } from '../components/OrderLocationMap';
 import { t } from '../i18n';
 
@@ -171,6 +171,7 @@ function PartnerOrderCard({ o, onAssign, onIncident, onMap }: { o: DeliveryOrder
       </View>
 
       <View style={{ padding: 14, borderTopWidth: 1, borderTopColor: LMX.hairline, gap: 10 }}>
+        <NotPackedNote packedAt={o.packed_at} status={o.status} />
         {o.driver_name ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: LMX.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}><Icon name="bike" size={14} color={LMX.ink} /></View>

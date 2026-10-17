@@ -19,7 +19,7 @@ import { OrderLocationMap, OrderMapSheet, MapButton } from '../components/OrderL
 import { configApi } from '../api/config';
 import { Product as ApiProduct } from '../api/products';
 import { driverApi, logisticsApi, csApi, partnerApi, DeliveryOrder, LogisticsDriver, DriverSummary, LogisticsPartner } from '../api/delivery';
-import { Sheet, TextArea, Pill, ErrorBanner, AmountRow, agoFr, PackedPill } from '../components/StaffKit';
+import { Sheet, TextArea, Pill, ErrorBanner, AmountRow, agoFr, PackedPill, NotPackedNote } from '../components/StaffKit';
 import { SITE_ORIGIN } from '../api/wcfm';
 import { vendorApi, VendorDashboard, MAX_PRODUCT_PHOTOS } from '../api/vendor';
 import { StoreAddressForm, StoreAddressValue, EMPTY_STORE_ADDRESS } from '../components/StoreAddressForm';
@@ -533,7 +533,7 @@ export function ScreenVendorEditProduct() {
 const VENDOR_STAGES: { key: string; label: string }[] = [
   { key: 'processing', label: 'En préparation' },
   { key: 'packed', label: 'Emballé' },
-  { key: 'ready-dispatch', label: 'Prêt' },
+  { key: 'ready-dispatch', label: 'Confirmée' },
 ];
 
 export function ScreenVendorOrders() {
@@ -1382,6 +1382,7 @@ function DriverActiveCard({ o, busy, otp, onOtp, onAdvance, onVerify, onLocation
       </View>
 
       <View style={{ padding: 14, gap: 11 }}>
+        {o.status === 'assigned-driver' && <NotPackedNote packedAt={o.packed_at} status={o.status} audience="driver" />}
         {o.customer_avatar ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <Image source={{ uri: o.customer_avatar }} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: LMX.surfaceAlt }} />
@@ -1808,6 +1809,7 @@ function LogisticsCard({ o, drivers, partners, onAssigned }: { o: DeliveryOrder;
         </View>
       </View>
       <View style={{ padding: 14, gap: 10 }}>
+        <NotPackedNote packedAt={o.packed_at} status={o.status} />
         <LogiRow icon="user" label={t('Client')} value={`${o.customer_name} · ${o.customer_phone}`} />
         <LogiRow icon="storefront" label={t('Retrait')} value={[o.pickup?.store, o.pickup?.address].filter(Boolean).join(' · ') || t('Vendeur')} />
         <LogiRow icon="pin" label={t('Livraison')} value={o.delivery_address || [o.address, o.neighborhood, o.city].filter(Boolean).join(', ') || 'Conakry'} />

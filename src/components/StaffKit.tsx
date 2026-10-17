@@ -96,6 +96,21 @@ export function PackedPill({ packedAt, status }: { packedAt?: string | null; sta
     : <Pill label={t('Pas encore emballée')} color={LMX.ink50} />;
 }
 
+/** Warning while the store has not packed the parcel yet (assignment is allowed, the driver should wait). */
+export function NotPackedNote({ packedAt, status, audience = 'staff' }: { packedAt?: string | null; status?: string; audience?: 'staff' | 'driver' }) {
+  if (packedAt || !status || !PACKABLE_STATUSES.includes(status)) return null;
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, backgroundColor: LMX.accentSoft, borderRadius: 10, borderWidth: 1, borderColor: LMX.accent + '40', padding: 10 }}>
+      <Icon name="package" size={14} color={LMX.accent} />
+      <Text style={{ flex: 1, fontSize: 11.5, color: LMX.ink70, lineHeight: 16, fontFamily: sans(500) }}>
+        {audience === 'driver'
+          ? t("Attendez : le magasin n'a pas encore emballé le colis. Vous serez prévenu dès qu'il sera prêt.")
+          : t("Colis pas encore emballé par le magasin — le livreur sera prévenu dès qu'il sera prêt.")}
+      </Text>
+    </View>
+  );
+}
+
 /** Inline error banner with a Réessayer link. */
 export function ErrorBanner({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (

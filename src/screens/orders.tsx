@@ -169,7 +169,7 @@ export function ScreenOrderSuccess() {
 const TRACK_FLOW: { keys: string[]; label: string }[] = [
   { keys: ['pending'],                        label: 'Commande passée' },
   { keys: ['processing'],                      label: 'Confirmée · en préparation' },
-  { keys: ['ready-dispatch'],                  label: 'Prête pour expédition' },
+  { keys: ['ready-dispatch'],                  label: 'Confirmée' },
   { keys: ['assigned-driver'],                 label: 'Livreur assigné' },
   { keys: ['out-delivery'],                    label: 'En cours de livraison' },
   { keys: ['driver-arrived', 'otp-pending'],   label: 'Livreur arrivé' },
