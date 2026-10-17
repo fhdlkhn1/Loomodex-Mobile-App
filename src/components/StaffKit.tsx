@@ -6,6 +6,7 @@ import { Icon, IconName } from '../Icon';
 import type { LogisticsDriver } from '../api/delivery';
 import { DRIVER_STATE_COLOR, driverMapState, hasPosition } from './DriversMap';
 import { t } from '../i18n';
+import { KEYBOARD_BEHAVIOR, useKeyboardScroll, notifyInputFocus } from '../hooks/useKeyboardScroll';
 
 /** "il y a 5 min" from a unix timestamp (seconds). */
 export function agoFr(unix: number | null | undefined): string {
@@ -30,9 +31,10 @@ export function Sheet({ visible, title, subtitle, onClose, children, footer }: {
   visible: boolean; title: string; subtitle?: string; onClose: () => void; children: React.ReactNode; footer?: React.ReactNode;
 }) {
   const insets = useSafeAreaInsets();
+  const kb = useKeyboardScroll();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={KEYBOARD_BEHAVIOR}>
         <View style={{ flex: 1, backgroundColor: 'rgba(11,31,58,0.38)', justifyContent: 'flex-end' }}>
           <Pressable style={{ flex: 1 }} onPress={onClose} />
           <View style={{ maxHeight: '85%', backgroundColor: LMX.surface, borderTopLeftRadius: 22, borderTopRightRadius: 22, paddingTop: 18, paddingBottom: insets.bottom + 14 }}>
@@ -43,7 +45,7 @@ export function Sheet({ visible, title, subtitle, onClose, children, footer }: {
               </View>
               <Pressable onPress={onClose} hitSlop={10}><Icon name="close" size={18} color={LMX.ink50} /></Pressable>
             </View>
-            <ScrollView style={{ marginTop: 12 }} contentContainerStyle={{ paddingHorizontal: 18, gap: 8, paddingBottom: 6 }} keyboardShouldPersistTaps="handled">
+            <ScrollView ref={kb.ref} onScroll={kb.onScroll} scrollEventThrottle={32} style={{ marginTop: 12 }} contentContainerStyle={{ paddingHorizontal: 18, gap: 8, paddingBottom: 6 }} keyboardShouldPersistTaps="handled">
               {children}
             </ScrollView>
             {!!footer && <View style={{ paddingHorizontal: 18, paddingTop: 10 }}>{footer}</View>}
@@ -64,7 +66,7 @@ export function TextArea({ label, value, onChangeText, placeholder, keyboardType
       <Text style={{ fontSize: 12, color: LMX.ink70, fontFamily: sans(500), marginBottom: 6 }}>{label}</Text>
       <TextInput
         value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={LMX.ink50}
-        keyboardType={keyboardType} multiline={multi} numberOfLines={lines}
+        keyboardType={keyboardType} multiline={multi} numberOfLines={lines} onFocus={notifyInputFocus}
         style={{
           minHeight: multi ? 22 * lines + 20 : 48, textAlignVertical: multi ? 'top' : 'center',
           backgroundColor: LMX.bg, borderWidth: 1, borderColor: LMX.border, borderRadius: 12,

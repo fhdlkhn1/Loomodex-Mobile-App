@@ -19,6 +19,7 @@ import { ErrorState, SkeletonRail } from '../components/StateViews';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { t } from '../i18n';
+import { notifyInputFocus } from '../hooks/useKeyboardScroll';
 
 // Homepage should surface PRODUCTS first, not categories. The category grid is hidden
 // here (categories remain reachable via the menu drawer and the Categories tab).
@@ -895,7 +896,7 @@ export function ScreenCategory() {
       <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: LMX.surface, borderRadius: 999, paddingHorizontal: 14, height: 44, borderWidth: 1, borderColor: LMX.border }}>
           <Icon name="search" size={16} color={LMX.ink50} />
-          <TextInput
+          <TextInput onFocus={notifyInputFocus}
             value={query}
             onChangeText={setQuery}
             placeholder={t('Rechercher dans cette catégorie…')}
@@ -1091,7 +1092,7 @@ export function ScreenSearchResults() {
         <IconBtn icon="chevL" onPress={() => nav.goBack()} />
         <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: LMX.surfaceAlt, borderRadius: 999, paddingHorizontal: 14, height: 42 }}>
           <Icon name="search" size={16} color={LMX.ink} />
-          <TextInput
+          <TextInput onFocus={notifyInputFocus}
             value={query}
             onChangeText={setQuery}
             onSubmitEditing={() => {}}

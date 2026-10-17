@@ -65,6 +65,8 @@ export interface ProductTabs {
 export interface HomeBanner {
   image: string;
   title: string;
+  /** Print the title on the slide (admin option for plain photos). Off → title is the accessibility label only. */
+  show_title?: boolean;
   /** Where a tap goes: nothing, a product (id), a category (id) or an external/website URL. */
   link_type: 'none' | 'product' | 'category' | 'url';
   link_value: string;

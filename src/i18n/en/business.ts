@@ -503,6 +503,14 @@ const dict: Record<string, string> = {
   'Annuler « emballée »': 'Undo "packed"',
   'Marquer comme emballée': 'Mark as packed',
   'Pas encore emballée': 'Not packed yet',
+  // Driver home (redesign)
+  'Bonjour, {name}': 'Hello, {name}',
+  'Bonjour': 'Hello',
+  'En ligne — position partagée': 'Online — location shared',
+  'Voir le code de ramassage': 'Show pickup code',
+  'Saisir le code de livraison': 'Enter delivery code',
+  'Voir la commande': 'View order',
+  'À encaisser': 'To collect',
 };
 
 export default dict;

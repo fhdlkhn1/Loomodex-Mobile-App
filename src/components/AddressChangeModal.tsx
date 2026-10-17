@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Modal, Pressable, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, Modal, Pressable, ScrollView, Alert, ActivityIndicator, KeyboardAvoidingView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LMX, sans, mono, fr } from '../theme';
 import { Icon } from '../Icon';
@@ -13,6 +13,7 @@ import { configApi } from '../api/config';
 import { ordersApi, Order, AddressChange } from '../api/orders';
 import { friendlyError } from '../api/client';
 import { t } from '../i18n';
+import { KEYBOARD_BEHAVIOR, useKeyboardScroll } from '../hooks/useKeyboardScroll';
 
 /** Customer changes the delivery address of an order (before pickup): new quote first, then apply. */
 export function AddressChangeModal({
@@ -24,6 +25,7 @@ export function AddressChangeModal({
   onApplied: (order: Order) => void;
 }) {
   const insets = useSafeAreaInsets();
+  const kb = useKeyboardScroll();
   const [zones, setZones]           = useState<DeliveryZone[]>([]);
   const [zonesError, setZonesError] = useState<string | null>(null);
   const [mapsKey, setMapsKey]       = useState('');
@@ -109,6 +111,7 @@ export function AddressChangeModal({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={KEYBOARD_BEHAVIOR}>
       <View style={{ flex: 1, backgroundColor: 'rgba(11,31,58,0.38)', justifyContent: 'flex-end' }}>
         <Pressable style={{ flex: 1, minHeight: 40 }} onPress={onClose} />
         <View style={{ maxHeight: '92%', backgroundColor: LMX.bg, borderTopLeftRadius: 22, borderTopRightRadius: 22, paddingTop: 18 }}>
@@ -116,7 +119,7 @@ export function AddressChangeModal({
             <Text style={{ flex: 1, fontSize: 16, fontFamily: sans(700), color: LMX.ink }}>{t("Modifier l'adresse de livraison")}</Text>
             <Pressable onPress={onClose} hitSlop={10}><Icon name="close" size={20} color={LMX.ink70} /></Pressable>
           </View>
-          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: insets.bottom + 18, gap: 12 }}>
+          <ScrollView ref={kb.ref} onScroll={kb.onScroll} scrollEventThrottle={32} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: insets.bottom + 18, gap: 12 }}>
             <Text style={{ fontSize: 12, color: LMX.ink50, lineHeight: 17 }}>
               {t('Les frais de livraison seront recalculés pour la nouvelle adresse. Rien ne change tant que vous n’avez pas accepté.')}
             </Text>
@@ -182,6 +185,7 @@ export function AddressChangeModal({
           </ScrollView>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

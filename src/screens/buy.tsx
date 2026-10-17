@@ -24,6 +24,7 @@ import { ImageViewer } from '../components/ImageViewer';
 import { ProductVideo } from '../components/ProductVideo';
 import { PhoneInput, toE164 } from '../components/PhoneInput';
 import { t } from '../i18n';
+import { notifyInputFocus } from '../hooks/useKeyboardScroll';
 
 // ─── Helpers ─────────────────────────────────────────────────────
 
@@ -715,7 +716,7 @@ export function ScreenCart() {
           <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 14, paddingRight: 6, backgroundColor: LMX.surface, borderRadius: 14, borderWidth: 1, borderColor: LMX.border, borderStyle: 'dashed', height: 50 }}>
               <Icon name="tag" size={16} color={LMX.ink70} />
-              <TextInput
+              <TextInput onFocus={notifyInputFocus}
                 value={coupon}
                 onChangeText={setCoupon}
                 placeholder={t('Code promo ou bon')}
@@ -1240,7 +1241,7 @@ export function ScreenCheckout() {
         <Text style={{ fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600), marginBottom: 10 }}>{t('Code promo')}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: LMX.surface, borderRadius: 14, borderWidth: 1, borderColor: LMX.border, borderStyle: 'dashed', paddingLeft: 14, paddingRight: 6, height: 52 }}>
           <Icon name="tag" size={16} color={LMX.ink70} />
-          <TextInput
+          <TextInput onFocus={notifyInputFocus}
             value={coupon}
             onChangeText={setCoupon}
             placeholder={t('Entrez un code promo')}

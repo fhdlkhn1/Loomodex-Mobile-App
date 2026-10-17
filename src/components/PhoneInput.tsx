@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, TextInput, Pressable, Modal, FlatList, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, Pressable, Modal, FlatList, KeyboardAvoidingView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LMX, sans, mono } from '../theme';
 import { Icon } from '../Icon';
 import { t } from '../i18n';
+import { notifyInputFocus, KEYBOARD_BEHAVIOR } from '../hooks/useKeyboardScroll';
 
 export interface Country { iso: string; name: string; dial: string }
 
@@ -159,7 +160,7 @@ export function PhoneInput({
         {isOther && (
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Text style={{ fontFamily: mono(500), fontSize: 14, color: LMX.ink70 }}>+</Text>
-            <TextInput
+            <TextInput onFocus={notifyInputFocus}
               value={customDial}
               onChangeText={t => { const cd = digitsOnly(t).slice(0, 4); setCustomDial(cd); emit(country, local, cd); }}
               keyboardType="number-pad"
@@ -170,7 +171,7 @@ export function PhoneInput({
           </View>
         )}
         <View style={{ width: 1, height: 22, backgroundColor: LMX.hairline }} />
-        <TextInput
+        <TextInput onFocus={notifyInputFocus}
           value={local}
           onChangeText={t => { const l = t.replace(/[^\d\s]/g, ''); setLocal(l); emit(country, l, customDial); }}
           keyboardType="phone-pad"
@@ -206,7 +207,7 @@ function CountryPicker({ visible, selected, onClose, onSelect }: {
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose} statusBarTranslucent>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: 'rgba(11,31,58,0.38)', justifyContent: 'flex-end' }}>
+      <KeyboardAvoidingView behavior={KEYBOARD_BEHAVIOR} style={{ flex: 1, backgroundColor: 'rgba(11,31,58,0.38)', justifyContent: 'flex-end' }}>
         <Pressable style={{ flex: 1 }} onPress={onClose} />
         <View style={{ height: '78%', backgroundColor: LMX.bg, borderTopLeftRadius: 22, borderTopRightRadius: 22, paddingBottom: insets.bottom }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 10 }}>
@@ -218,7 +219,7 @@ function CountryPicker({ visible, selected, onClose, onSelect }: {
           <View style={{ paddingHorizontal: 16, paddingBottom: 10 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: LMX.surface, borderRadius: 999, borderWidth: 1, borderColor: LMX.border, paddingHorizontal: 14, height: 44 }}>
               <Icon name="search" size={16} color={LMX.ink50} />
-              <TextInput
+              <TextInput onFocus={notifyInputFocus}
                 value={q}
                 onChangeText={setQ}
                 placeholder={t('Rechercher un pays ou un indicatif')}

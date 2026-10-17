@@ -9,6 +9,7 @@ import { LocationPicker, LatLng } from './LocationPicker';
 import { checkoutApi, DeliveryZone } from '../api/checkout';
 import { friendlyError } from '../api/client';
 import { t } from '../i18n';
+import { notifyInputFocus } from '../hooks/useKeyboardScroll';
 
 export interface StoreAddressValue {
   zone: string;
@@ -217,7 +218,7 @@ function CoordInput({ label, value, onChangeText, onDone, placeholder }: {
     <View style={{ flex: 1 }}>
       <Text style={{ fontSize: 12, color: LMX.ink70, fontFamily: sans(500), marginBottom: 6 }}>{label}</Text>
       <View style={{ height: 46, borderRadius: 12, borderWidth: 1, borderColor: LMX.border, backgroundColor: LMX.surface, paddingHorizontal: 12, justifyContent: 'center' }}>
-        <TextInput
+        <TextInput onFocus={notifyInputFocus}
           value={value} onChangeText={onChangeText} onEndEditing={onDone} onSubmitEditing={onDone}
           placeholder={placeholder} placeholderTextColor={LMX.ink30}
           keyboardType="numbers-and-punctuation" autoCorrect={false} autoCapitalize="none" returnKeyType="done"

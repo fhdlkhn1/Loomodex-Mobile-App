@@ -6,9 +6,9 @@ import * as Clipboard from 'expo-clipboard';
 import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Defs, LinearGradient as SvgGrad, Stop } from 'react-native-svg';
-import { LMX, FONT, sans, mono, fr, decodeEntities } from '../theme';
+import { LMX, FONT, sans, mono, fr, decodeEntities, shadow } from '../theme';
 import { IMG, PRODUCTS } from '../data';
-import { Icon } from '../Icon';
+import { Icon, IconName } from '../Icon';
 import { Screen, AppBar, IconBtn, Button, Field, Toggle, MapVisual, CategoryGlyph, LoadingOverlay } from '../components';
 import { Picker } from '../components/Picker';
 import { useAuth } from '../context/AuthContext';
@@ -26,6 +26,7 @@ import { StoreAddressForm, StoreAddressValue, EMPTY_STORE_ADDRESS } from '../com
 import { DriversMap, driverMapState, hasPosition, DRIVER_STATE_COLOR, DriverMapState } from '../components/DriversMap';
 import { t, locale } from '../i18n';
 import { quoteLineLabel } from '../components/FeeBreakdown';
+import { notifyInputFocus } from '../hooks/useKeyboardScroll';
 
 function Chart() {
   const pts = [10, 18, 12, 28, 22, 40, 32, 46, 38, 52, 44, 58];
@@ -412,7 +413,7 @@ function ProductVideoField({ value, onChange, uploading }: { value: ProductVideo
           </Pressable>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <View style={{ flex: 1, height: 48, borderRadius: 14, borderWidth: 1, borderColor: LMX.border, backgroundColor: LMX.surface, paddingHorizontal: 14, justifyContent: 'center' }}>
-              <TextInput value={link} onChangeText={setLink} placeholder={t('ou collez un lien YouTube / Vimeo')} placeholderTextColor={LMX.ink50} autoCapitalize="none" autoCorrect={false} keyboardType="url" style={{ fontSize: 13.5, color: LMX.ink, fontFamily: sans(400), padding: 0 }} />
+              <TextInput onFocus={notifyInputFocus} value={link} onChangeText={setLink} placeholder={t('ou collez un lien YouTube / Vimeo')} placeholderTextColor={LMX.ink50} autoCapitalize="none" autoCorrect={false} keyboardType="url" style={{ fontSize: 13.5, color: LMX.ink, fontFamily: sans(400), padding: 0 }} />
             </View>
             <Button variant="soft" size="md" onPress={addLink} disabled={!link.trim()}>{t('Ajouter')}</Button>
           </View>
@@ -710,7 +711,7 @@ export function ScreenVendorOrder() {
             </Text>
             <View style={{ flexDirection: 'row', gap: 8 }}>
               <View style={{ flex: 1, height: 48, borderRadius: 12, borderWidth: 1, borderColor: LMX.border, backgroundColor: LMX.surface, paddingHorizontal: 14, justifyContent: 'center' }}>
-                <TextInput value={pickupCode} onChangeText={setPickupCode} keyboardType="number-pad" maxLength={4} placeholder="••••" placeholderTextColor={LMX.ink50} style={{ fontFamily: mono(600), fontSize: 18, letterSpacing: 6, color: LMX.ink, padding: 0 }} />
+                <TextInput onFocus={notifyInputFocus} value={pickupCode} onChangeText={setPickupCode} keyboardType="number-pad" maxLength={4} placeholder="••••" placeholderTextColor={LMX.ink50} style={{ fontFamily: mono(600), fontSize: 18, letterSpacing: 6, color: LMX.ink, padding: 0 }} />
               </View>
               <Button variant="accent" size="md" icon="check" onPress={verifyPickup} disabled={busy || pickupCode.trim().length < 4}>{t('Confirmer')}</Button>
             </View>
@@ -1224,60 +1225,66 @@ export function ScreenDriver() {
     } finally { setBusy(null); }
   };
 
+  const firstName = (user?.first_name ?? '').trim();
+  const fullName = `${user?.first_name ?? ''} ${user?.last_name ?? ''}`.trim();
+  const tabCount: Record<'active' | 'history' | 'failed', number | undefined> = {
+    active: summary?.active_count, history: summary?.total_delivered, failed: summary?.failed_count,
+  };
+  const refresh = () => { setLoad(true); load(); };
+
   return (
-    <Screen>
-      {/* Header */}
-      <View style={{ paddingHorizontal: 16, paddingTop: 8 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: LMX.navy, alignItems: 'center', justifyContent: 'center' }}><Icon name="truck" size={18} color="#fff" /></View>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 15, fontFamily: sans(700) }}>{t('Tableau de bord livreur')}</Text>
-            <Text style={{ fontSize: 11.5, color: LMX.ink50, marginTop: 1 }}>{`${user?.first_name ?? ''} ${user?.last_name ?? ''}`.trim() || t('Livreur')}</Text>
-          </View>
-          <IconBtn icon="refresh" onPress={() => { setLoad(true); load(); }} />
-          <DashboardProfileBtn />
-          <DashboardLogoutBtn />
+    <Screen refreshControl={<RefreshControl refreshing={false} onRefresh={refresh} tintColor={LMX.brand} colors={[LMX.brand]} />}>
+      {/* Header — greeting + avatar */}
+      <View style={{ paddingHorizontal: 16, paddingTop: 8, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <DriverAvatar uri={user?.has_avatar !== false ? user?.avatar : null} name={fullName} />
+        <View style={{ flex: 1 }}>
+          <Text numberOfLines={1} style={{ fontSize: 17, fontFamily: sans(700), color: LMX.ink }}>
+            {firstName ? t('Bonjour, {name}', { name: firstName }) : t('Bonjour')}
+          </Text>
+          <Text style={{ fontSize: 12, color: LMX.ink50, marginTop: 2 }}>{t('Tableau de bord livreur')}</Text>
         </View>
+        <IconBtn icon="refresh" onPress={refresh} />
+        <DashboardProfileBtn />
+        <DashboardLogoutBtn />
       </View>
 
-      {/* Availability switch — unavailable = no new assignments, current orders stay */}
-      <View style={{ paddingHorizontal: 16, paddingTop: 14 }}>
-        <Pressable onPress={toggleAvailable} disabled={switching} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: LMX.surface, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: available ? LMX.emerald + '66' : LMX.border, padding: 14, opacity: switching ? 0.7 : 1 }}>
-          <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: available ? LMX.emerald : LMX.ink30 }} />
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 14, fontFamily: sans(700), color: LMX.ink }}>{available ? t('Disponible') : t('Indisponible')}</Text>
-            <Text style={{ fontSize: 11, color: LMX.ink50, marginTop: 2 }}>{available ? t('Vous pouvez recevoir de nouvelles commandes') : t('Touchez pour redevenir disponible')}</Text>
+      {/* Availability — unavailable = no new assignments, current orders stay */}
+      <View style={{ marginHorizontal: 16, marginTop: 16, backgroundColor: LMX.surface, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.border, padding: 12, gap: 12 }}>
+        <AvailabilitySwitch available={available} switching={switching} onChange={v => { if (v !== available && !switching) toggleAvailable(); }} />
+        {available ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 4 }}>
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: LMX.emerald }} />
+            <Text style={{ flex: 1, fontSize: 12, color: LMX.ink70, fontFamily: sans(500) }}>{t('En ligne — position partagée')}</Text>
           </View>
-          {switching ? <ActivityIndicator size="small" color={LMX.brand} /> : (
-            <View style={{ width: 48, height: 28, borderRadius: 14, backgroundColor: available ? LMX.emerald : LMX.ink10, justifyContent: 'center' }}>
-              <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: '#fff', marginLeft: available ? 22 : 2 }} />
-            </View>
-          )}
-        </Pressable>
-        {!available && (
-          <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: LMX.accentSoft, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: LMX.accent + '44' }}>
-            <Icon name="bell" size={14} color={LMX.accent} />
-            <Text style={{ flex: 1, fontSize: 12, color: LMX.ink, fontFamily: sans(600) }}>{t('Vous ne recevrez pas de nouvelles commandes')}</Text>
+        ) : (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: LMX.bg, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10 }}>
+            <Icon name="bell" size={14} color={LMX.ink50} />
+            <Text style={{ flex: 1, fontSize: 12, color: LMX.ink70, fontFamily: sans(500) }}>{t('Vous ne recevrez pas de nouvelles commandes')}</Text>
           </View>
         )}
       </View>
 
-      {/* Stats: Active / Today / Total / Failed */}
-      <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 14 }}>
-        <DriverStatCard value={summary?.active_count ?? 0}    label={t('Actives')} />
-        <DriverStatCard value={summary?.trips_today ?? 0}     label={t("Aujourd'hui")} />
-        <DriverStatCard value={summary?.total_delivered ?? 0} label={t('Total')} color={LMX.emerald} />
-        <DriverStatCard value={summary?.failed_count ?? 0}    label={t('Échecs')} color={LMX.rose} />
+      {/* Stats */}
+      <View style={{ flexDirection: 'row', gap: 12, paddingHorizontal: 16, paddingTop: 12 }}>
+        <DriverKpiTile icon="chart"    value={summary?.trips_today ?? 0}     label={t("Aujourd'hui")} color={LMX.brand} />
+        <DriverKpiTile icon="bike"     value={summary?.active_count ?? 0}    label={t('En cours')}    color={LMX.accent} />
+        <DriverKpiTile icon="check"    value={summary?.total_delivered ?? 0} label={t('Livrées')}     color={LMX.emerald} />
       </View>
 
-      {/* Tabs */}
-      <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 14 }}>
+      {/* Tabs — segmented control */}
+      <View style={{ flexDirection: 'row', marginHorizontal: 16, marginTop: 16, padding: 4, borderRadius: 14, backgroundColor: LMX.ink10 }}>
         {DRIVER_TABS.map(tb => {
           const on = tab === tb.key;
+          const n = tabCount[tb.key];
           return (
-            <Pressable key={tb.key} onPress={() => { setTab(tb.key); setLoad(true); }} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 10, backgroundColor: on ? (tb.key === 'failed' ? LMX.rose : LMX.brand) : LMX.surface, borderWidth: 1, borderColor: on ? 'transparent' : LMX.border }}>
-              <Icon name={tb.icon} size={13} color={on ? '#fff' : LMX.ink70} />
-              <Text style={{ fontSize: 12, fontFamily: sans(700), color: on ? '#fff' : LMX.ink70 }}>{t(tb.label)}</Text>
+            <Pressable key={tb.key} onPress={() => { if (!on) { setTab(tb.key); setLoad(true); } }}
+              style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 38, borderRadius: 10, backgroundColor: on ? LMX.surface : 'transparent', ...(on ? shadow('sm') : null) }}>
+              <Text style={{ fontSize: 12.5, fontFamily: sans(on ? 700 : 600), color: on ? LMX.ink : LMX.ink50 }}>{t(tb.label)}</Text>
+              {n != null && n > 0 && (
+                <View style={{ minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 5, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? (tb.key === 'failed' ? LMX.rose : LMX.brand) : LMX.ink10 }}>
+                  <Text style={{ fontSize: 10, fontFamily: mono(700), color: on ? '#fff' : LMX.ink50 }}>{n}</Text>
+                </View>
+              )}
             </Pressable>
           );
         })}
@@ -1286,20 +1293,83 @@ export function ScreenDriver() {
       {loading ? (
         <View style={{ paddingTop: 40 }}><ActivityIndicator color={LMX.brand} size="large" /></View>
       ) : orders.length === 0 ? (
-        <View style={{ alignItems: 'center', paddingTop: 44, gap: 12 }}>
-          <Icon name={tab === 'failed' ? 'close' : tab === 'history' ? 'check' : 'bike'} size={42} color={LMX.ink30} />
-          <Text style={{ fontSize: 14, color: LMX.ink70 }}>
-            {tab === 'active' ? t('Aucune livraison active.') : tab === 'history' ? t('Aucune livraison terminée.') : t('Aucun échec de livraison.')}
-          </Text>
-        </View>
+        <DriverEmpty
+          icon={tab === 'failed' ? 'close' : tab === 'history' ? 'checkCircle' : 'bike'}
+          text={tab === 'active' ? t('Aucune livraison active.') : tab === 'history' ? t('Aucune livraison terminée.') : t('Aucun échec de livraison.')}
+        />
       ) : (
-        <View style={{ paddingHorizontal: 16, paddingTop: 14, gap: 10 }}>
+        <View style={{ paddingHorizontal: 16, paddingTop: 12, gap: 12 }}>
           {tab === 'active'
-            ? orders.map(o => <DriverOrderRow key={o.id} o={o} onPress={() => nav.navigate('DriverOrder', { order: o })} />)
+            ? orders.map(o => (
+                <DriverOrderRow key={o.id} o={o} busy={busyId === o.id}
+                  onPress={() => nav.navigate('DriverOrder', { order: o })}
+                  onArrived={() => advance(o, 'driver-arrived')} />
+              ))
             : orders.map(o => <DriverDoneCard key={o.id} o={o} failed={tab === 'failed'} />)}
         </View>
       )}
     </Screen>
+  );
+}
+
+/** Profile photo, or the driver's initials on a navy disc. */
+function DriverAvatar({ uri, name }: { uri?: string | null; name: string }) {
+  const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]?.toUpperCase()).join('');
+  if (uri) return <Image source={{ uri }} style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: LMX.surfaceAlt }} />;
+  return (
+    <View style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: LMX.navy, alignItems: 'center', justifyContent: 'center' }}>
+      {initials ? <Text style={{ fontSize: 16, fontFamily: sans(700), color: '#fff' }}>{initials}</Text> : <Icon name="truck" size={18} color="#fff" />}
+    </View>
+  );
+}
+
+/** Two-pill Available / Unavailable switch. */
+function AvailabilitySwitch({ available, switching, onChange }: { available: boolean; switching: boolean; onChange: (v: boolean) => void }) {
+  const opts: { v: boolean; label: string; color: string }[] = [
+    { v: true,  label: t('Disponible'),   color: LMX.emerald },
+    { v: false, label: t('Indisponible'), color: '#64748B' },
+  ];
+  return (
+    <View style={{ flexDirection: 'row', padding: 4, borderRadius: 14, backgroundColor: LMX.bg, borderWidth: 1, borderColor: LMX.hairline }}>
+      {opts.map(o => {
+        const on = available === o.v;
+        return (
+          <Pressable key={String(o.v)} onPress={() => onChange(o.v)} disabled={switching}
+            accessibilityRole="button" accessibilityState={{ selected: on, disabled: switching }}
+            style={{ flex: 1, height: 44, borderRadius: 11, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: on ? o.color : 'transparent' }}>
+            {on && switching
+              ? <ActivityIndicator size="small" color="#fff" />
+              : <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: on ? '#fff' : o.color, opacity: on ? 1 : 0.6 }} />}
+            <Text style={{ fontSize: 14, fontFamily: sans(700), color: on ? '#fff' : LMX.ink50 }}>{o.label}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+function DriverKpiTile({ icon, value, label, color }: { icon: IconName; value: number; label: string; color: string }) {
+  return (
+    <View style={{ flex: 1, backgroundColor: LMX.surface, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.border, padding: 12, gap: 8 }}>
+      <View style={{ width: 28, height: 28, borderRadius: 9, backgroundColor: color + '1A', alignItems: 'center', justifyContent: 'center' }}>
+        <Icon name={icon} size={15} color={color} />
+      </View>
+      <View>
+        <Text style={{ fontFamily: mono(700), fontSize: 24, color: LMX.ink, lineHeight: 28 }}>{value}</Text>
+        <Text numberOfLines={1} style={{ fontSize: 11, color: LMX.ink50, fontFamily: sans(600), marginTop: 2 }}>{label}</Text>
+      </View>
+    </View>
+  );
+}
+
+function DriverEmpty({ icon, text }: { icon: IconName; text: string }) {
+  return (
+    <View style={{ alignItems: 'center', paddingTop: 40, paddingHorizontal: 32, gap: 12 }}>
+      <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: LMX.surface, borderWidth: 1, borderColor: LMX.border, alignItems: 'center', justifyContent: 'center' }}>
+        <Icon name={icon} size={26} color={LMX.ink30} />
+      </View>
+      <Text style={{ fontSize: 13.5, color: LMX.ink50, textAlign: 'center' }}>{text}</Text>
+    </View>
   );
 }
 
@@ -1312,6 +1382,114 @@ function DriverStatCard({ value, label, color }: { value: number; label: string;
   );
 }
 
+/** Rounded status pill (dot + label) used on the driver cards. */
+function DriverStatusPill({ status, label }: { status: string; label: string }) {
+  const st = STATUS_STYLE[status] ?? { label, color: LMX.brand };
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999, backgroundColor: st.color + '1A' }}>
+      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: st.color }} />
+      <Text style={{ fontSize: 10.5, fontFamily: sans(700), color: st.color }}>{t(st.label)}</Text>
+    </View>
+  );
+}
+
+/** Store → customer as a vertical two-step timeline. */
+function DriverRoute({ o, detailed }: { o: DeliveryOrder; detailed?: boolean }) {
+  const pickedUp = o.status !== 'assigned-driver';
+  const custAddress = o.delivery_address || [o.commune, o.neighborhood].filter(Boolean).join(' — ') || o.zone_label || o.city || 'Conakry';
+  const Step = ({ icon, color, label, title, sub, avatar, last }: { icon: IconName; color: string; label: string; title?: string; sub: string; avatar?: string | null; last?: boolean }) => (
+    <View style={{ flexDirection: 'row', gap: 12 }}>
+      <View style={{ alignItems: 'center', width: 30 }}>
+        <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: color + '1A', alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name={icon} size={15} color={color} />
+        </View>
+        {!last && <View style={{ flex: 1, width: 2, minHeight: 14, marginVertical: 3, borderRadius: 1, backgroundColor: pickedUp ? LMX.brand + '55' : LMX.border }} />}
+      </View>
+      <View style={{ flex: 1, paddingBottom: last ? 0 : 12 }}>
+        <Text style={{ fontSize: 10.5, color: LMX.ink50, fontFamily: sans(600), letterSpacing: 0.3 }}>{label}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+          {!!avatar && <Image source={{ uri: avatar }} style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: LMX.surfaceAlt }} />}
+          {!!title && <Text numberOfLines={1} style={{ flex: 1, fontSize: 13.5, fontFamily: sans(700), color: LMX.ink }}>{title}</Text>}
+        </View>
+        <Text numberOfLines={detailed ? undefined : 1} style={{ fontSize: 12, color: LMX.ink70, marginTop: 2, lineHeight: 17 }}>{sub}</Text>
+      </View>
+    </View>
+  );
+  return (
+    <View>
+      <Step icon="storefront" color={LMX.accent} label={t('Retrait')}
+        title={o.pickup?.store ? decodeEntities(o.pickup.store) : undefined}
+        sub={o.pickup?.address || t('Adresse du vendeur indisponible')} />
+      <Step icon="pin" color={LMX.brand} label={t('Livraison')} last
+        title={o.customer_name || t('Client')} avatar={detailed ? null : o.customer_avatar}
+        sub={custAddress} />
+    </View>
+  );
+}
+
+/** COD amount to collect, or "already paid". */
+function DriverPayment({ o }: { o: DeliveryOrder }) {
+  if (o.payment !== 'cod') {
+    return (
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <Icon name="wallet" size={14} color={LMX.emerald} />
+        <Text style={{ fontSize: 12.5, fontFamily: sans(700), color: LMX.emerald }}>{t('Déjà payé')}</Text>
+      </View>
+    );
+  }
+  return (
+    <View>
+      <Text style={{ fontSize: 10.5, color: LMX.ink50, fontFamily: sans(600) }}>{t('À encaisser')}</Text>
+      <Text style={{ fontSize: 18, fontFamily: mono(700), color: LMX.ink, marginTop: 1 }}>{fr(o.total)} <Text style={{ fontSize: 12, color: LMX.ink50 }}>GNF</Text></Text>
+    </View>
+  );
+}
+
+/** Compact round call / WhatsApp buttons for the recipient. */
+function DriverContactButtons({ o }: { o: DeliveryOrder }) {
+  if (!(o.recipient_phone || o.customer_phone)) return null;
+  return (
+    <View style={{ flexDirection: 'row', gap: 8 }}>
+      <Pressable onPress={() => call(o.recipient_phone || o.customer_phone)} hitSlop={4} accessibilityLabel={t('Appeler')}
+        style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: LMX.brandSoft, alignItems: 'center', justifyContent: 'center' }}>
+        <Icon name="phone" size={17} color={LMX.brand} />
+      </Pressable>
+      <Pressable onPress={() => whatsapp(o.whatsapp || o.recipient_phone || o.customer_phone)} hitSlop={4} accessibilityLabel="WhatsApp"
+        style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: '#25D3661F', alignItems: 'center', justifyContent: 'center' }}>
+        <Icon name="msg" size={17} color="#1DA851" />
+      </Pressable>
+    </View>
+  );
+}
+
+function DriverOrderRow({ o, busy, onPress, onArrived }: { o: DeliveryOrder; busy: boolean; onPress: () => void; onArrived: () => void }) {
+  const action = o.status === 'assigned-driver'
+    ? { label: t('Voir le code de ramassage'), icon: 'key' as IconName, variant: 'primary' as const, onPress }
+    : o.status === 'out-delivery'
+      ? { label: t('Je suis arrivé'), icon: 'pin' as IconName, variant: 'accent' as const, onPress: onArrived }
+      : ['driver-arrived', 'otp-pending'].includes(o.status)
+        ? { label: t('Saisir le code de livraison'), icon: 'key' as IconName, variant: 'accent' as const, onPress }
+        : { label: t('Voir la commande'), icon: 'arrowR' as IconName, variant: 'soft' as const, onPress };
+  return (
+    <Pressable onPress={onPress} style={{ backgroundColor: LMX.surface, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.border, padding: 16, gap: 14 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <Text style={{ fontFamily: mono(700), fontSize: 14, color: LMX.ink }}>#{o.number}</Text>
+        <PackedPill packedAt={o.packed_at} status={o.status} />
+        <View style={{ flex: 1 }} />
+        <DriverStatusPill status={o.status} label={o.status_label} />
+      </View>
+      <DriverRoute o={o} />
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: LMX.hairline }}>
+        <View style={{ flex: 1 }}><DriverPayment o={o} /></View>
+        <DriverContactButtons o={o} />
+      </View>
+      <Button full variant={action.variant} size="md" icon={action.icon} onPress={action.onPress} disabled={busy}>
+        {busy ? <ActivityIndicator color={action.variant === 'soft' ? LMX.ink : '#fff'} /> : action.label}
+      </Button>
+    </Pressable>
+  );
+}
+
 function DriverInfoRow({ icon, children, color }: { icon: any; children: React.ReactNode; color?: string }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
@@ -1321,35 +1499,12 @@ function DriverInfoRow({ icon, children, color }: { icon: any; children: React.R
   );
 }
 
-function DriverOrderRow({ o, onPress }: { o: DeliveryOrder; onPress: () => void }) {
-  const st = STATUS_STYLE[o.status] ?? { label: o.status_label, color: LMX.brand };
-  return (
-    <Pressable onPress={onPress} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: LMX.surface, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.border, padding: 14 }}>
-      <View style={{ flex: 1 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Text style={{ fontFamily: mono(600), fontSize: 13 }}>#{o.number}</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: st.color + '1A' }}>
-            <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: st.color }} />
-            <Text style={{ fontSize: 9.5, fontFamily: sans(700), color: st.color, textTransform: 'uppercase' }}>{t(st.label)}</Text>
-          </View>
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 5 }}>
-          {!!o.customer_avatar && <Image source={{ uri: o.customer_avatar }} style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: LMX.surfaceAlt }} />}
-          <Text numberOfLines={1} style={{ flex: 1, fontSize: 12.5, fontFamily: sans(600), color: LMX.ink }}>{o.customer_name || t('Client')}</Text>
-        </View>
-        <Text numberOfLines={1} style={{ fontSize: 11, color: LMX.ink50, marginTop: 2 }}>{o.zone_label || o.commune || o.city || 'Conakry'} · {fr(o.total)} GNF</Text>
-      </View>
-      <Icon name="chevR" size={16} color={LMX.ink50} />
-    </Pressable>
-  );
-}
-
 // Pickup: driver enters the code the store reads to them → confirms collection.
 // Driver DISPLAYS his pickup code — he tells it to the store, who enters it to release the
 // order. The order advances (to "on the way") when the store verifies it.
 function PickupCodeDisplay({ code, onRefresh, refreshing }: { code?: string | null; onRefresh?: () => void; refreshing?: boolean }) {
   return (
-    <View style={{ backgroundColor: LMX.accentSoft, borderRadius: 12, padding: 14, gap: 6, borderWidth: 1, borderColor: LMX.accent + '55', alignItems: 'center' }}>
+    <View style={{ backgroundColor: LMX.accentSoft, borderRadius: 14, padding: 16, gap: 6, borderWidth: 1, borderColor: LMX.accent + '40', alignItems: 'center' }}>
       <Text style={{ fontSize: 11, color: LMX.accent, textTransform: 'uppercase', fontFamily: sans(700), letterSpacing: 0.5 }}>{t('Votre code de ramassage')}</Text>
       {code ? (
         <>
@@ -1382,126 +1537,108 @@ function DriverActiveCard({ o, busy, otp, onOtp, onAdvance, onVerify, onLocation
   onRefreshPickup?: () => void;
   refreshingPickup?: boolean;
 }) {
-  const st = STATUS_STYLE[o.status] ?? { label: o.status_label, color: LMX.brand };
   const showOtp = ['driver-arrived', 'otp-pending'].includes(o.status);
+  const canAskLocation = ['out-delivery', 'driver-arrived', 'otp-pending'].includes(o.status);
 
   return (
     <View style={{ backgroundColor: LMX.surface, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.border, overflow: 'hidden' }}>
       {/* Header */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderBottomWidth: 1, borderBottomColor: LMX.hairline }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Text style={{ fontFamily: mono(600), fontSize: 13 }}>{o.number}</Text>
-          <PackedPill packedAt={o.packed_at} status={o.status} />
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999, backgroundColor: st.color + '1A' }}>
-          <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: st.color }} />
-          <Text style={{ fontSize: 10, fontFamily: sans(700), color: st.color, textTransform: 'uppercase' }}>{t(st.label)}</Text>
-        </View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: LMX.hairline }}>
+        <Text style={{ fontFamily: mono(700), fontSize: 14, color: LMX.ink }}>#{o.number}</Text>
+        <PackedPill packedAt={o.packed_at} status={o.status} />
+        <View style={{ flex: 1 }} />
+        <DriverStatusPill status={o.status} label={o.status_label} />
       </View>
 
-      <View style={{ padding: 14, gap: 11 }}>
+      <View style={{ padding: 16, gap: 16 }}>
         {o.status === 'assigned-driver' && <NotPackedNote packedAt={o.packed_at} status={o.status} audience="driver" />}
-        {o.customer_avatar ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <Image source={{ uri: o.customer_avatar }} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: LMX.surfaceAlt }} />
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 9.5, color: LMX.ink50, fontFamily: sans(600), textTransform: 'uppercase' }}>{t('Client')}</Text>
-              <Text style={{ fontSize: 13, fontFamily: sans(700), color: LMX.ink, marginTop: 1 }}>{o.customer_name || t('Client')}</Text>
-            </View>
-          </View>
-        ) : (
-          <DriverInfoRow icon="user"><Text style={{ fontSize: 13, fontFamily: sans(700) }}>{o.customer_name || t('Client')}</Text></DriverInfoRow>
+
+        {/* Next action — pickup code (store verifies it), "arrived", then the customer's code */}
+        {o.status === 'assigned-driver' && (
+          <PickupCodeDisplay code={o.pickup_otp} onRefresh={onRefreshPickup} refreshing={refreshingPickup} />
         )}
-        {!!o.zone_label && <DriverInfoRow icon="pin">{o.zone_label}</DriverInfoRow>}
+        {o.status === 'out-delivery' && (
+          <Button full variant="accent" size="lg" icon="pin" onPress={() => onAdvance(o, 'driver-arrived')} disabled={busy}>{t('Je suis arrivé')}</Button>
+        )}
+        {showOtp && (
+          <View style={{ backgroundColor: LMX.surfaceAlt, borderRadius: 14, padding: 14, gap: 10 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Icon name="key" size={15} color={LMX.brand} />
+              <Text style={{ fontSize: 13.5, fontFamily: sans(700), color: LMX.ink }}>{t('Code de livraison')}</Text>
+            </View>
+            <Text style={{ fontSize: 12, color: LMX.ink50, lineHeight: 17 }}>{t('Demandez au client le code à 4 chiffres reçu par SMS.')}</Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <View style={{ flex: 1, height: 48, borderRadius: 12, borderWidth: 1, borderColor: LMX.border, backgroundColor: LMX.surface, paddingHorizontal: 14, justifyContent: 'center' }}>
+                <TextInput onFocus={notifyInputFocus} value={otp} onChangeText={onOtp} keyboardType="number-pad" maxLength={6} placeholder="••••" placeholderTextColor={LMX.ink50} returnKeyType="done" onSubmitEditing={() => onVerify(o)} style={{ fontFamily: mono(600), fontSize: 18, letterSpacing: 6, color: LMX.ink, padding: 0 }} />
+              </View>
+              <Button variant="accent" size="md" icon="check" onPress={() => onVerify(o)} disabled={busy}>{t('Vérifier')}</Button>
+            </View>
+            {o.otp_attempts > 0 && <Text style={{ fontSize: 11, color: LMX.rose }}>{t('{n} tentative(s) utilisée(s)', { n: o.otp_attempts })}</Text>}
+          </View>
+        )}
 
-        {/* Pickup */}
-        <View style={{ backgroundColor: LMX.surfaceAlt, borderRadius: 10, padding: 10 }}>
-          <Text style={{ fontSize: 9.5, color: LMX.ink50, fontFamily: sans(700), textTransform: 'uppercase', marginBottom: 3 }}>📦 {t('Adresse de retrait')}</Text>
-          {!!o.pickup?.store && <Text style={{ fontSize: 12.5, fontFamily: sans(700), color: LMX.ink }}>{decodeEntities(o.pickup.store)}</Text>}
-          <Text style={{ fontSize: 12, color: LMX.ink70, marginTop: 1 }}>{o.pickup?.address || t('Adresse du vendeur indisponible')}</Text>
+        {/* Store → customer */}
+        <View style={{ gap: 10 }}>
+          {!!o.customer_avatar && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <Image source={{ uri: o.customer_avatar }} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: LMX.surfaceAlt }} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 10.5, color: LMX.ink50, fontFamily: sans(600) }}>{t('Client')}</Text>
+                <Text style={{ fontSize: 13.5, fontFamily: sans(700), color: LMX.ink, marginTop: 1 }}>{o.customer_name || t('Client')}</Text>
+              </View>
+            </View>
+          )}
+          <DriverRoute o={o} detailed />
+          {!!o.zone_label && <DriverInfoRow icon="map">{o.zone_label}</DriverInfoRow>}
+          {!!o.landmark && <DriverInfoRow icon="pin" color={LMX.accent}>{o.landmark}</DriverInfoRow>}
         </View>
 
-        {/* Delivery */}
-        <View style={{ backgroundColor: '#EAF1FF', borderRadius: 10, padding: 10 }}>
-          <Text style={{ fontSize: 9.5, color: LMX.brand, fontFamily: sans(700), textTransform: 'uppercase', marginBottom: 3 }}>📍 {t('Adresse de livraison')}</Text>
-          <Text style={{ fontSize: 12.5, color: LMX.ink }}>{o.delivery_address || [o.commune, o.neighborhood].filter(Boolean).join(' — ') || 'Conakry'}</Text>
+        {/* Recipient may not be the buyer — the driver talks to the recipient */}
+        {!!(o.recipient_phone || o.customer_phone) && o.recipient_is_customer === false && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: LMX.bg, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9 }}>
+            <Icon name="user" size={14} color={LMX.ink50} />
+            <Text style={{ flex: 1, fontSize: 12, color: LMX.ink70, fontFamily: sans(500) }}>
+              {t('Destinataire différent du client')} · {o.recipient_phone}
+            </Text>
+          </View>
+        )}
+
+        {/* Payment + contact */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 14, borderTopWidth: 1, borderTopColor: LMX.hairline }}>
+          <View style={{ flex: 1 }}><DriverPayment o={o} /></View>
+          <DriverContactButtons o={o} />
         </View>
-        {!!o.landmark && <DriverInfoRow icon="pin" color={LMX.accent}>{o.landmark}</DriverInfoRow>}
 
         {/* Send Location Request — SMSes the recipient a one-tap link. Only useful
             once the driver is actually en route, so it appears from that point. */}
-        {['out-delivery', 'driver-arrived', 'otp-pending'].includes(o.status) && (
+        {canAskLocation && (
           <Pressable
             onPress={() => onLocationRequest(o)}
             disabled={busy}
             style={{
               flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-              height: 44, borderRadius: 10, borderWidth: 1.5, borderColor: LMX.accent,
-              backgroundColor: LMX.accentSoft, opacity: busy ? 0.6 : 1,
+              height: 44, borderRadius: 12, borderWidth: 1, borderColor: LMX.border,
+              backgroundColor: LMX.surface, opacity: busy ? 0.6 : 1,
             }}
           >
-            <Icon name="location" size={15} color={LMX.accent} />
-            <Text style={{ fontSize: 12.5, fontFamily: sans(700), color: LMX.accent }}>
+            <Icon name="location" size={15} color={LMX.brand} />
+            <Text style={{ fontSize: 13, fontFamily: sans(600), color: LMX.ink }}>
               {t('Demander la position')}
             </Text>
           </Pressable>
         )}
 
-        {/* Payment */}
-        <View style={{ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: o.payment === 'cod' ? '#FFF4E5' : LMX.emeraldSoft }}>
-          <Icon name={o.payment === 'cod' ? 'money' : 'wallet'} size={13} color={o.payment === 'cod' ? LMX.accent : LMX.emerald} />
-          <Text style={{ fontSize: 11.5, fontFamily: sans(700), color: o.payment === 'cod' ? LMX.accent : LMX.emerald }}>
-            {o.payment === 'cod' ? `${t('Paiement à la livraison')} · ${fr(o.total)} GNF` : t('Déjà payé')}
-          </Text>
-        </View>
-
         {/* Items */}
-        <View style={{ gap: 3 }}>
-          {o.items.map((it, i) => (
-            <Text key={i} style={{ fontSize: 12, color: LMX.ink70 }}>{decodeEntities(it.name)} × {it.qty}</Text>
-          ))}
-        </View>
-
-        {/* Contact buttons — the driver talks to the recipient, who may not be the buyer */}
-        {!!(o.recipient_phone || o.customer_phone) && (
-          <>
-            {o.recipient_is_customer === false && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: LMX.accentSoft, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7 }}>
-                <Icon name="user" size={13} color={LMX.accent} />
-                <Text style={{ flex: 1, fontSize: 11.5, color: LMX.ink70, fontFamily: sans(500) }}>
-                  {t('Destinataire différent du client')} · {o.recipient_phone}
-                </Text>
+        {o.items.length > 0 && (
+          <View style={{ gap: 6 }}>
+            <Text style={{ fontSize: 10.5, color: LMX.ink50, fontFamily: sans(600) }}>{t('Articles')}</Text>
+            {o.items.map((it, i) => (
+              <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Icon name="package" size={13} color={LMX.ink30} />
+                <Text style={{ flex: 1, fontSize: 12.5, color: LMX.ink70 }}>{decodeEntities(it.name)}</Text>
+                <Text style={{ fontSize: 12, fontFamily: mono(600), color: LMX.ink50 }}>× {it.qty}</Text>
               </View>
-            )}
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              <Pressable onPress={() => call(o.recipient_phone || o.customer_phone)} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 42, borderRadius: 10, backgroundColor: LMX.brand }}>
-                <Icon name="phone" size={15} color="#fff" /><Text style={{ fontSize: 12.5, fontFamily: sans(600), color: '#fff' }}>{t('Appeler')}</Text>
-              </Pressable>
-              <Pressable onPress={() => whatsapp(o.whatsapp || o.recipient_phone || o.customer_phone)} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 42, borderRadius: 10, backgroundColor: '#25D366' }}>
-                <Icon name="phone" size={15} color="#fff" /><Text style={{ fontSize: 12.5, fontFamily: sans(600), color: '#fff' }}>WhatsApp</Text>
-              </Pressable>
-            </View>
-          </>
-        )}
-
-        {/* Stage action — pickup now requires the store's code before "on the way" */}
-        {o.status === 'assigned-driver' && (
-          <PickupCodeDisplay code={o.pickup_otp} onRefresh={onRefreshPickup} refreshing={refreshingPickup} />
-        )}
-        {o.status === 'out-delivery' && (
-          <Button full variant="primary" size="md" icon="pin" onPress={() => onAdvance(o, 'driver-arrived')} disabled={busy}>{t('Je suis arrivé')}</Button>
-        )}
-        {showOtp && (
-          <View style={{ backgroundColor: LMX.surfaceAlt, borderRadius: 12, padding: 12, gap: 10 }}>
-            <Text style={{ fontSize: 12, fontFamily: sans(700) }}>🔒 {t('Code de livraison')}</Text>
-            <Text style={{ fontSize: 11, color: LMX.ink50 }}>{t('Demandez au client le code à 4 chiffres reçu par SMS.')}</Text>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              <View style={{ flex: 1, height: 48, borderRadius: 12, borderWidth: 1, borderColor: LMX.border, backgroundColor: LMX.surface, paddingHorizontal: 14, justifyContent: 'center' }}>
-                <TextInput value={otp} onChangeText={onOtp} keyboardType="number-pad" maxLength={6} placeholder="••••" placeholderTextColor={LMX.ink50} style={{ fontFamily: mono(600), fontSize: 18, letterSpacing: 6, color: LMX.ink, padding: 0 }} />
-              </View>
-              <Button variant="accent" size="md" icon="check" onPress={() => onVerify(o)} disabled={busy}>{t('Vérifier')}</Button>
-            </View>
-            {o.otp_attempts > 0 && <Text style={{ fontSize: 10.5, color: LMX.rose }}>{t('{n} tentative(s) utilisée(s)', { n: o.otp_attempts })}</Text>}
+            ))}
           </View>
         )}
       </View>
@@ -1704,17 +1841,23 @@ export function ScreenDriverOrder() {
 
 function DriverDoneCard({ o, failed }: { o: DeliveryOrder; failed: boolean }) {
   const color = failed ? LMX.rose : LMX.emerald;
+  const area = [o.commune, o.neighborhood].filter(Boolean).join(' — ') || o.zone_label || o.city;
   return (
-    <View style={{ backgroundColor: LMX.surface, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.border, borderLeftWidth: 3, borderLeftColor: color, padding: 14 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Text style={{ fontFamily: mono(600), fontSize: 13 }}>{o.number}</Text>
-        <Text style={{ fontSize: 11, fontFamily: sans(700), color }}>{failed ? t('Échec') : t('Livrée')}</Text>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: LMX.surface, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.border, padding: 14 }}>
+      <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: color + '1A', alignItems: 'center', justifyContent: 'center' }}>
+        <Icon name={failed ? 'close' : 'check'} size={18} color={color} />
       </View>
-      <Text style={{ fontSize: 12.5, color: LMX.ink, marginTop: 6 }}>{o.customer_name}</Text>
-      <Text style={{ fontSize: 11.5, color: LMX.ink50, marginTop: 2 }}>{[o.commune, o.neighborhood].filter(Boolean).join(' — ') || o.city}</Text>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
-        <Text style={{ fontSize: 11, color: LMX.ink50 }}>{o.delivery_time || o.date || ''}</Text>
-        <Text style={{ fontFamily: mono(700), fontSize: 13, color: LMX.accent }}>{fr(o.total)} GNF</Text>
+      <View style={{ flex: 1 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Text style={{ fontFamily: mono(700), fontSize: 13, color: LMX.ink }}>#{o.number}</Text>
+          <Text style={{ fontSize: 11, fontFamily: sans(700), color }}>{failed ? t('Échec') : t('Livrée')}</Text>
+        </View>
+        <Text numberOfLines={1} style={{ fontSize: 12.5, fontFamily: sans(600), color: LMX.ink, marginTop: 3 }}>{o.customer_name || t('Client')}</Text>
+        {!!area && <Text numberOfLines={1} style={{ fontSize: 11.5, color: LMX.ink50, marginTop: 1 }}>{area}</Text>}
+      </View>
+      <View style={{ alignItems: 'flex-end' }}>
+        <Text style={{ fontFamily: mono(700), fontSize: 13, color: LMX.ink }}>{fr(o.total)} <Text style={{ fontSize: 10.5, color: LMX.ink50 }}>GNF</Text></Text>
+        {!!(o.delivery_time || o.date) && <Text style={{ fontSize: 10.5, color: LMX.ink50, marginTop: 3 }}>{o.delivery_time || o.date}</Text>}
       </View>
     </View>
   );
@@ -2271,7 +2414,7 @@ export function ScreenCS() {
       <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: LMX.surface, borderRadius: 999, paddingHorizontal: 14, height: 44, borderWidth: 1, borderColor: LMX.border }}>
           <Icon name="search" size={16} color={LMX.ink50} />
-          <TextInput value={query} onChangeText={setQuery} placeholder={t('Commande, nom, téléphone…')} placeholderTextColor={LMX.ink50} style={{ flex: 1, fontSize: 13.5, color: LMX.ink, fontFamily: sans(400), padding: 0 }} />
+          <TextInput onFocus={notifyInputFocus} value={query} onChangeText={setQuery} placeholder={t('Commande, nom, téléphone…')} placeholderTextColor={LMX.ink50} style={{ flex: 1, fontSize: 13.5, color: LMX.ink, fontFamily: sans(400), padding: 0 }} />
           {query.length > 0 && <Pressable onPress={() => setQuery('')}><Icon name="close" size={15} color={LMX.ink50} /></Pressable>}
         </View>
       </View>

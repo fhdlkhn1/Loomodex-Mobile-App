@@ -13,6 +13,7 @@ import { IMG, Product, Category } from './data';
 import { useNotifications } from './context/NotificationsContext';
 import { useAuth } from './context/AuthContext';
 import { t, useLanguage, Lang } from './i18n';
+import { KEYBOARD_BEHAVIOR, useKeyboardScroll, notifyInputFocus } from './hooks/useKeyboardScroll';
 
 // ── Role tab bar awareness ─────────────────────────────────────
 /**
@@ -43,13 +44,17 @@ export function Screen({
   const bottomInset = tabBar.visible ? 0 : insets.bottom;
   const top = padTop ? insets.top + 6 : 0;
   const bottomPad = (footer ? 96 : 24) + bottomInset;
+  const kb = useKeyboardScroll();
   return (
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: bg || LMX.bg }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={KEYBOARD_BEHAVIOR}
     >
       {scroll ? (
         <ScrollView
+          ref={kb.ref}
+          onScroll={kb.onScroll}
+          scrollEventThrottle={32}
           style={{ flex: 1 }}
           contentContainerStyle={[{ paddingTop: top, paddingBottom: bottomPad }, contentStyle]}
           showsVerticalScrollIndicator={false}
@@ -408,6 +413,7 @@ export function Field({
           autoCapitalize={autoCapitalize ?? 'sentences'}
           placeholder={placeholder}
           placeholderTextColor={LMX.ink50}
+          onFocus={notifyInputFocus}
           style={{ flex: 1, fontFamily: sans(400), fontSize: 15, color: LMX.ink, padding: 0 }}
         />
         {trailingIcon && (

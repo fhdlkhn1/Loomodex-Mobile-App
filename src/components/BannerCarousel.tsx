@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Pressable, ScrollView, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
+import { View, Text, Pressable, ScrollView, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
-import { LMX, shadow } from '../theme';
+import { LMX, shadow, sans, decodeEntities } from '../theme';
 import type { HomeBanner } from '../api/products';
 
 const AUTO_MS = 5000;
@@ -48,8 +48,19 @@ export function BannerCarousel({ banners, onPress }: { banners: HomeBanner[]; on
           {slides.map((b, i) => (
             <Pressable key={`${i}-${b.image}`} onPress={() => onPress(b)} disabled={b.link_type === 'none'} style={{ width, height }}
               accessibilityRole={b.link_type === 'none' ? 'image' : 'button'} accessibilityLabel={b.title || undefined}>
-              {/* The banner design carries its own text — the title is only the accessibility label. */}
+              {/* Designs usually carry their own text, so the title is only the accessibility label —
+                  unless the admin ticked "show title" (plain photos): then a small label pill. */}
               <ExpoImage source={{ uri: b.image }} style={{ width, height }} contentFit="cover" transition={200} cachePolicy="memory-disk" />
+              {b.show_title === true && !!b.title?.trim() && (
+                <View pointerEvents="none" style={{
+                  position: 'absolute', left: 12, bottom: slides.length > 1 ? 26 : 12, maxWidth: width * 0.68,
+                  paddingHorizontal: 12, paddingVertical: 7, borderRadius: 12, backgroundColor: 'rgba(11,31,58,0.62)',
+                }}>
+                  <Text numberOfLines={2} style={{ color: '#fff', fontFamily: sans(700), fontSize: 13.5, lineHeight: 18 }}>
+                    {decodeEntities(b.title).trim()}
+                  </Text>
+                </View>
+              )}
             </Pressable>
           ))}
         </ScrollView>
