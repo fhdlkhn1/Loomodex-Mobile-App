@@ -595,6 +595,24 @@ export function ScreenVendorOrder() {
   const [busy, setBusy]   = useState(false);
   const [pickupCode, setPickupCode] = useState('');
 
+  // Keep the order fresh: the driver may be assigned (→ "Verify the driver" box) while this screen is open.
+  const orderId = order?.id;
+  const refresh = useCallback(async () => {
+    if (!orderId) return;
+    try {
+      const r = await get<{ orders: Order[] }>('/vendor/orders', true);
+      const fresh = (r.orders ?? []).find(x => x.id === orderId);
+      if (fresh) setOrder(fresh);
+    } catch {}
+  }, [orderId]);
+  useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
+  const waitingForPickup = !!order && ['ready-dispatch', 'packed', 'assigned-driver'].includes(order.status);
+  useEffect(() => {
+    if (!waitingForPickup) return;
+    const id = setInterval(refresh, 20000);
+    return () => clearInterval(id);
+  }, [waitingForPickup, refresh]);
+
   if (!order) {
     return (
       <Screen>
@@ -649,7 +667,7 @@ export function ScreenVendorOrder() {
   return (
     <Screen>
       <LoadingOverlay visible={busy} message={t('Traitement…')} />
-      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title={t('Commande #{n}', { n: order.number })} />
+      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title={t('Commande #{n}', { n: order.number })} right={<IconBtn icon="refresh" onPress={refresh} />} />
       <View style={{ paddingHorizontal: 16, paddingTop: 8, gap: 12 }}>
         {/* Status + total */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: LMX.surface, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.border, padding: 14 }}>
