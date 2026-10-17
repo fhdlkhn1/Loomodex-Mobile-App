@@ -9,7 +9,7 @@ import { ErrorState } from '../components/StateViews';
 import { useAuth } from '../context/AuthContext';
 import { friendlyError, isApiError } from '../api/client';
 import { partnerApi, logisticsApi, DeliveryOrder, LogisticsDriver, Incident, PartnerLedger, LogisticsPartner } from '../api/delivery';
-import { Sheet, TextArea, Pill, ErrorBanner, DriverPickerSheet, todayYmd } from '../components/StaffKit';
+import { Sheet, TextArea, Pill, ErrorBanner, DriverPickerSheet, todayYmd, PackedPill } from '../components/StaffKit';
 import { OrderMapSheet, MapButton } from '../components/OrderLocationMap';
 import { t } from '../i18n';
 
@@ -127,7 +127,10 @@ function PartnerOrderCard({ o, onAssign, onIncident, onMap }: { o: DeliveryOrder
           <Text style={{ fontFamily: mono(600), fontSize: 13 }}>{o.number}</Text>
           {!!o.date && <Text style={{ fontSize: 10.5, color: LMX.ink50, marginTop: 2 }}>{o.date}</Text>}
         </View>
-        <Pill label={t(o.status_label)} color={statusColor} />
+        <View style={{ alignItems: 'flex-end', gap: 4 }}>
+          <Pill label={t(o.status_label)} color={statusColor} />
+          <PackedPill packedAt={o.packed_at} status={o.status} />
+        </View>
       </View>
 
       <View style={{ padding: 14, paddingBottom: 6 }}>

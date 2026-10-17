@@ -493,6 +493,16 @@ const dict: Record<string, string> = {
   'Longitude': 'Longitude',
   'Vous pouvez aussi coller « 9.5091, -13.7122 » dans le champ latitude.': 'You can also paste "9.5091, -13.7122" into the latitude field.',
   'Recherchez un lieu, activez votre position ou touchez la carte pour placer le magasin': 'Search a place, use your location or tap the map to place the store',
+  'Colis prêt': 'Parcel ready',
+  'Marque retirée': 'Mark removed',
+  'Emballée et prête pour le ramassage': 'Packed and ready for pickup',
+  'Le colis est-il prêt ?': 'Is the parcel ready?',
+  'Emballée le {time}.': 'Packed on {time}.',
+  "Le livreur et l'équipe de livraison sont prévenus.": 'The driver and the delivery team have been notified.',
+  'Marquez la commande comme emballée quand le colis est prêt, pour que le livreur vienne au bon moment.': 'Mark the order as packed when the parcel is ready, so the driver comes at the right time.',
+  'Annuler « emballée »': 'Undo "packed"',
+  'Marquer comme emballée': 'Mark as packed',
+  'Pas encore emballée': 'Not packed yet',
 };
 
 export default dict;

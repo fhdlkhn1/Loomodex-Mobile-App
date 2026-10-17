@@ -35,6 +35,7 @@ const LOOK: Record<string, Look> = {
   address_changed: { icon: 'location', color: LMX.brand, bg: LMX.brandSoft },
   incident_reported: BAD, incident_resolved: OK,
   remittance_recorded: { icon: 'wallet', color: LMX.emerald, bg: LMX.emeraldSoft },
+  order_packed: { icon: 'package', color: LMX.emerald, bg: LMX.emeraldSoft },
   order_status: INFO,
   promo: { icon: 'flame', color: LMX.rose, bg: '#FEE2E2' },
   system: { icon: 'bell', color: LMX.ink70, bg: LMX.surfaceAlt },

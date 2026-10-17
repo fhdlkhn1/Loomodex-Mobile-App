@@ -85,6 +85,17 @@ export function Pill({ label, color, icon }: { label: string; color: string; ico
   );
 }
 
+/** Statuses in which the store can still mark the parcel packed (confirmed, not yet picked up). */
+const PACKABLE_STATUSES = ['ready-dispatch', 'packed', 'assigned-driver'];
+
+/** Store's "packed / ready for pickup" mark on staff order cards (nothing once picked up). */
+export function PackedPill({ packedAt, status }: { packedAt?: string | null; status?: string }) {
+  if (!status || !PACKABLE_STATUSES.includes(status)) return null;
+  return packedAt
+    ? <Pill label={t('Emballée')} color={LMX.emerald} icon="check" />
+    : <Pill label={t('Pas encore emballée')} color={LMX.ink50} />;
+}
+
 /** Inline error banner with a Réessayer link. */
 export function ErrorBanner({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (

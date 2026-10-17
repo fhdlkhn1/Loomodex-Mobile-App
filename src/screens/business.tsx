@@ -19,7 +19,7 @@ import { OrderLocationMap, OrderMapSheet, MapButton } from '../components/OrderL
 import { configApi } from '../api/config';
 import { Product as ApiProduct } from '../api/products';
 import { driverApi, logisticsApi, csApi, partnerApi, DeliveryOrder, LogisticsDriver, DriverSummary, LogisticsPartner } from '../api/delivery';
-import { Sheet, TextArea, Pill, ErrorBanner, AmountRow, agoFr } from '../components/StaffKit';
+import { Sheet, TextArea, Pill, ErrorBanner, AmountRow, agoFr, PackedPill } from '../components/StaffKit';
 import { SITE_ORIGIN } from '../api/wcfm';
 import { vendorApi, VendorDashboard, MAX_PRODUCT_PHOTOS } from '../api/vendor';
 import { StoreAddressForm, StoreAddressValue, EMPTY_STORE_ADDRESS } from '../components/StoreAddressForm';
@@ -615,6 +615,21 @@ export function ScreenVendorOrder() {
     finally { setBusy(false); }
   };
 
+  // Store marks the parcel packed / ready for pickup (a flag — the order status does not change).
+  const togglePacked = async () => {
+    const packed = !order.packed_at;
+    setBusy(true);
+    try {
+      const res = await vendorApi.markPacked(order.id, packed);
+      if (res?.order) setOrder(res.order);
+      Alert.alert(packed ? t('Colis prêt') : t('Marque retirée'), res?.message || '');
+    } catch (e) { Alert.alert(t('Erreur'), friendlyError(e, t('Échec de la mise à jour.'))); }
+    finally { setBusy(false); }
+  };
+  const packedTime = order.packed_at
+    ? new Date(order.packed_at.replace(' ', 'T')).toLocaleString(locale(), { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+    : '';
+
   // Store verifies the driver's pickup code to hand over the order.
   const verifyPickup = async () => {
     const code = pickupCode.trim();
@@ -647,6 +662,25 @@ export function ScreenVendorOrder() {
             <Text style={{ fontFamily: mono(700), fontSize: 16, marginTop: 2 }}>{fr(order.total)} GNF</Text>
           </View>
         </View>
+
+        {/* Packed / ready for pickup — tells logistics, the partner and the driver the parcel can be collected. */}
+        {(order.can_mark_packed || !!order.packed_at) && (
+          <View style={{ backgroundColor: order.packed_at ? LMX.emeraldSoft : LMX.accentSoft, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: (order.packed_at ? LMX.emerald : LMX.accent) + '55', padding: 16, gap: 8 }}>
+            <Text style={{ fontSize: 13, fontFamily: sans(700), color: LMX.ink }}>
+              {order.packed_at ? `✓ ${t('Emballée et prête pour le ramassage')}` : `📦 ${t('Le colis est-il prêt ?')}`}
+            </Text>
+            <Text style={{ fontSize: 11.5, color: LMX.ink70, lineHeight: 16 }}>
+              {order.packed_at
+                ? `${t('Emballée le {time}.', { time: packedTime })} ${t("Le livreur et l'équipe de livraison sont prévenus.")}`
+                : t('Marquez la commande comme emballée quand le colis est prêt, pour que le livreur vienne au bon moment.')}
+            </Text>
+            {order.can_mark_packed && (
+              <Button variant={order.packed_at ? 'ghost' : 'accent'} size="md" icon={order.packed_at ? undefined : 'check'} onPress={togglePacked} disabled={busy}>
+                {order.packed_at ? t('Annuler « emballée »') : t('Marquer comme emballée')}
+              </Button>
+            )}
+          </View>
+        )}
 
         {/* Pickup verification — store enters the DRIVER's code to confirm his identity and
             hand over the order. Proves he's the driver Loomodex assigned. */}
@@ -1337,7 +1371,10 @@ function DriverActiveCard({ o, busy, otp, onOtp, onAdvance, onVerify, onLocation
     <View style={{ backgroundColor: LMX.surface, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.border, overflow: 'hidden' }}>
       {/* Header */}
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderBottomWidth: 1, borderBottomColor: LMX.hairline }}>
-        <Text style={{ fontFamily: mono(600), fontSize: 13 }}>{o.number}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Text style={{ fontFamily: mono(600), fontSize: 13 }}>{o.number}</Text>
+          <PackedPill packedAt={o.packed_at} status={o.status} />
+        </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999, backgroundColor: st.color + '1A' }}>
           <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: st.color }} />
           <Text style={{ fontSize: 10, fontFamily: sans(700), color: st.color, textTransform: 'uppercase' }}>{t(st.label)}</Text>
@@ -1763,6 +1800,7 @@ function LogisticsCard({ o, drivers, partners, onAssigned }: { o: DeliveryOrder;
             <Text style={{ fontSize: 10.5, color: LMX.ink50, fontFamily: mono(400) }}>· {fr(o.total)} GNF</Text>
           </View>
           <Pill label={o.partner_name || 'Loomodex'} color={orderPartner ? LMX.brandDeep : LMX.ink70} icon="truck" />
+          <PackedPill packedAt={o.packed_at} status={o.status} />
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999, backgroundColor: st.color + '1A' }}>
           <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: st.color }} />

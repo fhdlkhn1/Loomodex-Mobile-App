@@ -47,6 +47,10 @@ export interface Order {
   pickup_time?: string | null;
   /** True while the store still needs to verify the driver's pickup code (store view). */
   pickup_pending?: boolean;
+  /** Store's "packed / ready for pickup" mark (null = not packed yet). Store view. */
+  packed_at?: string | null;
+  /** Store may (un)mark the order as packed right now. Store view. */
+  can_mark_packed?: boolean;
   /** Delivery fee breakdown saved with the order (fixed once confirmed). */
   delivery_quote?: Pick<DeliveryQuote, 'lines' | 'total' | 'distance_km' | 'reliable' | 'needs_review'> | null;
   fee_status?: FeeStatus;

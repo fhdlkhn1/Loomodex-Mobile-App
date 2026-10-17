@@ -9,7 +9,7 @@ export type NotificationEvent =
   | 'order_confirmed' | 'order_rejected' | 'partner_assigned' | 'partner_transferred_away'
   | 'driver_assigned' | 'driver_unassigned' | 'picked_up' | 'driver_arrived' | 'delivered'
   | 'delivery_failed' | 'address_changed' | 'incident_reported' | 'incident_resolved'
-  | 'remittance_recorded' | 'order_cancelled'
+  | 'remittance_recorded' | 'order_cancelled' | 'order_packed'
   // legacy
   | 'order_shipped' | 'driver_on_way' | 'order_delivered' | 'order_status' | 'new_order'
   | 'vendor_new_order' | 'vendor_completed' | 'ready_dispatch' | 'promo' | 'system';

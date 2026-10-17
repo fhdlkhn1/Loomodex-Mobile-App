@@ -57,6 +57,10 @@ export const vendorApi = {
     lng: number | null;
   }>) => post<{ success: boolean; message: string; location: StoreLocation }>('/vendor/store/update', data, true),
 
+  /** Store marks the parcel packed / ready for pickup (a flag — the order status does not change). */
+  markPacked: (orderId: number, packed: boolean) =>
+    post<{ success: boolean; message: string; order: any }>(`/vendor/orders/${orderId}/packed`, { packed }, true),
+
   /** Upload a product image or video (≤ 50 MB). */
   uploadMedia: (uri: string, opts: { name?: string; type?: string } = {}) =>
     uploadFile<{ id: number; url: string; type: 'image' | 'video' }>('/vendor/upload-media', uri, opts),

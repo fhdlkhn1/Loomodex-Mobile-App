@@ -20,6 +20,8 @@ export interface DeliveryOrder {
   whatsapp: string;
   /** Pickup code the driver shows/tells the store; the store enters it to release the order. */
   pickup_otp?: string | null;
+  /** Store's "packed / ready for pickup" mark (null = not packed yet). */
+  packed_at?: string | null;
   /** Logistics partner company responsible for this delivery ('' = Loomodex internal). */
   partner_id?: string;
   partner_name?: string;
