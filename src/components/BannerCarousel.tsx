@@ -1,8 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, ScrollView, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
+import { View, Pressable, ScrollView, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
-import { LMX, sans, shadow } from '../theme';
+import { LMX, shadow } from '../theme';
 import type { HomeBanner } from '../api/products';
 
 const AUTO_MS = 5000;
@@ -47,13 +46,10 @@ export function BannerCarousel({ banners, onPress }: { banners: HomeBanner[]; on
           scrollEventThrottle={16}
         >
           {slides.map((b, i) => (
-            <Pressable key={`${i}-${b.image}`} onPress={() => onPress(b)} disabled={b.link_type === 'none'} style={{ width, height }}>
+            <Pressable key={`${i}-${b.image}`} onPress={() => onPress(b)} disabled={b.link_type === 'none'} style={{ width, height }}
+              accessibilityRole={b.link_type === 'none' ? 'image' : 'button'} accessibilityLabel={b.title || undefined}>
+              {/* The banner design carries its own text — the title is only the accessibility label. */}
               <ExpoImage source={{ uri: b.image }} style={{ width, height }} contentFit="cover" transition={200} cachePolicy="memory-disk" />
-              {!!b.title && (
-                <LinearGradient colors={['transparent', 'rgba(8,18,38,0.78)']} style={{ position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingTop: 30, paddingBottom: 26 }}>
-                  <Text numberOfLines={2} style={{ color: '#fff', fontFamily: sans(700), fontSize: 16, lineHeight: 21 }}>{b.title}</Text>
-                </LinearGradient>
-              )}
             </Pressable>
           ))}
         </ScrollView>
