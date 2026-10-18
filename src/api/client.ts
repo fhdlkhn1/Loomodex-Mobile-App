@@ -108,7 +108,8 @@ export async function apiRequest<T = any>(
 
   if (!res.ok) {
     const msg = data?.message || data?.code || `Error ${res.status}`;
-    const kind: ApiErrorKind = res.status === 404 ? 'notfound' : res.status >= 500 ? 'server' : 'api';
+    // A JSON answer with a message is the API explaining itself (even with a 5xx) — show it.
+    const kind: ApiErrorKind = res.status === 404 ? 'notfound' : (res.status >= 500 && !data?.message) ? 'server' : 'api';
     throw new ApiError(msg, res.status, kind, data?.code);
   }
 
