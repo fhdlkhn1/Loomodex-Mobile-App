@@ -9,7 +9,9 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.loomodex.app"
+      "bundleIdentifier": "com.loomodex.app",
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "icon": "./assets/ios-icon.png"
     },
     "android": {
       "package": "com.loomodex.app",
