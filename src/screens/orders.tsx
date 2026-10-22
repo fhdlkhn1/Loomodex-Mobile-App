@@ -251,6 +251,7 @@ export function ScreenTracking() {
   const [refreshing, setRefreshing] = useState(false);
   const [eta, setEta]       = useState<{ duration: string; distance: string } | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [newCodeBusy, setNewCodeBusy] = useState(false);
 
   // Public payload refresh (guests, or a signed-in user tracking someone else's order)
   const refreshPublic = useCallback(async () => {
@@ -299,6 +300,29 @@ export function ScreenTracking() {
         await refreshPublic();
       }
     } finally { setRefreshing(false); }
+  };
+
+  // Customer asks for a fresh delivery code (expired / lost): the old one stops working at once.
+  const requestNewCode = async () => {
+    if (!orderId || newCodeBusy) return;
+    setNewCodeBusy(true);
+    try {
+      const res = await ordersApi.newOtp(orderId);
+      try { setTrack(await ordersApi.tracking(orderId)); } catch {}
+      Alert.alert(
+        t('Nouveau code envoyé'),
+        res?.message ? t(res.message) : t("Un nouveau code de livraison a été généré. L'ancien code ne fonctionne plus."),
+      );
+    } catch (e) {
+      let msg = friendlyError(e, t('Impossible de générer un nouveau code. Réessayez dans un instant.'));
+      if (isApiError(e) && (e.code === 'rate_limited' || e.status === 429)) {
+        const wait = Number(e.data?.retry_after);
+        msg = wait > 0 ? t("Un code vient déjà d'être envoyé. Réessayez dans {n} s.", { n: Math.ceil(wait) }) : t("Un code vient déjà d'être envoyé. Réessayez dans un instant.");
+      } else if (isApiError(e) && e.code === 'otp_not_needed') {
+        msg = t("Cette commande n'a plus besoin de code de livraison.");
+      }
+      Alert.alert(t('Erreur'), msg);
+    } finally { setNewCodeBusy(false); }
   };
 
   if (loading) {
@@ -455,6 +479,13 @@ export function ScreenTracking() {
                 <View style={{ backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 12, paddingVertical: 14, alignItems: 'center' }}>
                   <Text style={{ fontSize: 30, letterSpacing: 8, fontFamily: mono(700), color: '#fff' }}>{track.otp}</Text>
                 </View>
+              )}
+              {live && (!!track?.otp || ['out-delivery', 'driver-arrived', 'otp-pending'].includes(status)) && (
+                <Pressable onPress={requestNewCode} disabled={newCodeBusy} accessibilityRole="button"
+                  style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 44, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)', opacity: newCodeBusy ? 0.6 : 1 }}>
+                  {newCodeBusy ? <ActivityIndicator size="small" color="#fff" /> : <Icon name="refresh" size={15} color="#fff" />}
+                  <Text style={{ fontSize: 13, fontFamily: sans(700), color: '#fff' }}>{t('Demander un nouveau code')}</Text>
+                </Pressable>
               )}
             </View>
           )}

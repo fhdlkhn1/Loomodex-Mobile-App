@@ -63,6 +63,8 @@ const ROLE_TABS: Record<AppRole, Tab[]> = {
 const HIDDEN_ROUTES = new Set([
   'Splash', 'Onboarding', 'SignIn', 'SignUp', 'OTP', 'Forgot', 'Reset',
   'Checkout', 'OrderSuccess', 'WalletTopup',
+  // Full-screen in-app navigation map for drivers
+  'DriverNavigate',
 ]);
 
 /** Sub-screens highlight the tab they belong to. */
@@ -76,7 +78,7 @@ const ACTIVE_ALIAS: Record<string, string> = {
   VendorOrder: 'VendorOrders',
   VendorEditProduct: 'VendorProducts', AddProduct: 'VendorProducts',
   VendorStore: 'Seller',
-  DriverOrder: 'Driver',
+  DriverOrder: 'Driver', DriverNavigate: 'Driver',
   DriverLocate: 'Logistics', LogisticsPartners: 'Logistics', PartnerLedger: 'Partner',
 };
 
@@ -87,7 +89,7 @@ const ACTIVE_ALIAS: Record<string, string> = {
 const ADMIN_ROUTE_ROLE: Record<string, AppRole> = {
   Seller: 'vendor', VendorOrders: 'vendor', VendorOrder: 'vendor', VendorProducts: 'vendor',
   VendorEditProduct: 'vendor', AddProduct: 'vendor', VendorStore: 'vendor',
-  Driver: 'driver', DriverOrder: 'driver',
+  Driver: 'driver', DriverOrder: 'driver', DriverNavigate: 'driver',
   Logistics: 'logistics', DriversMap: 'logistics', LogisticsIncidents: 'logistics',
   LogisticsPartners: 'logistics', DriverLocate: 'logistics',
   Partner: 'partner', PartnerDriversMap: 'partner', PartnerIncidents: 'partner',

@@ -19,11 +19,14 @@ export class ApiError extends Error {
   status: number;
   kind: ApiErrorKind;
   code?: string;
-  constructor(message: string, status: number, kind: ApiErrorKind, code?: string) {
+  /** Extra details the API sent with the error (WP_Error data), e.g. { attempts, max_attempts }. */
+  data?: Record<string, any>;
+  constructor(message: string, status: number, kind: ApiErrorKind, code?: string, data?: Record<string, any>) {
     super(message);
     this.status = status;
     this.kind = kind;
     this.code = code;
+    this.data = data;
   }
 }
 
@@ -110,7 +113,7 @@ export async function apiRequest<T = any>(
     const msg = data?.message || data?.code || `Error ${res.status}`;
     // A JSON answer with a message is the API explaining itself (even with a 5xx) — show it.
     const kind: ApiErrorKind = res.status === 404 ? 'notfound' : (res.status >= 500 && !data?.message) ? 'server' : 'api';
-    throw new ApiError(msg, res.status, kind, data?.code);
+    throw new ApiError(msg, res.status, kind, data?.code, data?.data);
   }
 
   return data as T;

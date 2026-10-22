@@ -9,7 +9,7 @@ import { ErrorState } from '../components/StateViews';
 import { useAuth } from '../context/AuthContext';
 import { friendlyError, isApiError } from '../api/client';
 import { partnerApi, logisticsApi, DeliveryOrder, LogisticsDriver, Incident, PartnerLedger, LogisticsPartner } from '../api/delivery';
-import { Sheet, TextArea, Pill, ErrorBanner, DriverPickerSheet, todayYmd, PackedPill, NotPackedNote } from '../components/StaffKit';
+import { Sheet, TextArea, Pill, ErrorBanner, DriverPickerSheet, todayYmd, PackedPill, NotPackedNote, ContactLockNote } from '../components/StaffKit';
 import { OrderMapSheet, MapButton } from '../components/OrderLocationMap';
 import { t } from '../i18n';
 
@@ -119,6 +119,8 @@ function PartnerOrderCard({ o, onAssign, onIncident, onMap }: { o: DeliveryOrder
   const destAddr = o.delivery_address || [o.address, o.neighborhood, o.commune, o.city].filter(Boolean).join(', ');
   const statusColor = failed ? LMX.rose : done ? LMX.emerald : o.driver_id ? LMX.brand : LMX.accent;
   const custGps = (o.customer_lat != null && o.customer_lng != null) || (o.dest_lat != null && o.dest_lng != null);
+  // Anti-poaching: no customer phone / call until the store verified the driver's pickup code.
+  const custPhone = o.contact_locked ? '' : (o.recipient_phone || o.customer_phone);
 
   return (
     <View style={{ backgroundColor: LMX.surface, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: failed ? LMX.rose : LMX.border, overflow: 'hidden' }}>
@@ -143,15 +145,16 @@ function PartnerOrderCard({ o, onAssign, onIncident, onMap }: { o: DeliveryOrder
           {!!storeAddr && <Text style={{ fontSize: 12, color: LMX.ink70, marginTop: 1, lineHeight: 17 }}>{storeAddr}</Text>}
           {!!p?.phone && <Text style={{ fontSize: 11.5, color: LMX.ink50, marginTop: 1 }}>{p.phone}</Text>}
         </InfoRow>
-        <InfoRow icon="pin" label={t('Livraison')} onCall={o.recipient_phone || o.customer_phone ? () => call(o.recipient_phone || o.customer_phone) : undefined}>
+        <InfoRow icon="pin" label={t('Livraison')} onCall={custPhone ? () => call(custPhone) : undefined}>
           <Text style={{ fontSize: 12.5, fontFamily: sans(600), color: LMX.ink }}>{o.customer_name}{o.recipient_is_customer === false ? ` · ${t('destinataire')}` : ''}</Text>
-          {!!(o.recipient_phone || o.customer_phone) && <Text style={{ fontSize: 11.5, color: LMX.ink50, marginTop: 1 }}>{o.recipient_phone || o.customer_phone}</Text>}
+          {!!custPhone && <Text style={{ fontSize: 11.5, color: LMX.ink50, marginTop: 1 }}>{custPhone}</Text>}
           {!!destAddr && <Text style={{ fontSize: 12, color: LMX.ink70, marginTop: 1, lineHeight: 17 }}>{destAddr}</Text>}
           {!!o.landmark && <Text style={{ fontSize: 11.5, color: LMX.ink50, marginTop: 1 }}>{t('Repère : {l}', { l: o.landmark })}</Text>}
           <Text style={{ fontSize: 11, color: custGps ? LMX.emerald : LMX.ink50, fontFamily: sans(600), marginTop: 3 }}>
             {custGps ? t('Position GPS du client disponible') : t('Pas de position GPS — adresse uniquement')}
           </Text>
         </InfoRow>
+        {o.contact_locked && <ContactLockNote />}
         <MapButton onPress={() => onMap(o)} />
         <InfoRow icon="money" label={t('Paiement')}>
           {o.payment === 'cod' ? t('À encaisser à la livraison : {a} GNF', { a: fr(o.total) }) : t('Prépayée · {a} GNF', { a: fr(o.total) })}

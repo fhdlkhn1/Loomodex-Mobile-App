@@ -426,6 +426,15 @@ const dict: Record<string, string> = {
   'Sans changement': 'No change',
   'Accepter et modifier': 'Accept and change',
   'Calculer les nouveaux frais': 'Calculate the new fee',
+
+  // ── October feedback: delivery code, navigation, contact lock, action history, homepage ──
+  'Nouveau code envoyé': 'New code sent',
+  "Un nouveau code de livraison a été généré. L'ancien code ne fonctionne plus.": 'A new delivery code has been generated. The old code no longer works.',
+  'Impossible de générer un nouveau code. Réessayez dans un instant.': 'Unable to generate a new code. Try again in a moment.',
+  "Un code vient déjà d'être envoyé. Réessayez dans {n} s.": 'A code was just sent. Try again in {n} s.',
+  "Un code vient déjà d'être envoyé. Réessayez dans un instant.": 'A code was just sent. Try again in a moment.',
+  "Cette commande n'a plus besoin de code de livraison.": 'This order no longer needs a delivery code.',
+  'Demander un nouveau code': 'Request a new code',
 };
 
 export default dict;

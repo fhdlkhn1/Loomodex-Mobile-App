@@ -376,6 +376,11 @@ const dict: Record<string, string> = {
   'Magasin supplémentaire': 'Additional store',
   'Livraison (zone)': 'Delivery (zone)',
   'Colis volumineux': 'Bulky parcel',
+
+  // ── October feedback: delivery code, navigation, contact lock, action history, homepage ──
+  'Menu': 'Menu',
+  'Vos achats, livrés avec soin !': 'Your purchases, delivered with care!',
+  'Confiance garantie': 'Guaranteed trust',
 };
 
 export default dict;

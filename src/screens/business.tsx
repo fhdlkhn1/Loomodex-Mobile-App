@@ -19,7 +19,7 @@ import { OrderLocationMap, OrderMapSheet, MapButton } from '../components/OrderL
 import { configApi } from '../api/config';
 import { Product as ApiProduct } from '../api/products';
 import { driverApi, logisticsApi, csApi, partnerApi, DeliveryOrder, LogisticsDriver, DriverSummary, LogisticsPartner } from '../api/delivery';
-import { Sheet, TextArea, Pill, ErrorBanner, AmountRow, agoFr, PackedPill, NotPackedNote } from '../components/StaffKit';
+import { Sheet, TextArea, Pill, ErrorBanner, AmountRow, agoFr, PackedPill, NotPackedNote, CsConfirmedLine, AuditHistory, ReasonSheet, ContactLockNote } from '../components/StaffKit';
 import { SITE_ORIGIN } from '../api/wcfm';
 import { vendorApi, VendorDashboard, MAX_PRODUCT_PHOTOS } from '../api/vendor';
 import { StoreAddressForm, StoreAddressValue, EMPTY_STORE_ADDRESS } from '../components/StoreAddressForm';
@@ -27,6 +27,8 @@ import { DriversMap, driverMapState, hasPosition, DRIVER_STATE_COLOR, DriverMapS
 import { t, locale } from '../i18n';
 import { quoteLineLabel } from '../components/FeeBreakdown';
 import { notifyInputFocus } from '../hooks/useKeyboardScroll';
+import { DeliveryCodeVerify } from '../components/DeliveryCodeVerify';
+import { NavigateButton, navTargetFor } from './driverNav';
 
 function Chart() {
   const pts = [10, 18, 12, 28, 22, 40, 32, 46, 38, 52, 44, 58];
@@ -1047,6 +1049,14 @@ const DRIVER_TABS: { key: 'active' | 'history' | 'failed'; label: string; icon: 
 const call     = (phone?: string) => { if (phone) Linking.openURL(`tel:${phone}`).catch(() => {}); };
 const whatsapp = (num?: string) => { const c = (num || '').replace(/[^0-9]/g, ''); if (c) Linking.openURL(`https://wa.me/${c}`).catch(() => {}); };
 
+/** Driver status change error — the store must verify the pickup code before "on the way". */
+function statusErrorMessage(e: unknown): string {
+  if (isApiError(e) && e.code === 'pickup_not_verified') {
+    return t("Le magasin doit d'abord vérifier votre code de ramassage.");
+  }
+  return friendlyError(e, t('Action impossible.'));
+}
+
 // sms: URL differs between platforms (iOS uses & before body, Android uses ?)
 const smsLink = (phone: string, body: string) => {
   const num = (phone || '').replace(/[^0-9+]/g, '');
@@ -1087,7 +1097,10 @@ async function promptSendLocation(orderId: number) {
       ]
     );
   } catch (e) {
-    Alert.alert(t('Envoi impossible'), friendlyError(e, t('Réessayez dans un instant.')));
+    const msg = isApiError(e) && e.code === 'contact_locked'
+      ? t('Coordonnées du client visibles après la vérification du retrait au magasin')
+      : friendlyError(e, t('Réessayez dans un instant.'));
+    Alert.alert(t('Envoi impossible'), msg);
   }
 }
 
@@ -1127,7 +1140,6 @@ export function ScreenDriver() {
   const [summary, setSummary] = useState<DriverSummary | null>(null);
   const [loading, setLoad]    = useState(true);
   const [busyId, setBusy]     = useState<number | null>(null);
-  const [otpInputs, setOtp]   = useState<Record<number, string>>({});
   const [available, setAvailable] = useState(true);
   const [switching, setSwitching] = useState(false);
   const [appActive, setAppActive] = useState(AppState.currentState === 'active');
@@ -1208,21 +1220,8 @@ export function ScreenDriver() {
   const advance = async (o: DeliveryOrder, to: 'out-delivery' | 'driver-arrived') => {
     setBusy(o.id);
     try { await driverApi.updateStatus(o.id, to); await load(); }
-    catch (e: any) { Alert.alert(t('Erreur'), e?.message ?? t('Action impossible.')); }
+    catch (e) { Alert.alert(t('Erreur'), statusErrorMessage(e)); }
     finally { setBusy(null); }
-  };
-
-  const verifyOtp = async (o: DeliveryOrder) => {
-    const code = (otpInputs[o.id] ?? '').trim();
-    if (code.length < 4) { Alert.alert(t('Code requis'), t('Entrez le code à 4 chiffres communiqué par le client.')); return; }
-    setBusy(o.id);
-    try {
-      const res = await ordersApi.verifyOtp(o.id, code);
-      if (res.verified) { Alert.alert(t('Confirmé'), t('Livraison confirmée avec succès.')); setOtp(p => ({ ...p, [o.id]: '' })); await load(); }
-      else Alert.alert(t('Code incorrect'), res.message ?? t('Veuillez réessayer.'));
-    } catch (e: any) {
-      Alert.alert(t('Code incorrect'), e?.message ?? t('Veuillez réessayer.'));
-    } finally { setBusy(null); }
   };
 
   const firstName = (user?.first_name ?? '').trim();
@@ -1303,6 +1302,7 @@ export function ScreenDriver() {
             ? orders.map(o => (
                 <DriverOrderRow key={o.id} o={o} busy={busyId === o.id}
                   onPress={() => nav.navigate('DriverOrder', { order: o })}
+                  onNavigate={() => nav.navigate('DriverNavigate', { order: o, target: navTargetFor(o) })}
                   onArrived={() => advance(o, 'driver-arrived')} />
               ))
             : orders.map(o => <DriverDoneCard key={o.id} o={o} failed={tab === 'failed'} />)}
@@ -1447,7 +1447,7 @@ function DriverPayment({ o }: { o: DeliveryOrder }) {
 
 /** Compact round call / WhatsApp buttons for the recipient. */
 function DriverContactButtons({ o }: { o: DeliveryOrder }) {
-  if (!(o.recipient_phone || o.customer_phone)) return null;
+  if (o.contact_locked || !(o.recipient_phone || o.customer_phone)) return null;
   return (
     <View style={{ flexDirection: 'row', gap: 8 }}>
       <Pressable onPress={() => call(o.recipient_phone || o.customer_phone)} hitSlop={4} accessibilityLabel={t('Appeler')}
@@ -1462,7 +1462,9 @@ function DriverContactButtons({ o }: { o: DeliveryOrder }) {
   );
 }
 
-function DriverOrderRow({ o, busy, onPress, onArrived }: { o: DeliveryOrder; busy: boolean; onPress: () => void; onArrived: () => void }) {
+const NAVIGABLE = ['assigned-driver', 'out-delivery', 'driver-arrived', 'otp-pending'];
+
+function DriverOrderRow({ o, busy, onPress, onArrived, onNavigate }: { o: DeliveryOrder; busy: boolean; onPress: () => void; onArrived: () => void; onNavigate: () => void }) {
   const action = o.status === 'assigned-driver'
     ? { label: t('Voir le code de ramassage'), icon: 'key' as IconName, variant: 'primary' as const, onPress }
     : o.status === 'out-delivery'
@@ -1483,6 +1485,8 @@ function DriverOrderRow({ o, busy, onPress, onArrived }: { o: DeliveryOrder; bus
         <View style={{ flex: 1 }}><DriverPayment o={o} /></View>
         <DriverContactButtons o={o} />
       </View>
+      {o.contact_locked && <ContactLockNote />}
+      {NAVIGABLE.includes(o.status) && <NavigateButton order={o} onPress={onNavigate} />}
       <Button full variant={action.variant} size="md" icon={action.icon} onPress={action.onPress} disabled={busy}>
         {busy ? <ActivityIndicator color={action.variant === 'soft' ? LMX.ink : '#fff'} /> : action.label}
       </Button>
@@ -1528,17 +1532,18 @@ function PickupCodeDisplay({ code, onRefresh, refreshing }: { code?: string | nu
   );
 }
 
-function DriverActiveCard({ o, busy, otp, onOtp, onAdvance, onVerify, onLocationRequest, onRefreshPickup, refreshingPickup }: {
-  o: DeliveryOrder; busy: boolean; otp: string;
-  onOtp: (v: string) => void;
+function DriverActiveCard({ o, busy, onAdvance, onDelivered, onNavigate, onLocationRequest, onRefreshPickup, refreshingPickup }: {
+  o: DeliveryOrder; busy: boolean;
   onAdvance: (o: DeliveryOrder, to: 'out-delivery' | 'driver-arrived') => void;
-  onVerify: (o: DeliveryOrder) => void;
+  onDelivered: () => void;
+  onNavigate: () => void;
   onLocationRequest: (o: DeliveryOrder) => void;
   onRefreshPickup?: () => void;
   refreshingPickup?: boolean;
 }) {
   const showOtp = ['driver-arrived', 'otp-pending'].includes(o.status);
-  const canAskLocation = ['out-delivery', 'driver-arrived', 'otp-pending'].includes(o.status);
+  // Contacting the recipient (incl. the location link) stays locked until the store verified the pickup.
+  const canAskLocation = !o.contact_locked && ['out-delivery', 'driver-arrived', 'otp-pending'].includes(o.status);
 
   return (
     <View style={{ backgroundColor: LMX.surface, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.border, overflow: 'hidden' }}>
@@ -1557,25 +1562,20 @@ function DriverActiveCard({ o, busy, otp, onOtp, onAdvance, onVerify, onLocation
         {o.status === 'assigned-driver' && (
           <PickupCodeDisplay code={o.pickup_otp} onRefresh={onRefreshPickup} refreshing={refreshingPickup} />
         )}
+        {/* The driver can only mark "picked up — on the way" once the store verified his pickup code */}
+        {o.status === 'assigned-driver' && (o.pickup_verified ? (
+          <Button full variant="primary" size="lg" icon="truck" onPress={() => onAdvance(o, 'out-delivery')} disabled={busy}>{t('Récupéré — en route')}</Button>
+        ) : (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: LMX.surfaceAlt, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10 }}>
+            <ActivityIndicator size="small" color={LMX.accent} />
+            <Text style={{ flex: 1, fontSize: 12.5, color: LMX.ink70, fontFamily: sans(600) }}>{t('En attente de la vérification du code par le magasin')}</Text>
+          </View>
+        ))}
+        {NAVIGABLE.includes(o.status) && <NavigateButton order={o} onPress={onNavigate} />}
         {o.status === 'out-delivery' && (
           <Button full variant="accent" size="lg" icon="pin" onPress={() => onAdvance(o, 'driver-arrived')} disabled={busy}>{t('Je suis arrivé')}</Button>
         )}
-        {showOtp && (
-          <View style={{ backgroundColor: LMX.surfaceAlt, borderRadius: 14, padding: 14, gap: 10 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Icon name="key" size={15} color={LMX.brand} />
-              <Text style={{ fontSize: 13.5, fontFamily: sans(700), color: LMX.ink }}>{t('Code de livraison')}</Text>
-            </View>
-            <Text style={{ fontSize: 12, color: LMX.ink50, lineHeight: 17 }}>{t('Demandez au client le code à 4 chiffres reçu par SMS.')}</Text>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              <View style={{ flex: 1, height: 48, borderRadius: 12, borderWidth: 1, borderColor: LMX.border, backgroundColor: LMX.surface, paddingHorizontal: 14, justifyContent: 'center' }}>
-                <TextInput onFocus={notifyInputFocus} value={otp} onChangeText={onOtp} keyboardType="number-pad" maxLength={6} placeholder="••••" placeholderTextColor={LMX.ink50} returnKeyType="done" onSubmitEditing={() => onVerify(o)} style={{ fontFamily: mono(600), fontSize: 18, letterSpacing: 6, color: LMX.ink, padding: 0 }} />
-              </View>
-              <Button variant="accent" size="md" icon="check" onPress={() => onVerify(o)} disabled={busy}>{t('Vérifier')}</Button>
-            </View>
-            {o.otp_attempts > 0 && <Text style={{ fontSize: 11, color: LMX.rose }}>{t('{n} tentative(s) utilisée(s)', { n: o.otp_attempts })}</Text>}
-          </View>
-        )}
+        {showOtp && <DeliveryCodeVerify order={o} onDelivered={onDelivered} />}
 
         {/* Store → customer */}
         <View style={{ gap: 10 }}>
@@ -1594,7 +1594,7 @@ function DriverActiveCard({ o, busy, otp, onOtp, onAdvance, onVerify, onLocation
         </View>
 
         {/* Recipient may not be the buyer — the driver talks to the recipient */}
-        {!!(o.recipient_phone || o.customer_phone) && o.recipient_is_customer === false && (
+        {!o.contact_locked && !!(o.recipient_phone || o.customer_phone) && o.recipient_is_customer === false && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: LMX.bg, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9 }}>
             <Icon name="user" size={14} color={LMX.ink50} />
             <Text style={{ flex: 1, fontSize: 12, color: LMX.ink70, fontFamily: sans(500) }}>
@@ -1608,6 +1608,7 @@ function DriverActiveCard({ o, busy, otp, onOtp, onAdvance, onVerify, onLocation
           <View style={{ flex: 1 }}><DriverPayment o={o} /></View>
           <DriverContactButtons o={o} />
         </View>
+        {o.contact_locked && <ContactLockNote />}
 
         {/* Send Location Request — SMSes the recipient a one-tap link. Only useful
             once the driver is actually en route, so it appears from that point. */}
@@ -1669,7 +1670,6 @@ export function ScreenDriverOrder() {
   const route = useRoute<any>();
   const [order, setOrder] = useState<DeliveryOrder | undefined>(route.params?.order);
   const [busy, setBusy]   = useState(false);
-  const [otp, setOtp]     = useState('');
   const [custLoc, setCustLoc] = useState<{ lat: number; lng: number } | null>(null);
   const [myPos, setMyPos] = useState<{ lat: number; lng: number } | null>(null);
   const [mapsKey, setMapsKey] = useState('');
@@ -1750,7 +1750,7 @@ export function ScreenDriverOrder() {
   const advance = async (o: DeliveryOrder, to: 'out-delivery' | 'driver-arrived') => {
     setBusy(true);
     try { const res = await driverApi.updateStatus(o.id, to); if (res?.order) setOrder(res.order); }
-    catch (e) { Alert.alert(t('Erreur'), friendlyError(e, t('Action impossible.'))); }
+    catch (e) { Alert.alert(t('Erreur'), statusErrorMessage(e)); }
     finally { setBusy(false); }
   };
 
@@ -1760,17 +1760,6 @@ export function ScreenDriverOrder() {
   const requestLocation = async (o: DeliveryOrder) => {
     setBusy(true);
     try { await promptSendLocation(o.id); }
-    finally { setBusy(false); }
-  };
-
-  const verifyOtp = async (o: DeliveryOrder) => {
-    if (otp.trim().length < 4) { Alert.alert(t('Code requis'), t('Entrez le code à 4 chiffres communiqué par le client.')); return; }
-    setBusy(true);
-    try {
-      const res = await ordersApi.verifyOtp(o.id, otp.trim());
-      if (res.verified) { Alert.alert(t('Confirmé'), t('Livraison confirmée avec succès.'), [{ text: 'OK', onPress: () => nav.goBack() }]); }
-      else Alert.alert(t('Code incorrect'), res.message ?? t('Veuillez réessayer.'));
-    } catch (e) { Alert.alert(t('Code incorrect'), friendlyError(e, t('Veuillez réessayer.'))); }
     finally { setBusy(false); }
   };
 
@@ -1832,7 +1821,9 @@ export function ScreenDriverOrder() {
             </View>
           )
         )}
-        <DriverActiveCard o={order} busy={busy} otp={otp} onOtp={setOtp} onAdvance={advance} onVerify={verifyOtp} onLocationRequest={requestLocation} onRefreshPickup={refreshPickup} refreshingPickup={refreshing} />
+        <DriverActiveCard o={order} busy={busy} onAdvance={advance} onDelivered={() => nav.goBack()}
+          onNavigate={() => nav.navigate('DriverNavigate', { order, target: navTargetFor(order) })}
+          onLocationRequest={requestLocation} onRefreshPickup={refreshPickup} refreshingPickup={refreshing} />
       </View>
     </Screen>
   );
@@ -1881,6 +1872,9 @@ const OTP_COLOR: Record<string, string> = {
   blocked: LMX.rose, expired: LMX.rose, overridden: LMX.brand,
 };
 
+/** Status slug → translated label (action history). */
+const statusLabelFor = (s: string) => t(STATUS_STYLE[s]?.label ?? s);
+
 function LogiRow({ icon, label, value }: any) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
@@ -1900,6 +1894,7 @@ function LogisticsCard({ o, drivers, partners, onAssigned }: { o: DeliveryOrder;
   const [busy, setBusy]   = useState(false);
   const [partnerSheet, setPartnerSheet] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
+  const [overrideOpen, setOverrideOpen] = useState(false);
   const st = STATUS_STYLE[o.status] ?? { label: o.status_label, color: LMX.ink50 };
   const orderPartner = o.partner_id || '';
   const canTransfer = ['processing', 'ready-dispatch', 'assigned-driver'].includes(o.status) && !o.pickup_time;
@@ -1941,16 +1936,17 @@ function LogisticsCard({ o, drivers, partners, onAssigned }: { o: DeliveryOrder;
     catch (e: any) { Alert.alert(t('Erreur'), e?.message ?? t('Envoi impossible.')); }
     finally { setBusy(false); }
   };
-  const override = () => {
-    Alert.alert(t('Forcer la livraison'), t('Marquer comme livré sans code OTP ?'), [
-      { text: t('Annuler'), style: 'cancel' },
-      { text: t('Confirmer'), style: 'destructive', onPress: async () => {
-        setBusy(true);
-        try { await logisticsApi.overrideOtp(o.id); onAssigned(); }
-        catch (e: any) { Alert.alert(t('Erreur'), e?.message ?? t('Action impossible.')); }
-        finally { setBusy(false); }
-      }},
-    ]);
+  // Forcing a delivery without the customer's code needs a reason (kept in the action history).
+  const override = async (reason: string) => {
+    setBusy(true);
+    try { await logisticsApi.overrideOtp(o.id, reason); setOverrideOpen(false); onAssigned(); }
+    catch (e) {
+      const msg = isApiError(e) && e.code === 'reason_required'
+        ? t("Indiquez un motif d'au moins 5 caractères.")
+        : friendlyError(e, t('Action impossible.'));
+      Alert.alert(t('Erreur'), msg);
+    }
+    finally { setBusy(false); }
   };
 
   return (
@@ -1975,6 +1971,7 @@ function LogisticsCard({ o, drivers, partners, onAssigned }: { o: DeliveryOrder;
         <LogiRow icon="storefront" label={t('Retrait')} value={[o.pickup?.store, o.pickup?.address].filter(Boolean).join(' · ') || t('Vendeur')} />
         <LogiRow icon="pin" label={t('Livraison')} value={o.delivery_address || [o.address, o.neighborhood, o.city].filter(Boolean).join(', ') || 'Conakry'} />
         <LogiRow icon="money" label={t('Paiement')} value={`${o.payment_method} · ${fr(o.total)} GNF`} />
+        <CsConfirmedLine by={o.cs_confirmed_by} at={o.cs_confirmed_at} />
         <MapButton onPress={() => setMapOpen(true)} />
         {/* OTP status + code (see OTP) */}
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
@@ -1990,8 +1987,9 @@ function LogisticsCard({ o, drivers, partners, onAssigned }: { o: DeliveryOrder;
           </View>
         </View>
       </View>
-      <View style={{ paddingHorizontal: 14, paddingBottom: 4 }}>
+      <View style={{ paddingHorizontal: 14, paddingBottom: 4, gap: 10 }}>
         <TrackShareRow o={o} />
+        <AuditHistory log={o.audit_log} statusLabel={statusLabelFor} />
       </View>
       <View style={{ padding: 14, borderTopWidth: 1, borderTopColor: LMX.hairline, gap: 10 }}>
         {o.driver_name ? (
@@ -2066,9 +2064,14 @@ function LogisticsCard({ o, drivers, partners, onAssigned }: { o: DeliveryOrder;
             </Button>
           )}
           {canResend && <Button variant="ghost" size="md" style={{ flex: 1 }} icon="arrowR" onPress={resendOtp} disabled={busy}>{t('Renvoyer OTP')}</Button>}
-          {canOverride && <Button variant="accent" size="md" style={{ flex: 1 }} icon="shield" onPress={override} disabled={busy}>{t('Forcer')}</Button>}
+          {canOverride && <Button variant="accent" size="md" style={{ flex: 1 }} icon="shield" onPress={() => setOverrideOpen(true)} disabled={busy}>{t('Forcer la livraison')}</Button>}
         </View>
       )}
+      <ReasonSheet visible={overrideOpen} busy={busy}
+        title={t('Forcer la livraison')}
+        subtitle={t('Commande {n} : marquer comme livrée sans le code du client. Indiquez le motif.', { n: o.number })}
+        confirmLabel={t('Forcer la livraison')}
+        onConfirm={override} onClose={() => setOverrideOpen(false)} />
     </View>
   );
 }
@@ -2439,6 +2442,7 @@ export function ScreenCS() {
                 <LogiRow icon="pin" label={t('Adresse')} value={o.delivery_address || [o.address, o.neighborhood, o.city].filter(Boolean).join(', ') || 'Conakry'} />
                 {!!o.landmark && <LogiRow icon="pin" label={t('Repère')} value={o.landmark} />}
                 <LogiRow icon="money" label={t('Paiement')} value={`${o.payment_method} · ${fr(o.total)} GNF`} />
+                <CsConfirmedLine by={o.cs_confirmed_by} at={o.cs_confirmed_at} />
               </View>
 
               {o.fee_status === 'awaiting_customer' && (
@@ -2487,9 +2491,10 @@ export function ScreenCS() {
                 </View>
               )}
 
-              {/* Share tracking link */}
-              <View style={{ paddingHorizontal: 14, paddingBottom: 12 }}>
+              {/* Share tracking link + permanent action history */}
+              <View style={{ paddingHorizontal: 14, paddingBottom: 12, gap: 10 }}>
                 <TrackShareRow o={o} />
+                <AuditHistory log={o.audit_log} statusLabel={statusLabelFor} />
               </View>
 
               {/* Actions (pending only) */}

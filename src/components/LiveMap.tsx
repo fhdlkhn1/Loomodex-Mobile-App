@@ -26,6 +26,10 @@ interface LiveMapProps {
   /** Name shown when the driver pin is tapped. */
   driverLabel?: string;
   onEta?: (eta: { duration: string; distance: string }) => void;
+  /** Change this number to re-centre the map on the route (e.g. a "Recentrer" button). */
+  recenterKey?: number;
+  /** Corner radius / border (full-screen navigation uses false). */
+  rounded?: boolean;
 }
 
 const has = (p?: { lat?: number | null; lng?: number | null } | null): p is { lat: number; lng: number } =>
@@ -37,7 +41,7 @@ const has = (p?: { lat?: number | null; lng?: number | null } | null): p is { la
  * driving route driver → destination, and reports the ETA + distance back to React Native
  * via postMessage. Position changes are injected so the map never reloads.
  */
-export function LiveMap({ mapsKey, driver, destination, height = 240, destinationLabel, destinationColor, extra, driverLabel, onEta }: LiveMapProps) {
+export function LiveMap({ mapsKey, driver, destination, height = 240, destinationLabel, destinationColor, extra, driverLabel, onEta, recenterKey, rounded = true }: LiveMapProps) {
   const ref = useRef<WebView>(null);
   const initial = useRef({ driver, destination, extra });
 
@@ -68,8 +72,12 @@ export function LiveMap({ mapsKey, driver, destination, height = 240, destinatio
     }
   }, [extra?.lat, extra?.lng]);
 
+  useEffect(() => {
+    if (recenterKey && ref.current) ref.current.injectJavaScript(`window.lmxRecenter && window.lmxRecenter(); true;`);
+  }, [recenterKey]);
+
   return (
-    <View style={{ height, borderRadius: LMX.r.lg, overflow: 'hidden', borderWidth: 1, borderColor: LMX.border, backgroundColor: '#EAE6DA' }}>
+    <View style={[{ height, overflow: 'hidden', backgroundColor: '#EAE6DA' }, rounded && { borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.border }]}>
       <WebView
         ref={ref}
         originWhitelist={['*']}
@@ -136,6 +144,7 @@ function buildHtml(key: string, driver: LatLng | null, dest: LiveMapProps['desti
   var CONAKRY = {lat:9.6412,lng:-13.5784};
   var lastDir = 0;
   var useFallback = false; // true once Directions is unavailable (billing/quota/denied)
+  var userMoved = false;   // the viewer panned the map: stop auto-fitting until "recentre"
 
   function post(o){ try { window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify(o)); } catch(e){} }
   function esc(s){ return String(s).replace(/[<>&]/g,''); }
@@ -161,8 +170,9 @@ function buildHtml(key: string, driver: LatLng | null, dest: LiveMapProps['desti
     post({type:'eta', duration:'', distance:(km<1 ? Math.round(km*1000)+' m' : km.toFixed(1)+' km')});
   }
   function clearFallbackLine(){ if(fallbackLine){ fallbackLine.setMap(null); } }
-  function fit(){
+  function fit(force){
     if(!map) return;
+    if(userMoved && !force) return;
     var b = new google.maps.LatLngBounds(); var n=0;
     [driverMarker, destMarker, extraMarker].forEach(function(m){ if(m){ b.extend(m.getPosition()); n++; } });
     if(n>1){ map.fitBounds(b, 70); google.maps.event.addListenerOnce(map,'idle',function(){ if(map.getZoom()>16) map.setZoom(16); }); }
@@ -223,6 +233,7 @@ function buildHtml(key: string, driver: LatLng | null, dest: LiveMapProps['desti
     } else { extraMarker.setPosition(p); }
     fit();
   }
+  window.lmxRecenter = function(){ userMoved = false; fit(true); };
   window.lmxUpdateDriver = lmxUpdateDriver;
   window.lmxUpdateDest = lmxUpdateDest;
   window.lmxUpdateExtra = lmxUpdateExtra;
@@ -232,6 +243,7 @@ function buildHtml(key: string, driver: LatLng | null, dest: LiveMapProps['desti
     map = new google.maps.Map(document.getElementById('map'), {
       center: center, zoom: 14, disableDefaultUI: true, zoomControl: true, gestureHandling: 'greedy',
     });
+    map.addListener('dragstart', function(){ userMoved = true; });
     dirSvc = new google.maps.DirectionsService();
     dirRenderer = new google.maps.DirectionsRenderer({map:map, suppressMarkers:true, preserveViewport:true, polylineOptions:{strokeColor:DRIVER_COLOR, strokeWeight:5, strokeOpacity:0.85}});
     if(EXTRA_LL){ lmxUpdateExtra(EXTRA_LL.lat, EXTRA_LL.lng); }

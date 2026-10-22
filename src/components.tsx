@@ -28,10 +28,12 @@ export const TabBarContext = React.createContext<{ visible: boolean; hasNotifica
 
 // ── Screen shell ───────────────────────────────────────────────
 export function Screen({
-  children, bg, footer, scroll = true, padTop = true, contentStyle, refreshControl,
+  children, bg, topBg, footer, scroll = true, padTop = true, contentStyle, refreshControl,
 }: {
   children: React.ReactNode;
   bg?: string;
+  /** Solid colour behind the phone status bar (default: the screen background). */
+  topBg?: string;
   footer?: React.ReactNode;
   scroll?: boolean;
   padTop?: boolean;
@@ -42,7 +44,9 @@ export function Screen({
   const insets = useSafeAreaInsets();
   const tabBar = React.useContext(TabBarContext);
   const bottomInset = tabBar.visible ? 0 : insets.bottom;
-  const top = padTop ? insets.top + 6 : 0;
+  // Content never scrolls under the status bar: a solid band covers the top safe area and
+  // the scrolling area starts below it.
+  const top = padTop ? 6 : 0;
   const bottomPad = (footer ? 96 : 24) + bottomInset;
   const kb = useKeyboardScroll();
   return (
@@ -50,6 +54,7 @@ export function Screen({
       style={{ flex: 1, backgroundColor: bg || LMX.bg }}
       behavior={KEYBOARD_BEHAVIOR}
     >
+      <View style={{ height: insets.top, backgroundColor: topBg || bg || LMX.bg, zIndex: 20 }} />
       {scroll ? (
         <ScrollView
           ref={kb.ref}
@@ -89,11 +94,10 @@ export function Screen({
 export function AppBar({
   left, right, title, overlay = false, bell = true,
 }: { left?: React.ReactNode; right?: React.ReactNode; title?: string | null; overlay?: boolean; bell?: boolean }) {
-  const insets = useSafeAreaInsets();
   return (
     <View style={[
       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10 },
-      overlay && { position: 'absolute', top: insets.top + 6, left: 0, right: 0, zIndex: 10 },
+      overlay && { position: 'absolute', top: 6, left: 0, right: 0, zIndex: 10 },
     ]}>
       <View style={{ minWidth: 40, flexDirection: 'row', alignItems: 'center' }}>{left}</View>
       {!!title && <Text style={{ fontFamily: sans(600), fontSize: 15, color: LMX.ink }}>{title}</Text>}

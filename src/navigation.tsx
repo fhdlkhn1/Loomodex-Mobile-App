@@ -19,6 +19,7 @@ import { ScreenWishlist, ScreenListeSouhaits, ScreenAccount, ScreenAccountDetail
 import { ScreenPartner, ScreenPartnerIncidents, ScreenPartnerLedger, ScreenLogisticsIncidents, ScreenLogisticsPartners } from './screens/partner';
 import { ScreenWallet, ScreenWalletTopup } from './screens/wallet';
 import { ScreenHelp } from './screens/support';
+import { ScreenDriverNavigate } from './screens/driverNav';
 import { ScreenNotifications } from './screens/notifications';
 import { ScreenUsaStore } from './screens/usastore';
 import { ScreenSeller, ScreenAddProduct, ScreenDriver, ScreenDriverOrder, ScreenLogistics, ScreenCS, ScreenVendorProducts, ScreenVendorEditProduct, ScreenVendorOrders, ScreenVendorOrder, ScreenVendorStore, ScreenDriverLocate, ScreenDriversMap } from './screens/business';
@@ -143,6 +144,7 @@ export function RootNavigator() {
       <Stack.Screen name="VendorStore" component={ScreenVendorStore} />
       <Stack.Screen name="Driver" component={ScreenDriver} />
       <Stack.Screen name="DriverOrder" component={ScreenDriverOrder} />
+      <Stack.Screen name="DriverNavigate" component={ScreenDriverNavigate} />
       <Stack.Screen name="Logistics" component={ScreenLogistics} />
       <Stack.Screen name="DriverLocate" component={ScreenDriverLocate} />
       <Stack.Screen name="DriversMap" component={ScreenDriversMap} />

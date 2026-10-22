@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, Pressable, Modal, ScrollView, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LMX, sans, mono } from '../theme';
 import { Icon, IconName } from '../Icon';
-import type { LogisticsDriver } from '../api/delivery';
+import type { LogisticsDriver, AuditEntry } from '../api/delivery';
 import { DRIVER_STATE_COLOR, driverMapState, hasPosition } from './DriversMap';
 import { t } from '../i18n';
 import { KEYBOARD_BEHAVIOR, useKeyboardScroll, notifyInputFocus } from '../hooks/useKeyboardScroll';
@@ -170,5 +170,124 @@ export function DriverPickerSheet({ visible, title, subtitle, drivers, loading, 
         );
       })}
     </Sheet>
+  );
+}
+
+/** "22/10/2026 14:05" from a MySQL datetime ("2026-10-22 14:05:33") — shown as stored (site time). */
+export function fmtDateTime(mysql?: string | null): string {
+  const m = /^(d{4})-(d{2})-(d{2})[ T](d{2}):(d{2})/.exec(mysql || '');
+  return m ? `${m[3]}/${m[2]}/${m[1]} ${m[4]}:${m[5]}` : (mysql || '');
+}
+
+/** "Confirmée par {nom} · {date}" — customer service confirmation, staff screens only. */
+export function CsConfirmedLine({ by, at }: { by?: string | null; at?: string | null }) {
+  if (!by) return null;
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+      <Icon name="checkCircle" size={13} color={LMX.emerald} />
+      <Text style={{ flex: 1, fontSize: 11.5, color: LMX.ink70, fontFamily: sans(500) }}>
+        {at ? t('Confirmée par {nom} · {date}', { nom: by, date: fmtDateTime(at) }) : t('Confirmée par {nom}', { nom: by })}
+      </Text>
+    </View>
+  );
+}
+
+const AUDIT_ACTION: Record<string, string> = {
+  cs_confirm: 'Commande confirmée (service client)',
+  cs_reject: 'Commande rejetée (service client)',
+  fee_confirm: 'Frais de livraison confirmés',
+  fee_adjust: 'Frais de livraison ajustés',
+  partner_assign: 'Attribuée à un partenaire',
+  partner_transfer: 'Transférée à un autre partenaire',
+  driver_assign: 'Livreur assigné',
+  otp_override: 'Livraison forcée sans code',
+  status_override: 'Statut modifié manuellement',
+  pickup_verified: 'Retrait vérifié au magasin',
+};
+
+const AUDIT_ROLE: Record<string, string> = {
+  administrator: 'Administrateur',
+  logistics_manager: 'Logistique',
+  customer_support: 'Service client',
+  shop_manager: 'Gestionnaire',
+  driver: 'Livreur',
+  partner_manager: 'Partenaire',
+  wcfm_vendor: 'Vendeur',
+  seller: 'Vendeur',
+  system: 'Système',
+};
+
+/**
+ * "Historique des actions" — permanent, read-only order history for Loomodex staff
+ * (date/time, who, action, previous → new status, reason). Collapsed by default.
+ */
+export function AuditHistory({ log, statusLabel }: { log?: AuditEntry[] | null; statusLabel?: (s: string) => string }) {
+  const [open, setOpen] = useState(false);
+  if (!log || log.length === 0) return null;
+  const label = (s: string | null) => (s ? (statusLabel ? statusLabel(s) : s) : '—');
+  const entries = [...log].reverse();
+  return (
+    <View style={{ borderWidth: 1, borderColor: LMX.hairline, borderRadius: 12, overflow: 'hidden' }}>
+      <Pressable onPress={() => setOpen(v => !v)} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: LMX.surfaceAlt }}>
+        <Icon name="receipt" size={14} color={LMX.ink70} />
+        <Text style={{ flex: 1, fontSize: 12.5, fontFamily: sans(700), color: LMX.ink }}>{t('Historique des actions')} ({log.length})</Text>
+        <Icon name={open ? 'chevU' : 'chevD'} size={14} color={LMX.ink50} />
+      </Pressable>
+      {open && (
+        <View style={{ paddingHorizontal: 12, paddingVertical: 6 }}>
+          {entries.map((e, i) => (
+            <View key={i} style={{ paddingVertical: 8, gap: 2, borderTopWidth: i ? 1 : 0, borderTopColor: LMX.hairline }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={{ fontSize: 11, fontFamily: mono(600), color: LMX.ink50 }}>{fmtDateTime(e.at)}</Text>
+                <Text numberOfLines={1} style={{ flex: 1, fontSize: 11.5, fontFamily: sans(600), color: LMX.ink70, textAlign: 'right' }}>
+                  {e.user_name || t('Système')}{e.role ? ` · ${t(AUDIT_ROLE[e.role] ?? e.role)}` : ''}
+                </Text>
+              </View>
+              <Text style={{ fontSize: 12.5, fontFamily: sans(700), color: LMX.ink }}>{t(AUDIT_ACTION[e.action] ?? e.action)}</Text>
+              {(!!e.from || !!e.to) && (
+                <Text style={{ fontSize: 11.5, color: LMX.ink70 }}>{label(e.from)} → {label(e.to)}</Text>
+              )}
+              {!!e.reason && <Text style={{ fontSize: 11.5, color: LMX.ink70, fontStyle: 'italic' }}>{t('Motif : {r}', { r: e.reason })}</Text>}
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+/** Bottom sheet asking for a mandatory reason (min 5 characters) before a forced action. */
+export function ReasonSheet({ visible, title, subtitle, confirmLabel, busy, onConfirm, onClose }: {
+  visible: boolean; title: string; subtitle?: string; confirmLabel: string; busy?: boolean;
+  onConfirm: (reason: string) => void; onClose: () => void;
+}) {
+  const [reason, setReason] = useState('');
+  const ok = reason.trim().length >= 5;
+  const close = () => { setReason(''); onClose(); };
+  return (
+    <Sheet visible={visible} title={title} subtitle={subtitle} onClose={close}
+      footer={
+        <Pressable onPress={() => { if (ok && !busy) onConfirm(reason.trim()); }} disabled={!ok || busy}
+          style={{ height: 48, borderRadius: 12, backgroundColor: LMX.rose, alignItems: 'center', justifyContent: 'center', opacity: ok && !busy ? 1 : 0.45 }}>
+          {busy ? <ActivityIndicator color="#fff" /> : <Text style={{ fontSize: 14, fontFamily: sans(700), color: '#fff' }}>{confirmLabel}</Text>}
+        </Pressable>
+      }>
+      <TextArea label={t('Motif (obligatoire)')} value={reason} onChangeText={setReason} placeholder={t('Expliquez pourquoi…')} lines={3} />
+      <Text style={{ fontSize: 11.5, color: ok ? LMX.ink50 : LMX.rose }}>
+        {t("Au moins 5 caractères. Le motif est conservé dans l'historique des actions.")}
+      </Text>
+    </Sheet>
+  );
+}
+
+/** Customer contact is hidden from drivers / partners until the store verified the pickup. */
+export function ContactLockNote() {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: LMX.bg, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, borderWidth: 1, borderColor: LMX.hairline }}>
+      <Icon name="key" size={13} color={LMX.ink50} />
+      <Text style={{ flex: 1, fontSize: 11.5, color: LMX.ink70, fontFamily: sans(500), lineHeight: 16 }}>
+        {t('Coordonnées du client visibles après la vérification du retrait au magasin')}
+      </Text>
+    </View>
   );
 }

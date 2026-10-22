@@ -167,8 +167,15 @@ export const ordersApi = {
     return get<TrackedOrder>(`/orders/track?${q}`);
   },
 
+  /**
+   * Driver submits the customer's delivery code. Success only once the order is saved as delivered.
+   * Errors (ApiError.code): otp_incorrect (attempts info), otp_expired, otp_blocked, otp_missing, not_assigned.
+   */
   verifyOtp: (order_id: number, otp: string) =>
-    post<{ verified: boolean; message: string }>('/otp/verify', { order_id, otp }),
+    post<{ verified: boolean; order_status: string; message: string }>('/otp/verify', { order_id, otp }, true),
+
+  /** Customer asks for a new delivery code — the previous code stops working immediately. */
+  newOtp: (order_id: number) => post<{ success: boolean; message: string }>(`/orders/${order_id}/otp/new`, {}, true),
 
   resendOtp: (order_id: number) =>
     post<{ message: string }>('/otp/resend', { order_id }, true),

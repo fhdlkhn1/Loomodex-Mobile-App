@@ -37,6 +37,15 @@ export interface DeliveryOrder {
   pickup: StorePickup;
   /** Customer's profile photo (null if none) — helps the driver recognise them. */
   customer_avatar?: string | null;
+  /** True for drivers/partners until the store verified the pickup code: phones, WhatsApp and avatar are hidden. */
+  contact_locked?: boolean;
+  /** The store verified the driver's pickup code (unlocks customer contact). */
+  pickup_verified?: boolean;
+  /** Customer service agent who confirmed the order + when (staff viewers only). */
+  cs_confirmed_by?: string | null;
+  cs_confirmed_at?: string | null;
+  /** Permanent action history (Loomodex staff viewers only). */
+  audit_log?: AuditEntry[];
   /** Customer's position: live shared location, else the saved checkout pin (null if none). */
   customer_lat?: number | null;
   customer_lng?: number | null;
@@ -57,6 +66,17 @@ export interface DeliveryOrder {
   arrival_time: string | null;
   delivery_time: string | null;
   date: string | null;
+}
+
+export interface AuditEntry {
+  at: string;
+  user_id: number;
+  user_name: string;
+  role: string;
+  action: string;
+  from: string | null;
+  to: string | null;
+  reason: string | null;
 }
 
 export interface StorePickup {
@@ -199,8 +219,9 @@ export const logisticsApi = {
   sendOtp: (order_id: number) =>
     post<{ success: boolean; message: string; order: DeliveryOrder }>('/logistics/send-otp', { order_id }, true),
 
-  overrideOtp: (order_id: number) =>
-    post<{ success: boolean; message: string; order: DeliveryOrder }>('/logistics/override-otp', { order_id }, true),
+  /** Force delivery without the customer's code — a reason is mandatory and is kept in the action history. */
+  overrideOtp: (order_id: number, reason: string) =>
+    post<{ success: boolean; message: string; order: DeliveryOrder }>('/logistics/override-otp', { order_id, reason }, true),
 };
 
 export const csApi = {

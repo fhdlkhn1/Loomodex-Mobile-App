@@ -170,7 +170,7 @@ function ProductRail({ products, nav }: { products: ApiProduct[]; nav: any }) {
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingHorizontal: 16, paddingBottom: 16 }}>
       {products.slice(0, 12).map(p => (
-        <View key={p.id} style={{ width: 160 }}>
+        <View key={p.id} style={{ width: 150 }}>
           <ProductCard product={apiToCard(p) as any} onPress={() => nav.navigate('ProductDetail', { productId: p.id })} />
         </View>
       ))}
@@ -367,20 +367,20 @@ export function ScreenHome() {
   };
 
   return (
-    <Screen bg={LMX.bg} refreshControl={<RefreshControl refreshing={pulling} onRefresh={onRefresh} colors={[LMX.brand]} tintColor={LMX.brand} />}>
+    <Screen bg={LMX.bg} topBg={LMX.surface} padTop={false} refreshControl={<RefreshControl refreshing={pulling} onRefresh={onRefresh} colors={[LMX.brand]} tintColor={LMX.brand} />}>
 
-      {/* Header */}
-      <View style={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: LMX.surface }}>
+      {/* Compact header — menu, logo, bell, cart (white band continues under the status bar) */}
+      <View style={{ paddingHorizontal: 16, paddingTop: 6, paddingBottom: 6, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: LMX.surface }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Pressable onPress={() => setMenuOpen(true)} style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: LMX.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name="list" size={20} color={LMX.ink} />
+          <Pressable onPress={() => setMenuOpen(true)} accessibilityLabel={t('Menu')} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: LMX.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name="list" size={19} color={LMX.ink} />
           </Pressable>
-          <ExpoImage source={require('../../assets/logo.png')} style={{ width: 168, height: 38 }} contentFit="contain" />
+          <ExpoImage source={require('../../assets/logo.png')} style={{ width: 140, height: 32 }} contentFit="contain" />
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <BellButton bg={LMX.surfaceAlt} />
-          <Pressable onPress={() => nav.navigate('Cart')} style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: LMX.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name="bag" size={18} color={LMX.ink} />
+          <Pressable onPress={() => nav.navigate('Cart')} accessibilityLabel={t('Panier')} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: LMX.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name="bag" size={17} color={LMX.ink} />
           </Pressable>
         </View>
       </View>
@@ -389,157 +389,63 @@ export function ScreenHome() {
       <MenuDrawer visible={menuOpen} onClose={() => setMenuOpen(false)} cats={cats} nav={nav} />
 
       {/* Search bar */}
-      <View style={{ paddingHorizontal: 16, paddingVertical: 10, backgroundColor: LMX.surface }}>
-        <Pressable onPress={() => nav.navigate('Search')} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: LMX.bg, borderRadius: 999, paddingHorizontal: 16, height: 46, borderWidth: 1, borderColor: LMX.border }}>
-          <Icon name="search" size={17} color={LMX.ink50} />
-          <Text style={{ flex: 1, fontSize: 13.5, color: LMX.ink50, fontFamily: sans(400) }}>{t('Rechercher un produit, un vendeur...')}</Text>
-          <Icon name="mic" size={17} color={LMX.ink50} />
+      <View style={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 10, backgroundColor: LMX.surface }}>
+        <Pressable onPress={() => nav.navigate('Search')} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: LMX.bg, borderRadius: 999, paddingHorizontal: 16, height: 40, borderWidth: 1, borderColor: LMX.border }}>
+          <Icon name="search" size={16} color={LMX.ink50} />
+          <Text style={{ flex: 1, fontSize: 13, color: LMX.ink50, fontFamily: sans(400) }}>{t('Rechercher un produit, un vendeur...')}</Text>
+          <Icon name="mic" size={16} color={LMX.ink50} />
         </Pressable>
       </View>
 
-      {/* Staff dashboard shortcut */}
-      {staffDash && (
-        <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
-          <Pressable onPress={() => nav.navigate(staffDash.route)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: LMX.navy, borderRadius: 16, padding: 14 }}>
-            <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' }}>
-              <Icon name={staffDash.icon} size={19} color="#fff" />
+      {/* Short banner (≈ 2.6:1): admin banners (wp-admin → Homepage Banners); none / failed → compact built-in hero */}
+      <View style={{ paddingHorizontal: 16, paddingTop: 10 }}>
+        {banners.length > 0 ? (
+          <BannerCarousel banners={banners} onPress={openBanner} />
+        ) : (
+          <Pressable onPress={() => nav.navigate('Category')} style={{ borderRadius: 16, overflow: 'hidden', ...shadow('sm') }}>
+            <ImageBackground source={require('../../assets/banner.jpg')} style={{ width: '100%', aspectRatio: 2.6 }} resizeMode="cover">
+              {/* Left-dark scrim keeps the text legible while the photo shows on the right */}
+              <LinearGradient
+                colors={['rgba(8,18,38,0.95)', 'rgba(8,18,38,0.7)', 'rgba(8,18,38,0.05)']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={{ flex: 1, paddingHorizontal: 14, paddingVertical: 12, justifyContent: 'center' }}
+              >
+                <Text style={{ fontFamily: sans(800), fontSize: 17, color: '#fff', lineHeight: 21, maxWidth: '64%' }}>
+                  {t('Vos achats, livrés avec soin !')}
+                </Text>
+                <View style={{ marginTop: 10, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: LMX.accent, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 }}>
+                  <Text style={{ color: '#fff', fontFamily: sans(800), fontSize: 12.5 }}>{t('Acheter maintenant')}</Text>
+                  <Icon name="arrowR" size={13} color="#fff" />
+                </View>
+                <View style={{ position: 'absolute', bottom: 8, right: 8, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: LMX.accent, borderRadius: 8, paddingVertical: 4, paddingHorizontal: 7 }}>
+                  <Icon name="shield" size={10} color="#fff" />
+                  <Text style={{ color: '#fff', fontFamily: sans(700), fontSize: 8, textTransform: 'uppercase', letterSpacing: 0.3 }}>{t('Confiance garantie')}</Text>
+                </View>
+              </LinearGradient>
+            </ImageBackground>
+          </Pressable>
+        )}
+      </View>
+
+      {/* Trust tiles — compact 2×2 reassurance grid right under the banner */}
+      <View style={{ paddingHorizontal: 16, paddingTop: 8, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 6 }}>
+        {[
+          { icon: 'truck',  title: t('Livraison 3h–48h'),       sub: t('à Conakry'),             tint: LMX.brand,     bg: LMX.brandSoft },
+          { icon: 'money',  title: t('Paiement à la livraison'), sub: t('Sans frais'),            tint: LMX.accent,    bg: LMX.accentSoft },
+          { icon: 'shield', title: t('Produits vérifiés'),       sub: t('Vendeurs de confiance'), tint: LMX.emerald,   bg: LMX.emeraldSoft },
+          { icon: 'key',    title: t('Livraison OTP'),           sub: t('Sécurisée par code'),    tint: LMX.brandDeep, bg: LMX.brandSoft },
+        ].map(b => (
+          <View key={b.title} style={{ width: '49%', height: 40, backgroundColor: LMX.surface, borderRadius: 12, borderWidth: 1, borderColor: LMX.border, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <View style={{ width: 26, height: 26, borderRadius: 8, backgroundColor: b.bg, alignItems: 'center', justifyContent: 'center' }}>
+              <Icon name={b.icon as any} size={14} color={b.tint} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 14, fontFamily: sans(700), color: '#fff' }}>{staffDash.label}</Text>
-              <Text style={{ fontSize: 11.5, color: '#fff', opacity: 0.7, marginTop: 2 }}>{staffDash.sub}</Text>
+              <Text numberOfLines={1} style={{ fontSize: 11, fontFamily: sans(700), color: LMX.ink, lineHeight: 14 }}>{b.title}</Text>
+              <Text numberOfLines={1} style={{ fontSize: 9.5, color: LMX.ink50 }}>{b.sub}</Text>
             </View>
-            <Icon name="arrowR" size={16} color="#fff" />
-          </Pressable>
-        </View>
-      )}
-
-      {/* Admin banners (wp-admin → Homepage Banners); none / failed → built-in hero (delivery photo + overlay + service footer) */}
-      {banners.length > 0 ? (
-        <View style={{ paddingHorizontal: 14, paddingTop: 12, paddingBottom: 4 }}>
-          <BannerCarousel banners={banners} onPress={openBanner} />
-        </View>
-      ) : (
-        <View style={{ paddingHorizontal: 14, paddingTop: 12, paddingBottom: 4 }}>
-          <View style={{ borderRadius: 20, overflow: 'hidden', ...shadow('md') }}>
-            <Pressable onPress={() => nav.navigate('Category')}>
-              <ImageBackground source={require('../../assets/banner.jpg')} style={{ width: '100%', height: 296 }} resizeMode="cover">
-                {/* Left-dark scrim keeps text legible while the photo shows on the right */}
-                <LinearGradient
-                  colors={['rgba(8,18,38,0.95)', 'rgba(8,18,38,0.72)', 'rgba(8,18,38,0.08)']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={{ flex: 1, paddingHorizontal: 16, paddingVertical: 14 }}
-                >
-                  {/* Logo */}
-                  <ExpoImage source={require('../../assets/logo.png')} style={{ width: 160, height: 36 }} contentFit="contain" />
-
-                  {/* Headline */}
-                  <Text style={{ fontFamily: sans(800), fontSize: 18, color: '#fff', lineHeight: 22, marginTop: 10, maxWidth: '74%' }}>
-                    {t('VOS ACHATS,')}{'\n'}
-                    <Text style={{ color: LMX.accent }}>{t('LIVRÉS AVEC')}{'\n'}</Text>
-                    {t('SOIN ET')} <Text style={{ color: LMX.accent }}>{t('SOURIRE !')}</Text>
-                  </Text>
-
-                  {/* Trust trio */}
-                  <View style={{ marginTop: 10, gap: 6 }}>
-                    {[
-                      { icon: 'truck',  label: t('Livraison rapide') },
-                      { icon: 'shield', label: t('Service fiable') },
-                      { icon: 'key',    label: t('Paiement sécurisé') },
-                    ].map(it => (
-                      <View key={it.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-                        <View style={{ width: 18, height: 18, borderRadius: 9, borderWidth: 1.5, borderColor: LMX.accent, alignItems: 'center', justifyContent: 'center' }}>
-                          <Icon name={it.icon as any} size={9} color={LMX.accent} />
-                        </View>
-                        <Text style={{ fontSize: 11, color: '#fff', fontFamily: sans(600) }}>{it.label}</Text>
-                      </View>
-                    ))}
-                  </View>
-
-                  {/* CTA — a clear, elevated button (its own tap target) */}
-                  <Pressable
-                    onPress={() => nav.navigate('Category')}
-                    style={{ marginTop: 14, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: LMX.accent, paddingHorizontal: 22, paddingVertical: 13, borderRadius: 12, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.35)', ...shadow('lg') }}
-                  >
-                    <Text style={{ color: '#fff', fontFamily: sans(800), fontSize: 14.5 }}>{t('Acheter maintenant')}</Text>
-                    <Icon name="arrowR" size={16} color="#fff" />
-                  </Pressable>
-
-                  {/* Confiance Garantie badge */}
-                  <View style={{ position: 'absolute', bottom: 12, right: 12, backgroundColor: LMX.accent, borderRadius: 12, paddingVertical: 8, paddingHorizontal: 8, alignItems: 'center', width: 76 }}>
-                    <Icon name="shield" size={15} color="#fff" />
-                    <Text style={{ color: '#fff', fontFamily: sans(700), fontSize: 7.5, textAlign: 'center', marginTop: 3, textTransform: 'uppercase', letterSpacing: 0.3 }}>{t('CONFIANCE\nGARANTIE')}</Text>
-                  </View>
-                </LinearGradient>
-              </ImageBackground>
-
-              {/* Navy service footer (matches banner bottom bar) */}
-              <View style={{ backgroundColor: LMX.navy, paddingVertical: 14, paddingHorizontal: 8 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  {[
-                    { icon: 'user',    label: t('Clients\nsatisfaits'),     tint: LMX.brand },
-                    { icon: 'package', label: t('Colis\nprotégés'),         tint: LMX.accent },
-                    { icon: 'pin',     label: t('Suivi en\ntemps réel'),    tint: LMX.brand },
-                    { icon: 'headset', label: t('Support\ndédié'),          tint: LMX.accent },
-                  ].map(s => (
-                    <View key={s.label} style={{ flex: 1, alignItems: 'center', gap: 6, paddingHorizontal: 2 }}>
-                      <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: s.tint, alignItems: 'center', justifyContent: 'center' }}>
-                        <Icon name={s.icon as any} size={16} color="#fff" />
-                      </View>
-                      <Text style={{ fontSize: 9, color: '#fff', fontFamily: sans(600), textAlign: 'center', lineHeight: 11 }}>{s.label}</Text>
-                    </View>
-                  ))}
-                </View>
-                <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.12)', marginTop: 12, marginBottom: 10 }} />
-                <Text style={{ textAlign: 'center', fontSize: 10.5, fontFamily: sans(700), color: '#fff', letterSpacing: 0.3 }}>
-                  {t('LOOMODEX, LA CONFIANCE À CHAQUE')} <Text style={{ color: LMX.accent }}>{t('LIVRAISON')}</Text>
-                </Text>
-              </View>
-            </Pressable>
           </View>
-        </View>
-      )}
-
-      {/* Trust badges — reassurance strip right under the hero */}
-      <View style={{ paddingHorizontal: 14, paddingTop: 12 }}>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-          {[
-            { icon: 'truck',  title: t('Livraison 3h–48h'),       sub: t('à Conakry'),             tint: LMX.brand,     bg: LMX.brandSoft },
-            { icon: 'money',  title: t('Paiement à la livraison'), sub: t('Sans frais'),            tint: LMX.accent,    bg: LMX.accentSoft },
-            { icon: 'shield', title: t('Produits vérifiés'),       sub: t('Vendeurs de confiance'), tint: LMX.emerald,   bg: LMX.emeraldSoft },
-            { icon: 'key',    title: t('Livraison OTP'),           sub: t('Sécurisée par code'),    tint: LMX.brandDeep, bg: LMX.brandSoft },
-          ].map(b => (
-            <View key={b.title} style={{ width: '48%', backgroundColor: LMX.surface, borderRadius: 14, borderWidth: 1, borderColor: LMX.border, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <View style={{ width: 38, height: 38, borderRadius: 11, backgroundColor: b.bg, alignItems: 'center', justifyContent: 'center' }}>
-                <Icon name={b.icon as any} size={18} color={b.tint} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 12, fontFamily: sans(700), color: LMX.ink, lineHeight: 15 }}>{b.title}</Text>
-                <Text style={{ fontSize: 10, color: LMX.ink50, marginTop: 1 }}>{b.sub}</Text>
-              </View>
-            </View>
-          ))}
-        </View>
-      </View>
-
-      {/* USA Store entry point — a separate catalogue, so it gets its own doorway
-          rather than being mixed into the category grid */}
-      <View style={{ paddingHorizontal: 14, paddingTop: 12 }}>
-        <Pressable
-          onPress={() => nav.navigate('UsaStore')}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: LMX.navy, borderRadius: 16, padding: 14 }}
-        >
-          <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' }}>
-            <Text style={{ fontSize: 19 }}>🇺🇸</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 13.5, fontFamily: sans(700), color: '#fff' }}>USA Store</Text>
-            <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>
-              {t('iPhone, MacBook, AirPods — importés des États-Unis')}
-            </Text>
-          </View>
-          <Icon name="arrowR" size={16} color="#fff" />
-        </Pressable>
+        ))}
       </View>
 
       {/* Shop by categories — gradient grid. Hidden so the homepage shows products
@@ -610,8 +516,8 @@ export function ScreenHome() {
           )}
           {/* Flash Deals */}
           {fdRail.length > 0 && (
-            <View style={{ backgroundColor: LMX.surface, marginTop: 8 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12 }}>
+            <View style={{ backgroundColor: LMX.surface, marginTop: 10 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 10, paddingBottom: 8 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
                   <Text style={{ fontSize: 18 }}>⚡</Text>
                   <Text style={{ fontSize: 16, fontFamily: sans(700), color: LMX.ink }}>{t('Offres flash')}</Text>
@@ -625,6 +531,42 @@ export function ScreenHome() {
               <ProductRail products={fdRail} nav={nav} />
             </View>
           )}
+
+          {/* Below the first product rail: staff shortcut + USA Store doorway (kept out of the first screen so products show first) */}
+          {/* Staff dashboard shortcut */}
+          {staffDash && (
+            <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
+              <Pressable onPress={() => nav.navigate(staffDash.route)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: LMX.navy, borderRadius: 16, padding: 14 }}>
+                <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name={staffDash.icon} size={19} color="#fff" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, fontFamily: sans(700), color: '#fff' }}>{staffDash.label}</Text>
+                  <Text style={{ fontSize: 11.5, color: '#fff', opacity: 0.7, marginTop: 2 }}>{staffDash.sub}</Text>
+                </View>
+                <Icon name="arrowR" size={16} color="#fff" />
+              </Pressable>
+            </View>
+          )}
+          {/* USA Store entry point — a separate catalogue, so it gets its own doorway
+              rather than being mixed into the category grid */}
+          <View style={{ paddingHorizontal: 14, paddingTop: 12 }}>
+            <Pressable
+              onPress={() => nav.navigate('UsaStore')}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: LMX.navy, borderRadius: 16, padding: 14 }}
+            >
+              <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ fontSize: 19 }}>🇺🇸</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 13.5, fontFamily: sans(700), color: '#fff' }}>USA Store</Text>
+                <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>
+                  {t('iPhone, MacBook, AirPods — importés des États-Unis')}
+                </Text>
+              </View>
+              <Icon name="arrowR" size={16} color="#fff" />
+            </Pressable>
+          </View>
 
           {/* New Arrivals */}
           {naRail.length > 0 && (
