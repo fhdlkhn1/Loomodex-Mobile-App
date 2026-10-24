@@ -1986,7 +1986,8 @@ function LogisticsCard({ o, drivers, partners, onAssigned }: { o: DeliveryOrder;
 
   const canAssign   = ['processing', 'ready-dispatch'].includes(o.status);
   const canResend   = ['assigned-driver', 'out-delivery', 'driver-arrived', 'otp-pending'].includes(o.status);
-  const canOverride = ['blocked', 'expired'].includes(o.otp_status);
+  // Force delivery whenever the parcel is with the driver (not only after a blocked / expired code)
+  const canOverride = ['out-delivery', 'driver-arrived', 'otp-pending'].includes(o.status) || ['blocked', 'expired'].includes(o.otp_status);
 
   const resendOtp = async () => {
     setBusy(true);
