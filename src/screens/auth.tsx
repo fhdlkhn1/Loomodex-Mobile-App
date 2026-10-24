@@ -101,7 +101,7 @@ export function ScreenSignIn() {
     }
     setLoading(true);
     try {
-      const u = await login(email.trim().toLowerCase(), password);
+      const u = await login(email.replace(/\s+/g, '').toLowerCase(), password);
       // Staff land on their dashboard as the ROOT (no shop underneath) so they can't
       // swipe/back into the customer shopping screens and get lost. Logout returns to SignIn.
       const dash = staffHomeRoute(u?.roles);

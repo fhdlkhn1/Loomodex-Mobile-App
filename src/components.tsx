@@ -413,6 +413,9 @@ export function Field({
           value={displayVal}
           onChangeText={controlled ? onChangeText : setInternal}
           secureTextEntry={secure}
+          // Emails / passwords: no keyboard autocorrect (it silently rewrites "logisticmanager" etc.)
+          autoCorrect={secure || keyboardType === 'email-address' ? false : undefined}
+          spellCheck={secure || keyboardType === 'email-address' ? false : undefined}
           keyboardType={keyboardType}
           autoCapitalize={autoCapitalize ?? 'sentences'}
           placeholder={placeholder}
