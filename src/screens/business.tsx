@@ -19,7 +19,7 @@ import { OrderLocationMap, OrderMapSheet, MapButton } from '../components/OrderL
 import { configApi } from '../api/config';
 import { Product as ApiProduct } from '../api/products';
 import { driverApi, logisticsApi, csApi, partnerApi, DeliveryOrder, LogisticsDriver, DriverSummary, LogisticsPartner } from '../api/delivery';
-import { Sheet, TextArea, Pill, ErrorBanner, AmountRow, agoFr, PackedPill, NotPackedNote, CsConfirmedLine, AuditHistory, ReasonSheet, ContactLockNote } from '../components/StaffKit';
+import { Sheet, TextArea, Pill, ErrorBanner, AmountRow, agoFr, PackedPill, NotPackedNote, CsConfirmedLine, AuditHistory, ReasonSheet, ContactLockNote, fmtDateTime } from '../components/StaffKit';
 import { SITE_ORIGIN } from '../api/wcfm';
 import { vendorApi, VendorDashboard, MAX_PRODUCT_PHOTOS } from '../api/vendor';
 import { StoreAddressForm, StoreAddressValue, EMPTY_STORE_ADDRESS } from '../components/StoreAddressForm';
@@ -1363,7 +1363,7 @@ export function ScreenDriver() {
                   onNavigate={() => nav.navigate('DriverNavigate', { order: o, target: navTargetFor(o) })}
                   onArrived={() => advance(o, 'driver-arrived')} />
               ))
-            : orders.map(o => <DriverDoneCard key={o.id} o={o} failed={tab === 'failed'} />)}
+            : orders.map(o => <DriverDoneCard key={o.id} o={o} failed={tab === 'failed'} onPress={() => nav.navigate('DriverOrder', { order: o })} />)}
         </View>
       )}
     </Screen>
@@ -1736,6 +1736,7 @@ export function ScreenDriverOrder() {
 
   const beforePickup = order?.status === 'assigned-driver';
   const active = !!order && ['out-delivery', 'driver-arrived', 'otp-pending'].includes(order.status);
+  const finished = !!order && ['otp-verified', 'completed', 'delivery-failed'].includes(order.status);
   const stage: 'store' | 'customer' = beforePickup ? 'store' : 'customer';
 
   useEffect(() => { configApi.get().then(c => setMapsKey(c.google_maps_key ?? '')).catch(() => {}); }, []);
@@ -1746,22 +1747,28 @@ export function ScreenDriverOrder() {
     if (!orderId) return;
     try {
       const r = await driverApi.orders();
-      const fresh = (r.orders ?? []).find(x => x.id === orderId);
+      let fresh = (r.orders ?? []).find(x => x.id === orderId);
+      // Gone from the active list: delivered (also when forced by logistics) or failed
+      if (!fresh) {
+        const [h, f] = await Promise.all([driverApi.orders('history'), driverApi.orders('failed')]);
+        fresh = [...(h.orders ?? []), ...(f.orders ?? [])].find(x => x.id === orderId);
+      }
       if (fresh) setOrder(fresh);
     } catch {}
   }, [orderId]);
 
   // Before pickup: re-read the order so the pickup code appears and the screen switches to
   // the customer route as soon as the store verifies the code.
+  // On the way: also re-read it, so a delivery forced by logistics shows up here.
   useEffect(() => {
-    if (!beforePickup) return;
+    if (!beforePickup && !active) return;
     const i = setInterval(refreshOrder, 20000);
     return () => clearInterval(i);
-  }, [beforePickup, refreshOrder]);
+  }, [beforePickup, active, refreshOrder]);
 
   // Poll the customer's shared live location so the driver can navigate to them
   useEffect(() => {
-    if (!orderId) return;
+    if (!orderId || finished) return;
     const load = () => ordersApi.tracking(orderId)
       .then(t => {
         // Prefer the customer's live shared location; fall back to the exact pin from checkout
@@ -1774,7 +1781,7 @@ export function ScreenDriverOrder() {
     load();
     const i = setInterval(load, 20000);
     return () => clearInterval(i);
-  }, [orderId]);
+  }, [orderId, finished]);
 
   // Driver's own live GPS — drives the in-app map AND keeps broadcasting to logistics.
   const tracking = beforePickup || active;
@@ -1801,6 +1808,16 @@ export function ScreenDriverOrder() {
       <Screen>
         <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title={t('Commande')} />
         <View style={{ padding: 24 }}><Text style={{ color: LMX.ink50 }}>{t('Commande introuvable.')}</Text></View>
+      </Screen>
+    );
+  }
+
+  // Delivered (incl. forced by logistics) or failed: read-only summary
+  if (finished) {
+    return (
+      <Screen>
+        <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title={t('Commande #{n}', { n: order.number })} />
+        <DriverOrderSummary o={order} />
       </Screen>
     );
   }
@@ -1888,11 +1905,11 @@ export function ScreenDriverOrder() {
 }
 
 
-function DriverDoneCard({ o, failed }: { o: DeliveryOrder; failed: boolean }) {
+function DriverDoneCard({ o, failed, onPress }: { o: DeliveryOrder; failed: boolean; onPress?: () => void }) {
   const color = failed ? LMX.rose : LMX.emerald;
   const area = [o.commune, o.neighborhood].filter(Boolean).join(' — ') || o.zone_label || o.city;
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: LMX.surface, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.border, padding: 14 }}>
+    <Pressable onPress={onPress} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: LMX.surface, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.border, padding: 14 }}>
       <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: color + '1A', alignItems: 'center', justifyContent: 'center' }}>
         <Icon name={failed ? 'close' : 'check'} size={18} color={color} />
       </View>
@@ -1906,7 +1923,103 @@ function DriverDoneCard({ o, failed }: { o: DeliveryOrder; failed: boolean }) {
       </View>
       <View style={{ alignItems: 'flex-end' }}>
         <Text style={{ fontFamily: mono(700), fontSize: 13, color: LMX.ink }}>{fr(o.total)} <Text style={{ fontSize: 10.5, color: LMX.ink50 }}>GNF</Text></Text>
-        {!!(o.delivery_time || o.date) && <Text style={{ fontSize: 10.5, color: LMX.ink50, marginTop: 3 }}>{o.delivery_time || o.date}</Text>}
+        {!!(o.delivery_time || o.date) && <Text style={{ fontSize: 10.5, color: LMX.ink50, marginTop: 3 }}>{fmtDateTime(o.delivery_time || o.date)}</Text>}
+      </View>
+      <Icon name="chevR" size={14} color={LMX.ink30} />
+    </Pressable>
+  );
+}
+
+/** Read-only summary of a finished delivery (delivered or failed) for the driver. */
+function DriverOrderSummary({ o }: { o: DeliveryOrder }) {
+  const failed = o.status === 'delivery-failed';
+  const color = failed ? LMX.rose : LMX.emerald;
+  const area = [o.landmark, o.neighborhood, o.commune].filter(Boolean).join(', ') || o.zone_label || o.city;
+  const pk = o.pickup;
+  const storeAddress = [pk?.landmark, pk?.neighborhood, pk?.commune, pk?.zone_label].filter(Boolean).join(', ') || pk?.address || '';
+  const steps: [string, string | null][] = [
+    [t('Commande assignée'), o.assigned_time],
+    [t('Récupérée au magasin'), o.pickup_time],
+    [t('Arrivé chez le client'), o.arrival_time],
+    [failed ? t('Échec de livraison') : t('Livrée'), o.delivery_time],
+  ];
+  const card = { backgroundColor: LMX.surface, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.border, padding: 14, gap: 8 } as const;
+  const head = { fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(700) } as const;
+  const fee = o.delivery_quote?.total ?? 0;
+
+  return (
+    <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 24, gap: 12 }}>
+      <View style={[card, { flexDirection: 'row', gap: 12, borderColor: color + '55', backgroundColor: color + '0F' }]}>
+        <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: color, alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name={failed ? 'close' : 'check'} size={20} color="#fff" />
+        </View>
+        <View style={{ flex: 1, gap: 3 }}>
+          <Text style={{ fontSize: 15, fontFamily: sans(700), color: LMX.ink }}>{failed ? t('Livraison échouée') : t('Livraison terminée')}</Text>
+          {!!o.delivery_time && <Text style={{ fontSize: 12, color: LMX.ink70 }}>{fmtDateTime(o.delivery_time)}</Text>}
+          {!failed && o.delivery_confirmation === 'forced' && (
+            <Text style={{ fontSize: 12, color: LMX.ink70, lineHeight: 17 }}>
+              {o.forced_by
+                ? t('Confirmée par la logistique Loomodex ({nom}), sans le code du client.', { nom: o.forced_by })
+                : t('Confirmée par la logistique Loomodex, sans le code du client.')}
+            </Text>
+          )}
+          {!failed && o.delivery_confirmation === 'code' && (
+            <Text style={{ fontSize: 12, color: LMX.ink70 }}>{t('Confirmée avec le code du client.')}</Text>
+          )}
+        </View>
+      </View>
+
+      <View style={card}>
+        <Text style={head}>{t('Déroulement')}</Text>
+        {steps.map(([label, at]) => (
+          <View key={label} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: at ? color : LMX.hairline }} />
+            <Text style={{ flex: 1, fontSize: 12.5, color: at ? LMX.ink : LMX.ink50 }}>{label}</Text>
+            <Text style={{ fontSize: 11.5, fontFamily: mono(500), color: LMX.ink50 }}>{at ? fmtDateTime(at) : '—'}</Text>
+          </View>
+        ))}
+      </View>
+
+      <View style={card}>
+        <Text style={head}>{t('Magasin')}</Text>
+        {!!pk?.store && <Text style={{ fontSize: 13.5, fontFamily: sans(700), color: LMX.ink }}>{decodeEntities(pk.store)}</Text>}
+        {!!storeAddress && <Text style={{ fontSize: 12.5, color: LMX.ink70, lineHeight: 18 }}>{decodeEntities(storeAddress)}</Text>}
+        <View style={{ height: 1, backgroundColor: LMX.hairline, marginVertical: 2 }} />
+        <Text style={head}>{t('Client')}</Text>
+        <Text style={{ fontSize: 13.5, fontFamily: sans(700), color: LMX.ink }}>{o.customer_name || t('Client')}</Text>
+        {!!area && <Text style={{ fontSize: 12.5, color: LMX.ink70, lineHeight: 18 }}>{area}</Text>}
+        <Text style={{ fontSize: 11, color: LMX.ink50, lineHeight: 16 }}>{t('Les coordonnées du client ne sont plus visibles une fois la livraison terminée.')}</Text>
+      </View>
+
+      {o.items?.length > 0 && (
+        <View style={card}>
+          <Text style={head}>{t('Articles ({n})', { n: o.item_count })}</Text>
+          {o.items.map((it, i) => (
+            <Text key={i} style={{ fontSize: 12.5, color: LMX.ink }}>
+              <Text style={{ fontFamily: mono(700) }}>{it.qty}×</Text> {decodeEntities(it.name)}
+            </Text>
+          ))}
+        </View>
+      )}
+
+      <View style={card}>
+        <Text style={head}>{t('Paiement')}</Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+          <Text style={{ fontSize: 12.5, color: LMX.ink70 }}>{t('Total de la commande')}</Text>
+          <Text style={{ fontSize: 13, fontFamily: mono(700), color: LMX.ink }}>{fr(o.total)} GNF</Text>
+        </View>
+        {fee > 0 && (
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <Text style={{ fontSize: 12.5, color: LMX.ink70 }}>{t('Frais de livraison')}</Text>
+            <Text style={{ fontSize: 13, fontFamily: mono(600), color: LMX.ink }}>{fr(Math.round(fee))} GNF</Text>
+          </View>
+        )}
+        <Text style={{ fontSize: 12, color: o.payment === 'cod' && !failed ? LMX.accent : LMX.ink50, fontFamily: sans(600) }}>
+          {o.payment === 'prepaid'
+            ? t('Déjà payée en ligne : rien à encaisser.')
+            : failed ? t('Paiement à la livraison : rien encaissé (livraison échouée).')
+            : t('Paiement à la livraison : {a} GNF encaissés, à remettre à Loomodex.', { a: fr(o.total) })}
+        </Text>
       </View>
     </View>
   );

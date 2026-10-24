@@ -66,6 +66,10 @@ export interface DeliveryOrder {
   arrival_time: string | null;
   delivery_time: string | null;
   date: string | null;
+  /** How the delivery was confirmed: customer's code, or forced by Loomodex logistics. */
+  delivery_confirmation?: 'code' | 'forced' | null;
+  /** Name of the logistics manager who forced it (only when forced). */
+  forced_by?: string | null;
 }
 
 export interface AuditEntry {
