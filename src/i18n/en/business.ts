@@ -567,6 +567,14 @@ const dict: Record<string, string> = {
   'Service client': 'Customer service',
   'Gestionnaire': 'Manager',
   'Partenaire': 'Partner',
+  "• Les commandes confirmées sont préparées sous 24 h (jours ouvrables).\n• La livraison est assurée par Loomodex à Conakry, généralement en 24 à 48 h.\n• Les frais de livraison sont calculés selon votre zone et affichés avant la validation de la commande.\n• Le livreur vous contacte avant de passer ; un code de livraison vous est demandé à la remise.": "• Confirmed orders are prepared within 24 hours (working days).\n• Delivery is handled by Loomodex in Conakry, usually within 24 to 48 hours.\n• Delivery fees depend on your area and are shown before you confirm the order.\n• The driver calls you before coming; you will be asked for a delivery code on handover.",
+  "• Retour accepté sous 7 jours après la livraison si l'article est défectueux, endommagé ou ne correspond pas à la commande.\n• L'article doit être rendu dans son état d'origine, avec son emballage et ses accessoires.\n• Contactez le service client Loomodex pour ouvrir une demande de retour.\n• Après vérification, l'article est échangé ou remboursé (sur le portefeuille Loomodex ou par le moyen de paiement utilisé).\n• Les articles d'hygiène, alimentaires ou personnalisés ne sont ni repris ni échangés.": "• Returns are accepted within 7 days of delivery if the item is faulty, damaged or not what you ordered.\n• The item must be returned in its original condition, with its packaging and accessories.\n• Contact Loomodex customer service to open a return request.\n• After checking, the item is exchanged or refunded (to your Loomodex wallet or the payment method used).\n• Hygiene, food and personalised items cannot be returned or exchanged.",
+  'Utiliser le modèle': 'Use template',
+  'Remplacer votre texte actuel par le modèle Loomodex ?': 'Replace your current text with the Loomodex template?',
+  'Remplacer': 'Replace',
+  'Délais de préparation, zones et frais de livraison.': 'Preparation times, areas and delivery fees.',
+  'Conditions de retour, délais et mode de remboursement.': 'Return conditions, deadlines and refund method.',
+  'Affichée aux clients sur votre boutique et sur chaque produit.': 'Shown to customers on your store and on every product.',
 };
 
 export default dict;

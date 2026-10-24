@@ -791,6 +791,64 @@ export function ScreenVendorOrder() {
 }
 
 // ── Vendor: store settings (address + GPS pin + policies) ──────
+const POLICY_MAX = 2000;
+
+/** Ready-made Loomodex wording a seller can start from and adjust (shown in the app language). */
+function policyTemplate(kind: 'shipping' | 'refund') {
+  return kind === 'shipping'
+    ? t("• Les commandes confirmées sont préparées sous 24 h (jours ouvrables).\n• La livraison est assurée par Loomodex à Conakry, généralement en 24 à 48 h.\n• Les frais de livraison sont calculés selon votre zone et affichés avant la validation de la commande.\n• Le livreur vous contacte avant de passer ; un code de livraison vous est demandé à la remise.")
+    : t("• Retour accepté sous 7 jours après la livraison si l'article est défectueux, endommagé ou ne correspond pas à la commande.\n• L'article doit être rendu dans son état d'origine, avec son emballage et ses accessoires.\n• Contactez le service client Loomodex pour ouvrir une demande de retour.\n• Après vérification, l'article est échangé ou remboursé (sur le portefeuille Loomodex ou par le moyen de paiement utilisé).\n• Les articles d'hygiène, alimentaires ou personnalisés ne sont ni repris ni échangés.");
+}
+
+/** Multi-line store policy editor with a counter and an optional starting template. */
+function PolicyEditor({ kind, value, onChange }: { kind: 'shipping' | 'refund'; value: string; onChange: (v: string) => void }) {
+  const shipping = kind === 'shipping';
+  const applyTemplate = () => {
+    const tpl = policyTemplate(kind);
+    if (!value.trim()) { onChange(tpl); return; }
+    Alert.alert(t('Utiliser le modèle'), t('Remplacer votre texte actuel par le modèle Loomodex ?'), [
+      { text: t('Annuler'), style: 'cancel' },
+      { text: t('Remplacer'), onPress: () => onChange(tpl) },
+    ]);
+  };
+  return (
+    <View style={{ backgroundColor: LMX.surface, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.border, padding: 14, gap: 12 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: shipping ? LMX.brandSoft : LMX.accentSoft, alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name={shipping ? 'truck' : 'refresh'} size={16} color={shipping ? LMX.brand : LMX.accent} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 13.5, fontFamily: sans(700), color: LMX.ink }}>{shipping ? t('Politique de livraison') : t('Politique de remboursement')}</Text>
+          <Text style={{ fontSize: 11, color: LMX.ink50, marginTop: 1 }}>
+            {shipping ? t('Délais de préparation, zones et frais de livraison.') : t('Conditions de retour, délais et mode de remboursement.')}
+          </Text>
+        </View>
+      </View>
+      <TextInput
+        value={value}
+        onChangeText={v => onChange(v.slice(0, POLICY_MAX))}
+        placeholder={shipping ? t('Décrivez vos délais et conditions de livraison') : t('Décrivez vos conditions de retour / remboursement')}
+        placeholderTextColor={LMX.ink50}
+        multiline
+        maxLength={POLICY_MAX}
+        onFocus={notifyInputFocus}
+        style={{
+          minHeight: 140, textAlignVertical: 'top', backgroundColor: LMX.bg, borderWidth: 1, borderColor: LMX.border, borderRadius: 12,
+          paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, lineHeight: 20, color: LMX.ink, fontFamily: sans(400),
+        }}
+      />
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Pressable onPress={applyTemplate} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: LMX.border }}>
+          <Icon name="list" size={13} color={LMX.ink70} />
+          <Text style={{ fontSize: 12, fontFamily: sans(600), color: LMX.ink70 }}>{t('Utiliser le modèle')}</Text>
+        </Pressable>
+        <Text style={{ fontSize: 11, color: LMX.ink50, fontFamily: mono(400) }}>{value.length}/{POLICY_MAX}</Text>
+      </View>
+      <Text style={{ fontSize: 11, color: LMX.ink50, lineHeight: 16 }}>{t('Affichée aux clients sur votre boutique et sur chaque produit.')}</Text>
+    </View>
+  );
+}
+
 export function ScreenVendorStore() {
   const nav = useNavigation<any>();
   const [name, setName]         = useState('');
@@ -895,8 +953,8 @@ export function ScreenVendorStore() {
             <StoreAddressForm value={addr} onChange={setAddr} confirmed={pinConfirmed} onConfirmedChange={setPinConfirmed} mapsKey={mapsKey} />
           </View>
 
-          <Field label={t('Politique de livraison')} value={shipping} onChangeText={setShipping} placeholder={t('Décrivez vos délais et conditions de livraison')} />
-          <Field label={t('Politique de remboursement')} value={refund} onChangeText={setRefund} placeholder={t('Décrivez vos conditions de retour / remboursement')} />
+          <PolicyEditor kind="shipping" value={shipping} onChange={setShipping} />
+          <PolicyEditor kind="refund" value={refund} onChange={setRefund} />
         </View>
       )}
     </Screen>
