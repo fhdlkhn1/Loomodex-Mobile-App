@@ -2048,7 +2048,6 @@ function LogisticsCard({ o, drivers, partners, onAssigned }: { o: DeliveryOrder;
       </View>
       <View style={{ paddingHorizontal: 14, paddingBottom: 4, gap: 10 }}>
         <TrackShareRow o={o} />
-        <AuditHistory log={o.audit_log} statusLabel={statusLabelFor} />
       </View>
       <View style={{ padding: 14, borderTopWidth: 1, borderTopColor: LMX.hairline, gap: 10 }}>
         {o.driver_name ? (
@@ -2136,6 +2135,10 @@ function LogisticsCard({ o, drivers, partners, onAssigned }: { o: DeliveryOrder;
           )}
         </View>
       )}
+      {/* Permanent action history — always last */}
+      <View style={{ paddingHorizontal: 14, paddingBottom: 14 }}>
+        <AuditHistory log={o.audit_log} statusLabel={statusLabelFor} />
+      </View>
       <ReasonSheet visible={overrideOpen} busy={busy}
         title={t('Forcer la livraison')}
         subtitle={t('Commande {n} : marquer comme livrée sans le code du client. Indiquez le motif.', { n: o.number })}
@@ -2560,10 +2563,9 @@ export function ScreenCS() {
                 </View>
               )}
 
-              {/* Share tracking link + permanent action history */}
+              {/* Share tracking link */}
               <View style={{ paddingHorizontal: 14, paddingBottom: 12, gap: 10 }}>
                 <TrackShareRow o={o} />
-                <AuditHistory log={o.audit_log} statusLabel={statusLabelFor} />
               </View>
 
               {/* Actions (pending only) */}
@@ -2573,6 +2575,11 @@ export function ScreenCS() {
                   <Button variant="accent" size="md" style={{ flex: 1.4 }} icon="check" onPress={() => confirm(o)} disabled={busyId === o.id}>{t('Confirmer')}</Button>
                 </View>
               )}
+
+              {/* Permanent action history — always last */}
+              <View style={{ paddingHorizontal: 14, paddingBottom: 14 }}>
+                <AuditHistory log={o.audit_log} statusLabel={statusLabelFor} />
+              </View>
             </View>
           ))}
         </View>
