@@ -270,6 +270,7 @@ const dict: Record<string, string> = {
   'En attente de confirmation du support.': 'Awaiting support confirmation.',
   'Demander position': 'Request location',
   'Renvoyer OTP': 'Resend OTP',
+  "Sans le code du client · motif obligatoire, enregistré dans l'historique": "Without the customer's code · reason required, saved in the history",
   'Forcer': 'Force',
   'En attente de la position du livreur en direct…': "Waiting for the driver's live location…",
   "La position en direct s'affiche lorsque le livreur est en route.": 'The live location shows once the driver is on the way.',

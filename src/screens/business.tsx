@@ -2115,15 +2115,25 @@ function LogisticsCard({ o, drivers, partners, onAssigned }: { o: DeliveryOrder;
       </Sheet>
 
       {(canResend || canOverride || !!o.driver_name) && (
-        <View style={{ paddingHorizontal: 14, paddingBottom: 14, flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-          {!!o.driver_name && (
-            <Button variant="ghost" size="md" style={{ flex: 1, minWidth: 150 }} icon="pin"
-              onPress={async () => { setBusy(true); try { await promptSendLocation(o.id); } finally { setBusy(false); } }} disabled={busy}>
-              {t('Demander position')}
-            </Button>
+        <View style={{ paddingHorizontal: 14, paddingBottom: 14, gap: 10 }}>
+          {/* Everyday actions side by side; the forced delivery gets its own line below */}
+          {(!!o.driver_name || canResend) && (
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {!!o.driver_name && (
+                <Button variant="ghost" size="md" style={{ flex: 1 }} icon="pin"
+                  onPress={async () => { setBusy(true); try { await promptSendLocation(o.id); } finally { setBusy(false); } }} disabled={busy}>
+                  {t('Demander position')}
+                </Button>
+              )}
+              {canResend && <Button variant="ghost" size="md" style={{ flex: 1 }} icon="arrowR" onPress={resendOtp} disabled={busy}>{t('Renvoyer OTP')}</Button>}
+            </View>
           )}
-          {canResend && <Button variant="ghost" size="md" style={{ flex: 1 }} icon="arrowR" onPress={resendOtp} disabled={busy}>{t('Renvoyer OTP')}</Button>}
-          {canOverride && <Button variant="accent" size="md" style={{ flex: 1 }} icon="shield" onPress={() => setOverrideOpen(true)} disabled={busy}>{t('Forcer la livraison')}</Button>}
+          {canOverride && (
+            <View style={{ gap: 6, paddingTop: 10, borderTopWidth: 1, borderTopColor: LMX.hairline }}>
+              <Button full variant="accent" size="md" icon="shield" onPress={() => setOverrideOpen(true)} disabled={busy}>{t('Forcer la livraison')}</Button>
+              <Text style={{ fontSize: 11, color: LMX.ink50, textAlign: 'center' }}>{t('Sans le code du client · motif obligatoire, enregistré dans l\'historique')}</Text>
+            </View>
+          )}
         </View>
       )}
       <ReasonSheet visible={overrideOpen} busy={busy}
