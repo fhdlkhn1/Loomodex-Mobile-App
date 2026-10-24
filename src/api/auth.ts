@@ -18,6 +18,13 @@ export interface User {
     banner: string | null;
     slug: string;
   };
+  /** Seller application that is not a store yet (null for stores and plain customers). */
+  store_application?: null | {
+    status: 'pending' | 'rejected';
+    store_name: string;
+    submitted_at: string | null;
+    reason: string | null;
+  };
 }
 
 export interface AuthResponse {

@@ -15,6 +15,7 @@ import {
 import { productsApi, Product as ApiProduct, HomeBanner } from '../api/products';
 import { get, friendlyError } from '../api/client';
 import { BannerCarousel } from '../components/BannerCarousel';
+import { StoreApplicationBanner } from '../components/StoreApplicationBanner';
 import { ErrorState, SkeletonRail } from '../components/StateViews';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
@@ -396,6 +397,9 @@ export function ScreenHome() {
           <Icon name="mic" size={16} color={LMX.ink50} />
         </Pressable>
       </View>
+
+      {/* Seller application waiting for (or refused by) the administrator */}
+      <StoreApplicationBanner style={{ paddingHorizontal: 16, paddingTop: 10 }} />
 
       {/* Short banner (≈ 2.6:1): admin banners (wp-admin → Homepage Banners); none / failed → compact built-in hero */}
       <View style={{ paddingHorizontal: 16, paddingTop: 10 }}>

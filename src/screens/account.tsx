@@ -15,6 +15,7 @@ import { profileApi } from '../api/profile';
 import { Product as ApiProduct } from '../api/products';
 import { friendlyError } from '../api/client';
 import { PhoneInput, toE164 } from '../components/PhoneInput';
+import { StoreApplicationBanner } from '../components/StoreApplicationBanner';
 import { t, locale, useLanguage, Lang } from '../i18n';
 
 // Map an API product to the shape ProductCard expects
@@ -457,6 +458,8 @@ export function ScreenAccount() {
           <Stat label={t('Avis')} value={stats ? String(stats.reviews) : '—'} />
         </View>
       </View>
+
+      <StoreApplicationBanner style={{ paddingHorizontal: 16, paddingBottom: 14 }} />
 
       {/* Settings */}
       <View style={{ paddingHorizontal: 16 }}>

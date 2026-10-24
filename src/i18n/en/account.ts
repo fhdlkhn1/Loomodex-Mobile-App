@@ -435,6 +435,12 @@ const dict: Record<string, string> = {
   "Un code vient déjà d'être envoyé. Réessayez dans un instant.": 'A code was just sent. Try again in a moment.',
   "Cette commande n'a plus besoin de code de livraison.": 'This order no longer needs a delivery code.',
   'Demander un nouveau code': 'Request a new code',
+  "Boutique en attente d'approbation": 'Store awaiting approval',
+  'Demande de boutique refusée': 'Store application declined',
+  "Votre boutique%s est en cours de vérification par l'administrateur. Vous pourrez vendre dès qu'elle sera approuvée ; vous recevrez une notification.": 'Your store%s is being reviewed by the administrator. You can start selling as soon as it is approved; you will get a notification.',
+  "Votre demande de boutique%s n'a pas été acceptée.": 'Your store application%s was not accepted.',
+  'Motif :': 'Reason:',
+  'Contacter le support': 'Contact support',
 };
 
 export default dict;
