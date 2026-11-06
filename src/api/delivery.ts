@@ -16,7 +16,7 @@ export interface DeliveryOrder {
   customer_phone: string;
   /** The person receiving the parcel — who the driver should call. Falls back to customer_phone. */
   recipient_phone: string;
-  /** Recipient's name (the buyer's name when the buyer receives the order). */
+  /** Recipient's name when someone other than the buyer receives the order ('' when not entered). */
   recipient_name?: string;
   recipient_is_customer: boolean;
   whatsapp: string;

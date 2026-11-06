@@ -60,14 +60,28 @@ export function LiveMap({ mapsKey, driver, destination, height = 240, destinatio
   // Bumped when the system kills the WebView renderer (memory pressure) → remount the map
   // instead of letting Android close the whole app.
   const [renderKey, setRenderKey] = useState(0);
-  const initial = useRef({ driver, destination, extra });
+  // Latest positions: the map page is (re)built from them, so a page rebuilt after a renderer
+  // crash starts with the current driver / destination instead of the first-mount values.
+  const latest = useRef({ driver, destination, extra });
+  latest.current = { driver, destination, extra };
 
-  const html = useMemo(() => buildHtml(mapsKey, initial.current.driver, initial.current.destination, {
+  const html = useMemo(() => buildHtml(mapsKey, latest.current.driver, latest.current.destination, {
     destLabel: destinationLabel, destColor: destinationColor,
-    extra: initial.current.extra ?? null,
+    extra: latest.current.extra ?? null,
     driverTitle: driverLabel || t('Livreur'), destTitle: t('Destination'),
     lang: getLanguage(),
-  }), [mapsKey]);
+  }), [mapsKey, renderKey]);
+
+  // Once the page has loaded, send the current positions again: the GPS watch only reports
+  // movement, so a standing driver would otherwise stay off a freshly (re)loaded map.
+  const onLoadEnd = () => {
+    const { driver: d, destination: dest, extra: x } = latest.current;
+    const js: string[] = [];
+    if (d) js.push(`window.lmxUpdateDriver && window.lmxUpdateDriver(${d.lat}, ${d.lng});`);
+    if (has(dest)) js.push(`window.lmxUpdateDest && window.lmxUpdateDest(${dest.lat}, ${dest.lng});`);
+    if (has(x)) js.push(`window.lmxUpdateExtra && window.lmxUpdateExtra(${x.lat}, ${x.lng});`);
+    if (js.length && ref.current) ref.current.injectJavaScript(js.join(' ') + ' true;');
+  };
   // Stable source object — prevents the WebView from reloading the map on every re-render (polling)
   const source = useMemo(() => ({ html }), [html]);
 
@@ -106,6 +120,7 @@ export function LiveMap({ mapsKey, driver, destination, height = 240, destinatio
         domStorageEnabled
         scrollEnabled={false}
         setSupportMultipleWindows={false}
+        onLoadEnd={onLoadEnd}
         onRenderProcessGone={() => setRenderKey(k => k + 1)}
         onContentProcessDidTerminate={() => setRenderKey(k => k + 1)}
         onMessage={(e) => {
