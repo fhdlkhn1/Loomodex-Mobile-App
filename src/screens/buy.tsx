@@ -789,6 +789,7 @@ export function ScreenCheckout() {
   // Recipient — the person who actually receives the parcel. Customers here often
   // order for family/friends, so this is frequently not the buyer. Defaults to "same".
   const [recipientSame, setRecipientSame]   = useState(true);
+  const [recipientName, setRecipientName]   = useState('');
   const [recipientPhone, setRecipientPhone] = useState('');
   // Delivery
   const [zoneKey, setZoneKey]         = useState('');
@@ -912,10 +913,13 @@ export function ScreenCheckout() {
     if (cart.items.length === 0) { Alert.alert(t('Panier vide')); return; }
     if (quoteBlocking) return;
     if (!region) { Alert.alert(t('Localisation requise'), t("Indiquez si vous êtes en Guinée ou à l'étranger.")); return; }
+    // A phone field holding only the country code (e.g. "+224") is still empty.
+    const phoneOk = (v: string) => v.replace(/\D/g, '').length >= 8;
     const missing =
       !firstName.trim() ? 'le prénom' :
-      !phone.trim()     ? 'le téléphone' :
-      (!recipientSame && !recipientPhone.trim()) ? 'le téléphone du destinataire' :
+      !phoneOk(phone)   ? "le téléphone de l'acheteur" :
+      (!recipientSame && !recipientName.trim()) ? 'le nom du destinataire' :
+      (!recipientSame && !phoneOk(recipientPhone)) ? 'le téléphone du destinataire' :
       !zoneKey          ? 'la zone de livraison' :
       !communeKey       ? 'la commune' :
       !neighborhood     ? 'le quartier' :
@@ -929,6 +933,7 @@ export function ScreenCheckout() {
         phone, whatsapp, zone: zoneKey, commune: communeKey,
         commune_name: commune?.label ?? '', neighborhood, landmark,
         recipient_same: recipientSame,
+        recipient_name: recipientSame ? '' : recipientName.trim(),
         recipient_phone: recipientSame ? phone : recipientPhone.trim(),
       };
       const locParams = {
@@ -1039,13 +1044,13 @@ export function ScreenCheckout() {
 
       {/* Billing details */}
       <View style={{ paddingHorizontal: 16, paddingBottom: 6 }}>
-        <Text style={{ fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600), marginBottom: 10 }}>{t('Coordonnées')}</Text>
+        <Text style={{ fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600), marginBottom: 10 }}>{t("Acheteur (vous)")}</Text>
         <View style={{ gap: 12 }}>
           <View style={{ flexDirection: 'row', gap: 10 }}>
             <View style={{ flex: 1 }}><Field label={t('Prénom *')} value={firstName} onChangeText={setFirstName} /></View>
             <View style={{ flex: 1 }}><Field label={t('Nom')} value={lastName} onChangeText={setLastName} /></View>
           </View>
-          <PhoneInput label={t('Numéro de téléphone *')} value={phone} onChange={setPhone} />
+          <PhoneInput label={t("Téléphone de l'acheteur *")} value={phone} onChange={setPhone} />
           <PhoneInput label={t('Numéro WhatsApp')} value={whatsapp} onChange={setWhatsapp} />
           {isGuest && (
             <Field label={t('Email (optionnel — pour le lien de suivi)')} value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
@@ -1070,16 +1075,19 @@ export function ScreenCheckout() {
               {recipientSame && <Icon name="check" size={13} color="#fff" />}
             </View>
             <Text style={{ flex: 1, fontSize: 12.5, color: LMX.ink70, fontFamily: sans(500) }}>
-              {t('Le destinataire est la même personne que le client')}
+              {t("Le destinataire est la même personne que l'acheteur")}
             </Text>
           </Pressable>
 
           {!recipientSame && (
-            <PhoneInput
-              label={t('Téléphone du destinataire *')}
-              value={recipientPhone}
-              onChange={setRecipientPhone}
-            />
+            <>
+              <Field label={t('Nom complet du destinataire *')} value={recipientName} onChangeText={setRecipientName} autoCapitalize="words" />
+              <PhoneInput
+                label={t('Téléphone du destinataire *')}
+                value={recipientPhone}
+                onChange={setRecipientPhone}
+              />
+            </>
           )}
 
           <Text style={{ fontSize: 11, color: LMX.ink50, lineHeight: 15 }}>

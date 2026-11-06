@@ -146,7 +146,9 @@ function PartnerOrderCard({ o, onAssign, onIncident, onMap }: { o: DeliveryOrder
           {!!p?.phone && <Text style={{ fontSize: 11.5, color: LMX.ink50, marginTop: 1 }}>{p.phone}</Text>}
         </InfoRow>
         <InfoRow icon="pin" label={t('Livraison')} onCall={custPhone ? () => call(custPhone) : undefined}>
-          <Text style={{ fontSize: 12.5, fontFamily: sans(600), color: LMX.ink }}>{o.customer_name}{o.recipient_is_customer === false ? ` · ${t('destinataire')}` : ''}</Text>
+          <Text style={{ fontSize: 12.5, fontFamily: sans(600), color: LMX.ink }}>
+            {o.recipient_is_customer === false ? `${o.recipient_name || o.customer_name} · ${t('destinataire')}` : o.customer_name}
+          </Text>
           {!!custPhone && <Text style={{ fontSize: 11.5, color: LMX.ink50, marginTop: 1 }}>{custPhone}</Text>}
           {!!destAddr && <Text style={{ fontSize: 12, color: LMX.ink70, marginTop: 1, lineHeight: 17 }}>{destAddr}</Text>}
           {!!o.landmark && <Text style={{ fontSize: 11.5, color: LMX.ink50, marginTop: 1 }}>{t('Repère : {l}', { l: o.landmark })}</Text>}

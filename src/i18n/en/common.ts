@@ -28,6 +28,7 @@ const common: Record<string, string> = {
   "Attendez : le magasin n'a pas encore emballé le colis. Vous serez prévenu dès qu'il sera prêt.": "Wait: the store has not packed the parcel yet. You will be notified as soon as it is ready.",
   'Français': 'French',
   'English': 'English',
+  "Appuyez sur « Réessayer ». Si le problème continue, fermez puis rouvrez l'application.": "Tap \"Retry\". If the problem continues, close and reopen the app.",
 };
 
 export default common;

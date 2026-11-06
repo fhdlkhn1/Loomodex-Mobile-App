@@ -16,6 +16,8 @@ export interface DeliveryOrder {
   customer_phone: string;
   /** The person receiving the parcel — who the driver should call. Falls back to customer_phone. */
   recipient_phone: string;
+  /** Recipient's name (the buyer's name when the buyer receives the order). */
+  recipient_name?: string;
   recipient_is_customer: boolean;
   whatsapp: string;
   /** Pickup code the driver shows/tells the store; the store enters it to release the order. */

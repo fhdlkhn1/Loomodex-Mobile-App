@@ -1,6 +1,6 @@
 import 'react-native-gesture-handler';
 import React, { useCallback, useEffect } from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -36,17 +36,36 @@ const navTheme = {
   },
 };
 
+// Fatal JS errors raised outside rendering (timers, callbacks) would close the app in a
+// release build. Route them to the error screen below instead, so the user sees a message
+// with "Retry" rather than the app disappearing.
+let showFatal: ((e: Error) => void) | null = null;
+const ErrorUtilsGlobal = (global as any).ErrorUtils;
+if (ErrorUtilsGlobal?.setGlobalHandler) {
+  const defaultHandler = ErrorUtilsGlobal.getGlobalHandler?.();
+  ErrorUtilsGlobal.setGlobalHandler((error: Error, isFatal?: boolean) => {
+    if (__DEV__ || !isFatal || !showFatal) { defaultHandler?.(error, isFatal); return; }
+    showFatal(error);
+  });
+}
+
 // Catches render/runtime crashes so the app never gets stuck on the splash logo
 class AppErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null };
   static getDerivedStateFromError(error: Error) { return { error }; }
+  componentDidMount() { showFatal = (error) => this.setState({ error }); }
+  componentWillUnmount() { showFatal = null; }
   componentDidCatch() { SplashScreen.hideAsync().catch(() => {}); }
   render() {
     if (this.state.error) {
       return (
         <View style={{ flex: 1, backgroundColor: LMX.bg, alignItems: 'center', justifyContent: 'center', padding: 28, gap: 10 }}>
           <Text style={{ fontSize: 16, fontWeight: '700', color: LMX.ink, textAlign: 'center' }}>{t('Une erreur est survenue')}</Text>
-          <Text style={{ fontSize: 13, color: LMX.ink70, textAlign: 'center' }}>{t("Veuillez fermer puis rouvrir l'application.")}</Text>
+          <Text style={{ fontSize: 13, color: LMX.ink70, textAlign: 'center' }}>{t("Appuyez sur « Réessayer ». Si le problème continue, fermez puis rouvrez l'application.")}</Text>
+          <Pressable onPress={() => this.setState({ error: null })}
+            style={{ marginTop: 8, paddingHorizontal: 22, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: LMX.brand }}>
+            <Text style={{ fontSize: 14, fontWeight: '700', color: '#fff' }}>{t('Réessayer')}</Text>
+          </Pressable>
         </View>
       );
     }

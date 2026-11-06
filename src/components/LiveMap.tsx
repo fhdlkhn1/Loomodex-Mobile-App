@@ -1,13 +1,26 @@
-import React, { useMemo, useRef, useEffect } from 'react';
+import React, { useMemo, useRef, useEffect, useState } from 'react';
 import { View, Text } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { LMX, sans } from '../theme';
-import { t } from '../i18n';
+import { t, getLanguage } from '../i18n';
 
 export interface LatLng { lat: number; lng: number; }
 
 /** A labelled pin that is shown on the map but not part of the driving route. */
 export interface MapPin { lat?: number | null; lng?: number | null; label?: string; color?: string; }
+
+/** One turn-by-turn instruction of the driving route. */
+export interface NavStep { text: string; distance: string; maneuver?: string; }
+
+/** Route / map health, reported by the map so screens can show a clear message + "Retry". */
+export type RouteStatus =
+  | { kind: 'ok' }
+  /** Road route unavailable — a straight line is drawn. reason = Google status (REQUEST_DENIED, ZERO_RESULTS…). */
+  | { kind: 'fallback'; reason: string; km: number }
+  /** The destination address could not be located. */
+  | { kind: 'nodest' }
+  /** Google Maps itself failed: 'auth' = key refused / billing, 'load' = no connection. */
+  | { kind: 'map-error'; reason: 'auth' | 'load' };
 
 /** Pin colours shared by every map (legend + markers). */
 export const PIN_COLOR = { store: '#FF7A00', customer: '#10B981', driver: '#1E6BFF' } as const;
@@ -25,7 +38,8 @@ interface LiveMapProps {
   extra?: MapPin | null;
   /** Name shown when the driver pin is tapped. */
   driverLabel?: string;
-  onEta?: (eta: { duration: string; distance: string }) => void;
+  onEta?: (eta: { duration: string; distance: string; steps?: NavStep[] }) => void;
+  onRouteStatus?: (status: RouteStatus) => void;
   /** Change this number to re-centre the map on the route (e.g. a "Recentrer" button). */
   recenterKey?: number;
   /** Corner radius / border (full-screen navigation uses false). */
@@ -41,14 +55,18 @@ const has = (p?: { lat?: number | null; lng?: number | null } | null): p is { la
  * driving route driver → destination, and reports the ETA + distance back to React Native
  * via postMessage. Position changes are injected so the map never reloads.
  */
-export function LiveMap({ mapsKey, driver, destination, height = 240, destinationLabel, destinationColor, extra, driverLabel, onEta, recenterKey, rounded = true }: LiveMapProps) {
+export function LiveMap({ mapsKey, driver, destination, height = 240, destinationLabel, destinationColor, extra, driverLabel, onEta, onRouteStatus, recenterKey, rounded = true }: LiveMapProps) {
   const ref = useRef<WebView>(null);
+  // Bumped when the system kills the WebView renderer (memory pressure) → remount the map
+  // instead of letting Android close the whole app.
+  const [renderKey, setRenderKey] = useState(0);
   const initial = useRef({ driver, destination, extra });
 
   const html = useMemo(() => buildHtml(mapsKey, initial.current.driver, initial.current.destination, {
     destLabel: destinationLabel, destColor: destinationColor,
     extra: initial.current.extra ?? null,
     driverTitle: driverLabel || t('Livreur'), destTitle: t('Destination'),
+    lang: getLanguage(),
   }), [mapsKey]);
   // Stable source object — prevents the WebView from reloading the map on every re-render (polling)
   const source = useMemo(() => ({ html }), [html]);
@@ -79,6 +97,7 @@ export function LiveMap({ mapsKey, driver, destination, height = 240, destinatio
   return (
     <View style={[{ height, overflow: 'hidden', backgroundColor: '#EAE6DA' }, rounded && { borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.border }]}>
       <WebView
+        key={renderKey}
         ref={ref}
         originWhitelist={['*']}
         source={source}
@@ -87,10 +106,19 @@ export function LiveMap({ mapsKey, driver, destination, height = 240, destinatio
         domStorageEnabled
         scrollEnabled={false}
         setSupportMultipleWindows={false}
+        onRenderProcessGone={() => setRenderKey(k => k + 1)}
+        onContentProcessDidTerminate={() => setRenderKey(k => k + 1)}
         onMessage={(e) => {
           try {
             const msg = JSON.parse(e.nativeEvent.data);
-            if (msg?.type === 'eta' && onEta) onEta({ duration: msg.duration, distance: msg.distance });
+            if (msg?.type === 'eta' && onEta) onEta({ duration: msg.duration, distance: msg.distance, steps: msg.steps });
+            else if (msg?.type === 'route' && onRouteStatus) {
+              if (msg.status === 'ok') onRouteStatus({ kind: 'ok' });
+              else if (msg.status === 'nodest') onRouteStatus({ kind: 'nodest' });
+              else onRouteStatus({ kind: 'fallback', reason: String(msg.reason || ''), km: Number(msg.km) || 0 });
+            } else if (msg?.type === 'maperror' && onRouteStatus) {
+              onRouteStatus({ kind: 'map-error', reason: msg.reason === 'auth' ? 'auth' : 'load' });
+            }
           } catch {}
         }}
       />
@@ -116,7 +144,7 @@ export function MapLegend({ items }: { items: { color: string; label: string }[]
 const js = (v: unknown) => JSON.stringify(v).replace(/</g, '\\u003c');
 
 function buildHtml(key: string, driver: LatLng | null, dest: LiveMapProps['destination'], o: {
-  destLabel?: string; destColor?: string; extra: MapPin | null; driverTitle: string; destTitle: string;
+  destLabel?: string; destColor?: string; extra: MapPin | null; driverTitle: string; destTitle: string; lang: string;
 }): string {
   // Only geocode when there is an actual address to look up (no pin and no address = no destination pin).
   const destAddress = (dest.address || dest.city) ? `${dest.address ?? ''} ${dest.city ?? 'Conakry'}, Guinée`.trim() : '';
@@ -147,6 +175,11 @@ function buildHtml(key: string, driver: LatLng | null, dest: LiveMapProps['desti
   var userMoved = false;   // the viewer panned the map: stop auto-fitting until "recentre"
 
   function post(o){ try { window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify(o)); } catch(e){} }
+  // Google calls this when the key is refused (invalid key, API not enabled, billing off).
+  window.gm_authFailure = function(){ post({type:'maperror', reason:'auth'}); };
+  function stepText(html){
+    return String(html||'').replace(/<div[^>]*>/g,' — ').replace(/<[^>]+>/g,'').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/\\s+/g,' ').trim();
+  }
   function esc(s){ return String(s).replace(/[<>&]/g,''); }
 
   // Great-circle distance (km) — no Directions/geometry library needed.
@@ -196,10 +229,14 @@ function buildHtml(key: string, driver: LatLng | null, dest: LiveMapProps['desti
         useFallback = false; clearFallbackLine();
         dirRenderer.setDirections(res);
         var leg = res.routes[0].legs[0];
-        post({type:'eta', duration:leg.duration.text, distance:leg.distance.text});
+        var steps = (leg.steps||[]).map(function(s){ return {text:stepText(s.instructions), distance:(s.distance&&s.distance.text)||'', maneuver:s.maneuver||''}; });
+        post({type:'eta', duration:leg.duration.text, distance:leg.distance.text, steps:steps});
+        post({type:'route', status:'ok'});
       } else {
         // Directions unavailable (REQUEST_DENIED / OVER_QUERY_LIMIT / ZERO_RESULTS / billing off)
         useFallback = true; drawFallbackLine();
+        var km = haversine(driverMarker.getPosition(), destMarker.getPosition());
+        post({type:'route', status:'fallback', reason:String(st), km:km});
       }
     });
   }
@@ -249,10 +286,10 @@ function buildHtml(key: string, driver: LatLng | null, dest: LiveMapProps['desti
     if(EXTRA_LL){ lmxUpdateExtra(EXTRA_LL.lat, EXTRA_LL.lng); }
     if(DRIVER){ lmxUpdateDriver(DRIVER.lat, DRIVER.lng); }
     if(DEST_LL){ placeDest(DEST_LL); }
-    else if(DEST_ADDR){ new google.maps.Geocoder().geocode({address:DEST_ADDR}, function(r,s){ if(s==='OK' && r[0]){ placeDest(r[0].geometry.location); } }); }
+    else if(DEST_ADDR){ new google.maps.Geocoder().geocode({address:DEST_ADDR}, function(r,s){ if(s==='OK' && r[0]){ placeDest(r[0].geometry.location); } else { post({type:'route', status:'nodest'}); } }); }
   }
   window.initMap = initMap;
 </script>
-<script async src="https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&callback=initMap"></script>
+<script async src="https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&language=${encodeURIComponent(o.lang)}&region=GN&callback=initMap" onerror="post({type:'maperror', reason:'load'})"></script>
 </body></html>`;
 }

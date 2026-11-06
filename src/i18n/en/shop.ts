@@ -381,6 +381,12 @@ const dict: Record<string, string> = {
   'Menu': 'Menu',
   'Vos achats, livrés avec soin !': 'Your purchases, delivered with care!',
   'Confiance garantie': 'Guaranteed trust',
+  "le téléphone de l'acheteur": "the buyer's phone",
+  "le nom du destinataire": "the recipient's name",
+  "Acheteur (vous)": "Buyer (you)",
+  "Téléphone de l'acheteur *": "Buyer's phone *",
+  "Le destinataire est la même personne que l'acheteur": "The recipient is the same person as the buyer",
+  "Nom complet du destinataire *": "Recipient's full name *",
 };
 
 export default dict;

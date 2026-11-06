@@ -592,6 +592,19 @@ const dict: Record<string, string> = {
   'Délais de préparation, zones et frais de livraison.': 'Preparation times, areas and delivery fees.',
   'Conditions de retour, délais et mode de remboursement.': 'Return conditions, deadlines and refund method.',
   'Affichée aux clients sur votre boutique et sur chaque produit.': 'Shown to customers on your store and on every product.',
+  "Autorisez la localisation pour Loomodex afin de calculer votre itinéraire.": "Allow location access for Loomodex to calculate your route.",
+  "La localisation (GPS) de votre téléphone est désactivée. Activez-la puis réessayez.": "Your phone's location (GPS) is turned off. Turn it on and try again.",
+  "Impossible d'obtenir votre position. Vérifiez que le GPS est activé, de préférence à l'extérieur, puis réessayez.": "Could not get your position. Check that GPS is on, preferably outdoors, then try again.",
+  "La localisation a rencontré une erreur. Réessayez.": "Location ran into an error. Please try again.",
+  "La carte Google Maps est refusée (clé ou facturation Google Cloud). Contactez Loomodex.": "Google Maps refused the map (key or Google Cloud billing). Contact Loomodex.",
+  "Impossible de charger la carte. Vérifiez votre connexion Internet.": "Could not load the map. Check your internet connection.",
+  "L'adresse de destination est introuvable sur la carte.": "The destination address could not be found on the map.",
+  "Aucun itinéraire routier trouvé : vous êtes trop loin de la destination ({km} km à vol d'oiseau).": "No road route found: you are too far from the destination ({km} km in a straight line).",
+  "Itinéraire routier indisponible (service Google Directions non activé). La distance affichée est à vol d'oiseau.": "Road route unavailable (Google Directions service not enabled). The distance shown is in a straight line.",
+  "Itinéraire routier indisponible pour le moment. La distance affichée est à vol d'oiseau.": "Road route unavailable for now. The distance shown is in a straight line.",
+  "Paramètres": "Settings",
+  "Itinéraire étape par étape": "Turn-by-turn directions",
+  "Acheteur": "Buyer",
 };
 
 export default dict;

@@ -14,7 +14,8 @@ import { Picker } from '../components/Picker';
 import { useAuth } from '../context/AuthContext';
 import { get, post, friendlyError, isApiError } from '../api/client';
 import { ordersApi, Order, OrderTracking } from '../api/orders';
-import { LiveMap } from '../components/LiveMap';
+import { LiveMap, RouteStatus } from '../components/LiveMap';
+import { useLivePosition } from '../hooks/useLivePosition';
 import { OrderLocationMap, OrderMapSheet, MapButton } from '../components/OrderLocationMap';
 import { configApi } from '../api/config';
 import { Product as ApiProduct } from '../api/products';
@@ -28,7 +29,7 @@ import { t, locale } from '../i18n';
 import { quoteLineLabel } from '../components/FeeBreakdown';
 import { notifyInputFocus } from '../hooks/useKeyboardScroll';
 import { DeliveryCodeVerify } from '../components/DeliveryCodeVerify';
-import { NavigateButton, navTargetFor } from './driverNav';
+import { NavigateButton, navTargetFor, navProblem, NavProblemBox } from './driverNav';
 
 function Chart() {
   const pts = [10, 18, 12, 28, 22, 40, 32, 46, 38, 52, 44, 58];
@@ -1244,17 +1245,27 @@ export function ScreenDriver() {
     if (!available || !appActive || inProgress) return;
     let cancelled = false;
     let granted = false;
+    let inFlight = false;
     const send = async () => {
-      if (!granted || cancelled) return;
+      // Never stack location requests: on a device without a fix, a request can hang far
+      // longer than the 60 s interval.
+      if (!granted || cancelled || inFlight) return;
+      inFlight = true;
       try {
-        const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-        if (!cancelled) driverApi.updateLocation(pos.coords.latitude, pos.coords.longitude, pos.coords.heading ?? 0).catch(() => {});
+        const pos = await Promise.race([
+          Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+          new Promise<null>(res => setTimeout(() => res(null), 20000)),
+        ]) ?? await Location.getLastKnownPositionAsync().catch(() => null);
+        if (pos && !cancelled) driverApi.updateLocation(pos.coords.latitude, pos.coords.longitude, pos.coords.heading ?? 0).catch(() => {});
       } catch {}
+      finally { inFlight = false; }
     };
     (async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      granted = status === 'granted';
-      send();
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        granted = status === 'granted';
+        send();
+      } catch {}
     })();
     const t = setInterval(send, 60000);
     return () => { cancelled = true; clearInterval(t); };
@@ -1265,12 +1276,15 @@ export function ScreenDriver() {
     let sub: Location.LocationSubscription | null = null;
     let cancelled = false;
     (async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted' || cancelled) return;
-      sub = await Location.watchPositionAsync(
-        { accuracy: Location.Accuracy.High, timeInterval: 12000, distanceInterval: 20 },
-        pos => { driverApi.updateLocation(pos.coords.latitude, pos.coords.longitude, pos.coords.heading ?? 0).catch(() => {}); }
-      );
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted' || cancelled) return;
+        const s = await Location.watchPositionAsync(
+          { accuracy: Location.Accuracy.High, timeInterval: 12000, distanceInterval: 20 },
+          pos => { driverApi.updateLocation(pos.coords.latitude, pos.coords.longitude, pos.coords.heading ?? 0).catch(() => {}); }
+        );
+        if (cancelled) s.remove(); else sub = s;
+      } catch {}
     })();
     return () => { cancelled = true; if (sub) sub.remove(); };
   }, [inProgress, appActive]);
@@ -1512,7 +1526,7 @@ function DriverContactButtons({ o }: { o: DeliveryOrder }) {
         style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: LMX.brandSoft, alignItems: 'center', justifyContent: 'center' }}>
         <Icon name="phone" size={17} color={LMX.brand} />
       </Pressable>
-      <Pressable onPress={() => whatsapp(o.whatsapp || o.recipient_phone || o.customer_phone)} hitSlop={4} accessibilityLabel="WhatsApp"
+      <Pressable onPress={() => whatsapp(o.recipient_is_customer === false ? o.recipient_phone : (o.whatsapp || o.recipient_phone || o.customer_phone))} hitSlop={4} accessibilityLabel="WhatsApp"
         style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: '#25D3661F', alignItems: 'center', justifyContent: 'center' }}>
         <Icon name="msg" size={17} color="#1DA851" />
       </Pressable>
@@ -1656,7 +1670,7 @@ function DriverActiveCard({ o, busy, onAdvance, onDelivered, onNavigate, onLocat
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: LMX.bg, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9 }}>
             <Icon name="user" size={14} color={LMX.ink50} />
             <Text style={{ flex: 1, fontSize: 12, color: LMX.ink70, fontFamily: sans(500) }}>
-              {t('Destinataire différent du client')} · {o.recipient_phone}
+              {t('Destinataire')} : {[o.recipient_name, o.recipient_phone].filter(Boolean).join(' · ')}
             </Text>
           </View>
         )}
@@ -1705,9 +1719,13 @@ function DriverActiveCard({ o, busy, onAdvance, onDelivered, onNavigate, onLocat
   );
 }
 
-function RouteFooter({ eta, located, label }: { eta: { duration: string; distance: string } | null; located: boolean; label: string }) {
+function RouteFooter({ eta, located, label, problem, onRetry }: {
+  eta: { duration: string; distance: string } | null; located: boolean; label: string;
+  problem?: { text: string; settings?: boolean } | null; onRetry?: () => void;
+}) {
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, backgroundColor: LMX.surface }}>
+    <View style={{ backgroundColor: LMX.surface }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12 }}>
       <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: LMX.brandSoft, alignItems: 'center', justifyContent: 'center' }}>
         <Icon name="truck" size={16} color={LMX.brand} />
       </View>
@@ -1717,6 +1735,8 @@ function RouteFooter({ eta, located, label }: { eta: { duration: string; distanc
         </Text>
         <Text style={{ fontSize: 11, color: LMX.ink50, marginTop: 1 }}>{label}</Text>
       </View>
+    </View>
+    {!!problem && !!onRetry && <View style={{ paddingHorizontal: 12, paddingBottom: 12 }}><NavProblemBox problem={problem} onRetry={onRetry} /></View>}
     </View>
   );
 }
@@ -1729,9 +1749,10 @@ export function ScreenDriverOrder() {
   const [order, setOrder] = useState<DeliveryOrder | undefined>(route.params?.order);
   const [busy, setBusy]   = useState(false);
   const [custLoc, setCustLoc] = useState<{ lat: number; lng: number } | null>(null);
-  const [myPos, setMyPos] = useState<{ lat: number; lng: number } | null>(null);
   const [mapsKey, setMapsKey] = useState('');
   const [eta, setEta] = useState<{ duration: string; distance: string } | null>(null);
+  const [routeStatus, setRouteStatus] = useState<RouteStatus | null>(null);
+  const [mapAttempt, setMapAttempt] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
 
   const beforePickup = order?.status === 'assigned-driver';
@@ -1740,7 +1761,7 @@ export function ScreenDriverOrder() {
   const stage: 'store' | 'customer' = beforePickup ? 'store' : 'customer';
 
   useEffect(() => { configApi.get().then(c => setMapsKey(c.google_maps_key ?? '')).catch(() => {}); }, []);
-  useEffect(() => { setEta(null); }, [stage]);
+  useEffect(() => { setEta(null); setRouteStatus(null); }, [stage]);
 
   const orderId = order?.id;
   const refreshOrder = useCallback(async () => {
@@ -1785,23 +1806,10 @@ export function ScreenDriverOrder() {
 
   // Driver's own live GPS — drives the in-app map AND keeps broadcasting to logistics.
   const tracking = beforePickup || active;
-  useEffect(() => {
-    if (!tracking) return;
-    let sub: Location.LocationSubscription | null = null;
-    let cancelled = false;
-    (async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted' || cancelled) return;
-      sub = await Location.watchPositionAsync(
-        { accuracy: Location.Accuracy.High, timeInterval: 8000, distanceInterval: 15 },
-        pos => {
-          setMyPos({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-          driverApi.updateLocation(pos.coords.latitude, pos.coords.longitude, pos.coords.heading ?? 0).catch(() => {});
-        }
-      );
-    })();
-    return () => { cancelled = true; if (sub) sub.remove(); };
-  }, [tracking]);
+  const gps = useLivePosition({ enabled: tracking, report: true, timeInterval: 8000, distanceInterval: 15 });
+  const myPos = gps.pos;
+  const mapProblem = navProblem(gps.status, routeStatus);
+  const retryMap = () => { setEta(null); setRouteStatus(null); gps.retry(); setMapAttempt(a => a + 1); };
 
   if (!order) {
     return (
@@ -1852,7 +1860,7 @@ export function ScreenDriverOrder() {
           storeLL && mapsKey ? (
             <View style={{ borderRadius: LMX.r.lg, overflow: 'hidden', borderWidth: 1, borderColor: LMX.border }}>
               <LiveMap
-                key="store"
+                key={`store-${mapAttempt}`}
                 mapsKey={mapsKey}
                 driver={myPos}
                 destination={storeLL}
@@ -1860,22 +1868,24 @@ export function ScreenDriverOrder() {
                 destinationColor={LMX.accent}
                 height={260}
                 onEta={setEta}
+                onRouteStatus={setRouteStatus}
               />
-              <RouteFooter eta={eta} located={!!myPos} label={t('Itinéraire vers le magasin')} />
+              <RouteFooter eta={eta} located={!!myPos} label={t('Itinéraire vers le magasin')} problem={mapProblem} onRetry={retryMap} />
             </View>
           ) : null
         ) : (
           !!mapsKey && (custLoc || order.delivery_address) && (
             <View style={{ borderRadius: LMX.r.lg, overflow: 'hidden', borderWidth: 1, borderColor: LMX.border }}>
               <LiveMap
-                key="customer"
+                key={`customer-${mapAttempt}`}
                 mapsKey={mapsKey}
                 driver={myPos}
                 destination={custLoc ? { lat: custLoc.lat, lng: custLoc.lng } : { address: order.delivery_address, city: order.city }}
                 height={260}
                 onEta={setEta}
+                onRouteStatus={setRouteStatus}
               />
-              <RouteFooter eta={eta} located={!!myPos} label={t('Itinéraire vers le client')} />
+              <RouteFooter eta={eta} located={!!myPos} label={t('Itinéraire vers le client')} problem={mapProblem} onRetry={retryMap} />
             </View>
           )
         )}
@@ -2162,7 +2172,10 @@ function LogisticsCard({ o, drivers, partners, onAssigned }: { o: DeliveryOrder;
       </View>
       <View style={{ padding: 14, gap: 10 }}>
         <NotPackedNote packedAt={o.packed_at} status={o.status} />
-        <LogiRow icon="user" label={t('Client')} value={`${o.customer_name} · ${o.customer_phone}`} />
+        <LogiRow icon="user" label={t('Acheteur')} value={[o.customer_name, o.customer_phone].filter(Boolean).join(' · ')} />
+        {o.recipient_is_customer === false && (
+          <LogiRow icon="user" label={t('Destinataire')} value={[o.recipient_name, o.recipient_phone].filter(Boolean).join(' · ')} />
+        )}
         <LogiRow icon="storefront" label={t('Retrait')} value={[o.pickup?.store, o.pickup?.address].filter(Boolean).join(' · ') || t('Vendeur')} />
         <LogiRow icon="pin" label={t('Livraison')} value={o.delivery_address || [o.address, o.neighborhood, o.city].filter(Boolean).join(', ') || 'Conakry'} />
         <LogiRow icon="money" label={t('Paiement')} value={`${o.payment_method} · ${fr(o.total)} GNF`} />
