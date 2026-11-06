@@ -1863,24 +1863,7 @@ export function ScreenDriverOrder() {
               />
               <RouteFooter eta={eta} located={!!myPos} label={t('Itinéraire vers le magasin')} />
             </View>
-          ) : (
-            <View style={{ backgroundColor: LMX.surface, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.border, padding: 14, gap: 8 }}>
-              <Text style={{ fontSize: 11, color: LMX.accent, textTransform: 'uppercase', fontFamily: sans(700) }}>{t('Itinéraire vers le magasin')}</Text>
-              {!!pk?.store && <Text style={{ fontSize: 14, fontFamily: sans(700), color: LMX.ink }}>{decodeEntities(pk.store)}</Text>}
-              <Text style={{ fontSize: 12.5, color: LMX.ink70, lineHeight: 18 }}>{storeAddress || t('Adresse du vendeur indisponible')}</Text>
-              {!storeLL && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: LMX.accentSoft, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 }}>
-                  <Icon name="pin" size={13} color={LMX.accent} />
-                  <Text style={{ flex: 1, fontSize: 11.5, color: LMX.ink70 }}>{t("Le magasin n'a pas encore enregistré sa position GPS")}</Text>
-                </View>
-              )}
-              {!!pk?.phone && (
-                <Pressable onPress={() => call(pk.phone)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 40, borderRadius: 10, backgroundColor: LMX.surfaceAlt, borderWidth: 1, borderColor: LMX.border }}>
-                  <Icon name="phone" size={14} color={LMX.ink} /><Text style={{ fontSize: 12, fontFamily: sans(600) }}>{t('Appeler le magasin')}</Text>
-                </Pressable>
-              )}
-            </View>
-          )
+          ) : null
         ) : (
           !!mapsKey && (custLoc || order.delivery_address) && (
             <View style={{ borderRadius: LMX.r.lg, overflow: 'hidden', borderWidth: 1, borderColor: LMX.border }}>
@@ -1896,6 +1879,7 @@ export function ScreenDriverOrder() {
             </View>
           )
         )}
+        {stage === 'store' && !!pk && <DriverStoreCard pk={pk} address={storeAddress} noGps={!storeLL} />}
         <DriverActiveCard o={order} busy={busy} onAdvance={advance} onDelivered={() => nav.goBack()}
           onNavigate={() => nav.navigate('DriverNavigate', { order, target: navTargetFor(order) })}
           onLocationRequest={requestLocation} onRefreshPickup={refreshPickup} refreshingPickup={refreshing} />
@@ -1904,6 +1888,45 @@ export function ScreenDriverOrder() {
   );
 }
 
+
+/** Store to pick up from (before pickup): logo, name, address + landmark, call / WhatsApp the store. */
+function DriverStoreCard({ pk, address, noGps }: { pk: NonNullable<DeliveryOrder['pickup']>; address: string; noGps: boolean }) {
+  const name = decodeEntities(pk.store) || t('Magasin');
+  return (
+    <View style={{ backgroundColor: LMX.surface, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.border, padding: 14, gap: 10 }}>
+      <Text style={{ fontSize: 11, color: LMX.accent, textTransform: 'uppercase', fontFamily: sans(700) }}>{t('Magasin de retrait')}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        {pk.logo ? (
+          <Image source={{ uri: pk.logo }} style={{ width: 52, height: 52, borderRadius: 12, backgroundColor: LMX.surfaceAlt, borderWidth: 1, borderColor: LMX.border }} />
+        ) : (
+          <View style={{ width: 52, height: 52, borderRadius: 12, backgroundColor: LMX.accentSoft, alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name="storefront" size={22} color={LMX.accent} />
+          </View>
+        )}
+        <View style={{ flex: 1 }}>
+          <Text numberOfLines={2} style={{ fontSize: 14.5, fontFamily: sans(700), color: LMX.ink }}>{name}</Text>
+          <Text style={{ fontSize: 12.5, color: LMX.ink70, lineHeight: 18, marginTop: 2 }}>{address || t('Adresse du vendeur indisponible')}</Text>
+        </View>
+      </View>
+      {noGps && (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: LMX.accentSoft, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 }}>
+          <Icon name="pin" size={13} color={LMX.accent} />
+          <Text style={{ flex: 1, fontSize: 11.5, color: LMX.ink70 }}>{t("Le magasin n'a pas encore enregistré sa position GPS")}</Text>
+        </View>
+      )}
+      {!!pk.phone && (
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <Pressable onPress={() => call(pk.phone)} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 42, borderRadius: 10, backgroundColor: LMX.surfaceAlt, borderWidth: 1, borderColor: LMX.border }}>
+            <Icon name="phone" size={14} color={LMX.ink} /><Text style={{ fontSize: 12.5, fontFamily: sans(600), color: LMX.ink }}>{t('Appeler le magasin')}</Text>
+          </Pressable>
+          <Pressable onPress={() => whatsapp(pk.phone)} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 42, borderRadius: 10, backgroundColor: '#25D366' }}>
+            <Icon name="msg" size={14} color="#fff" /><Text style={{ fontSize: 12.5, fontFamily: sans(600), color: '#fff' }}>{t('WhatsApp du magasin')}</Text>
+          </Pressable>
+        </View>
+      )}
+    </View>
+  );
+}
 
 function DriverDoneCard({ o, failed, onPress }: { o: DeliveryOrder; failed: boolean; onPress?: () => void }) {
   const color = failed ? LMX.rose : LMX.emerald;

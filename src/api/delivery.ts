@@ -85,6 +85,8 @@ export interface AuditEntry {
 
 export interface StorePickup {
   store: string;
+  /** WCFM store logo (null if the store has none). */
+  logo?: string | null;
   address: string;
   phone?: string;
   lat: number | null;

@@ -240,6 +240,8 @@ const dict: Record<string, string> = {
   'Itinéraire vers le magasin': 'Route to the store',
   "Le magasin n'a pas encore enregistré sa position GPS": 'The store has not saved its GPS location yet',
   'Appeler le magasin': 'Call the store',
+  'Magasin de retrait': 'Pickup store',
+  'WhatsApp du magasin': 'WhatsApp the store',
   'Itinéraire vers le client': 'Route to the customer',
 
   // ── Logistics ──
