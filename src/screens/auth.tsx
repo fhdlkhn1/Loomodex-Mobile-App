@@ -10,6 +10,7 @@ import { authApi } from '../api';
 import { friendlyError } from '../api/client';
 import { PhoneInput } from '../components/PhoneInput';
 import { staffHomeRoute } from '../roles';
+import { IS_DRIVERS_APP, APP_NAME } from '../appVariant';
 import { t } from '../i18n';
 
 // ── Helpers ───────────────────────────────────────────────────────
@@ -115,12 +116,20 @@ export function ScreenSignIn() {
 
   return (
     <Screen>
-      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} right={<LangToggle />} />
+      {/* Loomodex Drivers opens on this screen: there is nothing to go back to */}
+      <AppBar left={IS_DRIVERS_APP ? undefined : <IconBtn icon="chevL" onPress={() => nav.goBack()} />} right={<LangToggle />} />
       <View style={{ paddingHorizontal: 24, paddingTop: 12 }}>
-        <Text style={{ fontSize: 11, color: LMX.ink50, letterSpacing: 0.6, textTransform: 'uppercase', fontFamily: sans(600) }}>{t('Bienvenue')}</Text>
-        <Text style={{ fontFamily: FONT.display, fontSize: 36, lineHeight: 40, marginTop: 8, color: LMX.ink }}>
-          {t('Connectez-vous à')}{'\n'}<Text style={{ color: LMX.accent }}>Loomodex</Text>
+        <Text style={{ fontSize: 11, color: LMX.ink50, letterSpacing: 0.6, textTransform: 'uppercase', fontFamily: sans(600) }}>
+          {IS_DRIVERS_APP ? t('Espace livreurs et logistique') : t('Bienvenue')}
         </Text>
+        <Text style={{ fontFamily: FONT.display, fontSize: 36, lineHeight: 40, marginTop: 8, color: LMX.ink }}>
+          {t('Connectez-vous à')}{'\n'}<Text style={{ color: LMX.accent }}>{APP_NAME}</Text>
+        </Text>
+        {IS_DRIVERS_APP && (
+          <Text style={{ fontSize: 13, color: LMX.ink70, marginTop: 10, lineHeight: 19 }}>
+            {t('Utilisez le compte créé pour vous par Loomodex ou par votre société de livraison.')}
+          </Text>
+        )}
       </View>
 
       <View style={{ paddingHorizontal: 24, paddingTop: 28, gap: 16 }}>
@@ -147,6 +156,8 @@ export function ScreenSignIn() {
         }
       </View>
 
+      {/* Staff accounts are created by Loomodex: no sign-up or guest mode in Loomodex Drivers */}
+      {!IS_DRIVERS_APP && (<>
       <View style={{ paddingHorizontal: 24, paddingTop: 28, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' }}>
         <Text style={{ fontSize: 13, color: LMX.ink70 }}>{t('Nouveau sur Loomodex ?')} </Text>
         <Pressable onPress={() => nav.navigate('SignUp')}>
@@ -159,6 +170,7 @@ export function ScreenSignIn() {
           <Text style={{ fontSize: 12, color: LMX.ink50, textDecorationLine: 'underline' }}>{t('Continuer sans compte')}</Text>
         </Pressable>
       </View>
+      </>)}
     </Screen>
   );
 }

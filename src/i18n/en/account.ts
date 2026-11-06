@@ -441,6 +441,14 @@ const dict: Record<string, string> = {
   "Votre demande de boutique%s n'a pas été acceptée.": 'Your store application%s was not accepted.',
   'Motif :': 'Reason:',
   'Contacter le support': 'Contact support',
+  "Application réservée aux livreurs": "App for delivery staff only",
+  "Utilisez Loomodex Drivers": "Use Loomodex Drivers",
+  "Loomodex Drivers est réservée aux livreurs, aux responsables logistiques et aux partenaires logistiques. Pour acheter, vendre ou gérer le service client, utilisez l'application Loomodex.": "Loomodex Drivers is for drivers, logistics managers and logistics partners only. To shop, sell or handle customer service, use the Loomodex app.",
+  "Les livreurs, les responsables logistiques et les partenaires logistiques utilisent désormais l'application Loomodex Drivers. Téléchargez-la sur Google Play ou l'App Store et connectez-vous avec le même compte.": "Drivers, logistics managers and logistics partners now use the Loomodex Drivers app. Download it from Google Play or the App Store and sign in with the same account.",
+  "Se déconnecter": "Sign out",
+  "Même compte, mêmes identifiants.": "Same account, same login details.",
+  "Espace livreurs et logistique": "Drivers and logistics",
+  "Utilisez le compte créé pour vous par Loomodex ou par votre société de livraison.": "Use the account created for you by Loomodex or by your delivery company.",
 };
 
 export default dict;

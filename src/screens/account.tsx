@@ -16,6 +16,7 @@ import { Product as ApiProduct } from '../api/products';
 import { friendlyError } from '../api/client';
 import { PhoneInput, toE164 } from '../components/PhoneInput';
 import { StoreApplicationBanner } from '../components/StoreApplicationBanner';
+import { IS_DRIVERS_APP } from '../appVariant';
 import { t, locale, useLanguage, Lang } from '../i18n';
 
 // Map an API product to the shape ProductCard expects
@@ -422,7 +423,7 @@ export function ScreenAccount() {
           </Text>
           <View style={{ marginTop: 24, gap: 12, width: '100%' }}>
             <Button full variant="accent" size="lg" onPress={() => nav.navigate('SignIn')}>{t('Se connecter')}</Button>
-            <Button full variant="ghost" size="lg" onPress={() => nav.navigate('SignUp')}>{t('Créer un compte')}</Button>
+            {!IS_DRIVERS_APP && <Button full variant="ghost" size="lg" onPress={() => nav.navigate('SignUp')}>{t('Créer un compte')}</Button>}
           </View>
         </View>
       </Screen>
@@ -452,21 +453,26 @@ export function ScreenAccount() {
             <Text style={{ fontSize: 11.5, fontFamily: sans(600) }}>{t('Modifier')}</Text>
           </Pressable>
         </View>
-        <View style={{ flexDirection: 'row', gap: 1, marginTop: 18, backgroundColor: LMX.hairline, borderRadius: 14, overflow: 'hidden' }}>
-          <Stat label={t('Commandes')} value={stats ? String(stats.orders) : '—'} />
-          <Stat label={t('Favoris')} value={stats ? String(stats.wishlist) : '—'} />
-          <Stat label={t('Avis')} value={stats ? String(stats.reviews) : '—'} />
-        </View>
+        {/* Shopping stats + store application: customer app only */}
+        {!IS_DRIVERS_APP && (
+          <View style={{ flexDirection: 'row', gap: 1, marginTop: 18, backgroundColor: LMX.hairline, borderRadius: 14, overflow: 'hidden' }}>
+            <Stat label={t('Commandes')} value={stats ? String(stats.orders) : '—'} />
+            <Stat label={t('Favoris')} value={stats ? String(stats.wishlist) : '—'} />
+            <Stat label={t('Avis')} value={stats ? String(stats.reviews) : '—'} />
+          </View>
+        )}
       </View>
 
-      <StoreApplicationBanner style={{ paddingHorizontal: 16, paddingBottom: 14 }} />
+      {!IS_DRIVERS_APP && <StoreApplicationBanner style={{ paddingHorizontal: 16, paddingBottom: 14 }} />}
 
       {/* Settings */}
       <View style={{ paddingHorizontal: 16 }}>
         <View style={{ backgroundColor: LMX.surface, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.border, overflow: 'hidden' }}>
-          <SettingRow icon="pin"         label={t('Adresses')}         sub={t('Gérer mes adresses')}     onPress={() => nav.navigate('Addresses')} />
-          <SettingRow icon="wallet"      label={t('Mon portefeuille')}  sub={walletDisplay}          onPress={() => nav.navigate('Wallet')} />
-          <SettingRow icon="package"     label={t('Suivre une commande')}                            onPress={() => nav.navigate('TrackEntry')} />
+          {!IS_DRIVERS_APP && (<>
+            <SettingRow icon="pin"         label={t('Adresses')}         sub={t('Gérer mes adresses')}     onPress={() => nav.navigate('Addresses')} />
+            <SettingRow icon="wallet"      label={t('Mon portefeuille')}  sub={walletDisplay}          onPress={() => nav.navigate('Wallet')} />
+            <SettingRow icon="package"     label={t('Suivre une commande')}                            onPress={() => nav.navigate('TrackEntry')} />
+          </>)}
           <SettingRow icon="msg"       label={t('Langue')}           sub={lang === 'en' ? 'English' : 'Français'} onPress={() => setLangSheet(true)} />
           <SettingRow icon="headset"     label={t('Aide')}                                           onPress={() => nav.navigate('Help')} last />
         </View>

@@ -1,4 +1,5 @@
 import { get, post, uploadFile } from './client';
+import { APP_VARIANT } from '../appVariant';
 import { User } from './auth';
 import { Product } from './products';
 
@@ -66,8 +67,10 @@ export const profileApi = {
 
   deleteAccount: () => post<{ success: boolean; message: string }>('/profile/delete-account', {}, true),
 
-  savePushToken: (token: string) => post<{ success: boolean }>('/profile/push-token', { token }, true),
-  removePushToken: (token: string) => post<{ success: boolean }>('/profile/push-token', { token, remove: true }, true),
+  // `app` tells the server which store app the token belongs to (Loomodex / Loomodex Drivers):
+  // Expo refuses one push request mixing tokens of two apps.
+  savePushToken: (token: string) => post<{ success: boolean }>('/profile/push-token', { token, app: APP_VARIANT }, true),
+  removePushToken: (token: string) => post<{ success: boolean }>('/profile/push-token', { token, app: APP_VARIANT, remove: true }, true),
 
   wallet: () => get<WalletData>('/profile/wallet', true),
 

@@ -12,14 +12,28 @@
     "preview": {
       "distribution": "internal",
       "android": { "buildType": "apk" },
-      "ios": { "simulator": false }
+      "ios": { "simulator": false },
+      "env": { "APP_VARIANT": "customer" }
     },
     "production": {
       "autoIncrement": true,
-      "android": { "buildType": "app-bundle" }
+      "android": { "buildType": "app-bundle" },
+      "env": { "APP_VARIANT": "customer" }
+    },
+    "drivers-preview": {
+      "distribution": "internal",
+      "android": { "buildType": "apk" },
+      "ios": { "simulator": false },
+      "env": { "APP_VARIANT": "drivers" }
+    },
+    "drivers-production": {
+      "autoIncrement": true,
+      "android": { "buildType": "app-bundle" },
+      "env": { "APP_VARIANT": "drivers" }
     }
   },
   "submit": {
-    "production": {}
+    "production": {},
+    "drivers-production": {}
   }
 }

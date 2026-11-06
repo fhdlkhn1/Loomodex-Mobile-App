@@ -6,6 +6,8 @@ import { LMX } from './theme';
 import { useAuth } from './context/AuthContext';
 import { useNotifications } from './context/NotificationsContext';
 import { staffHomeRoute } from './roles';
+import { IS_DRIVERS_APP, roleAllowedInThisApp } from './appVariant';
+import { ScreenWrongApp } from './screens/wrongApp';
 import { Notifications } from './notifications';
 import { openNotificationTarget } from './notificationRouting';
 import { RoleScreenLayout } from './components/RoleTabBar';
@@ -81,9 +83,15 @@ export function RootNavigator() {
     );
   }
 
+  // Signed in to the wrong store app (e.g. a customer in Loomodex Drivers): only sign out.
+  if (isLoggedIn && !roleAllowedInThisApp(user?.roles)) return <ScreenWrongApp />;
+
   // On launch: customers → shop; staff → straight to their dashboard (so a driver never
-  // reopens the app onto the shopping home and gets lost).
-  const initialRoute = !isLoggedIn ? 'Splash' : (staffHomeRoute(user?.roles) ?? 'Main');
+  // reopens the app onto the shopping home and gets lost). Loomodex Drivers has no shop:
+  // signed-out users start on the sign-in screen.
+  const initialRoute = !isLoggedIn
+    ? (IS_DRIVERS_APP ? 'SignIn' : 'Splash')
+    : (staffHomeRoute(user?.roles) ?? 'Main');
 
   return (
     <>
