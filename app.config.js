@@ -14,7 +14,7 @@ const fs = require('fs');
 const path = require('path');
 
 /** EAS project of Loomodex Drivers (owner fhdlkhn). Paste the id printed by `eas init`. */
-const DRIVERS_EAS_PROJECT_ID = process.env.DRIVERS_EAS_PROJECT_ID || '';
+const DRIVERS_EAS_PROJECT_ID = process.env.DRIVERS_EAS_PROJECT_ID || '3d1ca04e-8652-422f-a1d3-a37131c1e22e';
 
 const exists = (p) => fs.existsSync(path.join(__dirname, p));
 /** Use the Drivers-specific asset when it exists, else the shared one. */
