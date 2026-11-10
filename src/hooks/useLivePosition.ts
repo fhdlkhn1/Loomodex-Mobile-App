@@ -13,6 +13,24 @@ export type GpsStatus = 'locating' | 'ok' | 'denied' | 'off' | 'timeout' | 'erro
 
 const FIX_TIMEOUT_MS = 25000;
 
+let askedThisSession = false;
+
+/**
+ * Location permission without a request loop. On Android a permission request pauses and
+ * resumes the app (even when it answers at once), so a request made on every "app active"
+ * event re-triggers itself forever — the status and navigation bars blink non-stop.
+ * We only check, and show the system prompt at most once per launch (or on `force`, i.e.
+ * the user tapped "Retry"), and never when Android can no longer show it.
+ */
+export async function ensureLocationPermission(force = false): Promise<boolean> {
+  const cur = await Location.getForegroundPermissionsAsync();
+  if (cur.status === 'granted') return true;
+  if (!cur.canAskAgain || (askedThisSession && !force)) return false;
+  askedThisSession = true;
+  const { status } = await Location.requestForegroundPermissionsAsync();
+  return status === 'granted';
+}
+
 /**
  * The driver's live position, robust on every device:
  *  - shows the last known position immediately (no blank wait),
@@ -47,9 +65,9 @@ export function useLivePosition({ enabled = true, report = false, timeInterval =
     setStatus(s => (s === 'ok' ? s : 'locating'));
     (async () => {
       try {
-        const { status: perm } = await Location.requestForegroundPermissionsAsync();
+        const granted = await ensureLocationPermission(attempt > 0);
         if (cancelled) return;
-        if (perm !== 'granted') { setStatus('denied'); return; }
+        if (!granted) { setStatus('denied'); return; }
         if (!(await Location.hasServicesEnabledAsync())) { if (!cancelled) setStatus('off'); return; }
         if (cancelled) return;
 

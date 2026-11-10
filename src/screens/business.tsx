@@ -15,7 +15,7 @@ import { useAuth } from '../context/AuthContext';
 import { get, post, friendlyError, isApiError } from '../api/client';
 import { ordersApi, Order, OrderTracking } from '../api/orders';
 import { LiveMap, RouteStatus } from '../components/LiveMap';
-import { useLivePosition } from '../hooks/useLivePosition';
+import { useLivePosition, ensureLocationPermission } from '../hooks/useLivePosition';
 import { OrderLocationMap, OrderMapSheet, MapButton } from '../components/OrderLocationMap';
 import { configApi } from '../api/config';
 import { Product as ApiProduct } from '../api/products';
@@ -1262,8 +1262,7 @@ export function ScreenDriver() {
     };
     (async () => {
       try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        granted = status === 'granted';
+        granted = await ensureLocationPermission();
         send();
       } catch {}
     })();
@@ -1277,8 +1276,7 @@ export function ScreenDriver() {
     let cancelled = false;
     (async () => {
       try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted' || cancelled) return;
+        if (!(await ensureLocationPermission()) || cancelled) return;
         const s = await Location.watchPositionAsync(
           { accuracy: Location.Accuracy.High, timeInterval: 12000, distanceInterval: 20 },
           pos => { driverApi.updateLocation(pos.coords.latitude, pos.coords.longitude, pos.coords.heading ?? 0).catch(() => {}); }
