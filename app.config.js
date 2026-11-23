@@ -16,6 +16,9 @@ const path = require('path');
 /** EAS project of Loomodex Drivers (owner fhdlkhn). Paste the id printed by `eas init`. */
 const DRIVERS_EAS_PROJECT_ID = process.env.DRIVERS_EAS_PROJECT_ID || '3d1ca04e-8652-422f-a1d3-a37131c1e22e';
 
+/** Navy behind the Drivers icon artwork: splash + adaptive-icon background match it. */
+const DRIVERS_ICON_BG = '#000639';
+
 const exists = (p) => fs.existsSync(path.join(__dirname, p));
 /** Use the Drivers-specific asset when it exists, else the shared one. */
 const asset = (driversFile, fallback) => (exists(driversFile) ? driversFile : fallback);
@@ -42,7 +45,11 @@ module.exports = ({ config }) => {
       }];
     }
     if (name === 'expo-splash-screen') {
-      return ['expo-splash-screen', { ...(Array.isArray(p) ? p[1] : {}), image: asset('./assets/drivers/splash-icon.png', './assets/splash-icon.png') }];
+      return ['expo-splash-screen', {
+        ...(Array.isArray(p) ? p[1] : {}),
+        image: asset('./assets/drivers/splash-icon.png', './assets/splash-icon.png'),
+        ...(exists('./assets/drivers/splash-icon.png') ? { backgroundColor: DRIVERS_ICON_BG } : {}),
+      }];
     }
     return p;
   });
@@ -68,6 +75,7 @@ module.exports = ({ config }) => {
       adaptiveIcon: {
         ...config.android.adaptiveIcon,
         foregroundImage: asset('./assets/drivers/android-icon-foreground.png', config.android.adaptiveIcon.foregroundImage),
+        ...(exists('./assets/drivers/android-icon-foreground.png') ? { backgroundColor: DRIVERS_ICON_BG } : {}),
       },
       ...(androidGoogle ? { googleServicesFile: androidGoogle } : { googleServicesFile: undefined }),
     },
