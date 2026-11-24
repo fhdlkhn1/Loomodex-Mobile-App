@@ -814,6 +814,7 @@ export function ScreenCheckout() {
   const [subsector, setSubsector]     = useState('');
   const [landmark, setLandmark]       = useState('');
   const [notes, setNotes]             = useState('');
+  const [promoCode, setPromoCode]     = useState('');
   const [express, setExpress]         = useState(false);
   // Live server quote (the fee is never computed on the device)
   const [quote, setQuote]               = useState<DeliveryQuote | null>(null);
@@ -966,12 +967,12 @@ export function ScreenCheckout() {
           ...(i.variation_id ? { variation_id: i.variation_id, variation: i.variation ?? {} } : {}),
         }));
         res = await ordersApi.createGuest({
-          items: guestItems, billing: { ...billing, region }, payment_method: payMethod, notes, region, ...locParams,
+          items: guestItems, billing: { ...billing, region }, payment_method: payMethod, notes, region, ...locParams, promo_code: promoCode.trim() || undefined,
         });
       } else {
         const orderItems = cart.items.map(i => ({ product_id: i.product_id, qty: i.qty }));
         res = await ordersApi.create({
-          items: orderItems, billing: { ...billing, region }, payment_method: payMethod, notes, region, ...locParams,
+          items: orderItems, billing: { ...billing, region }, payment_method: payMethod, notes, region, ...locParams, promo_code: promoCode.trim() || undefined,
         });
       }
 
@@ -1188,6 +1189,7 @@ export function ScreenCheckout() {
             </View>
           )}
           <Field label={t('Notes de commande (optionnel)')} value={notes} onChangeText={setNotes} placeholder={t('Instructions spéciales pour la livraison')} />
+          <Field label={t('Code promo (optionnel)')} value={promoCode} onChangeText={v => setPromoCode(v.toUpperCase())} autoCapitalize="characters" placeholder={t("Code d'un influenceur")} />
         </View>
       </View>
 
