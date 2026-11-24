@@ -61,6 +61,9 @@ export async function openNotificationTarget(nav: Nav, data: NotificationData, u
   const orderId = orderIdOf(data);
   const isIncident = type.startsWith('incident');
 
+  // Deposits verified, payments recorded / settled: every beneficiary role opens "Mes finances".
+  if (type === 'finance') { nav.navigate('Finance'); return; }
+
   switch (role) {
     case 'customer':
       if (orderId) nav.navigate('OrderDetails', { orderId });

@@ -354,7 +354,7 @@ export function ScreenPartner() {
       <View style={{ paddingHorizontal: 16, paddingTop: 12, flexDirection: 'row', gap: 8 }}>
         <EntryTile dark icon="pin" label={t('Carte de mes livreurs')} onPress={() => nav.navigate('PartnerDriversMap', { scope: 'partner' })} />
         <EntryTile icon="msg" label={t('Incidents')} onPress={() => nav.navigate('PartnerIncidents')} />
-        <EntryTile icon="wallet" label={t('Comptes')} onPress={() => nav.navigate('PartnerLedger')} />
+        <EntryTile icon="wallet" label={t('Mes finances')} onPress={() => nav.navigate('Finance')} />
       </View>
 
       <View style={{ paddingTop: 16 }}>

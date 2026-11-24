@@ -16,6 +16,7 @@ import { get, post, friendlyError, isApiError } from '../api/client';
 import { ordersApi, Order, OrderTracking } from '../api/orders';
 import { LiveMap, RouteStatus } from '../components/LiveMap';
 import { useLivePosition, ensureLocationPermission } from '../hooks/useLivePosition';
+import { FinanceLink } from './finance';
 import { OrderLocationMap, OrderMapSheet, MapButton } from '../components/OrderLocationMap';
 import { configApi } from '../api/config';
 import { Product as ApiProduct } from '../api/products';
@@ -188,6 +189,8 @@ export function ScreenSeller() {
               </View>
             </View>
           </View>
+
+          <FinanceLink style={{ marginHorizontal: 16, marginTop: 12 }} />
 
           {/* New orders banner */}
           {newOrders > 0 && (
@@ -1339,6 +1342,7 @@ export function ScreenDriver() {
         <DriverKpiTile icon="bike"     value={summary?.active_count ?? 0}    label={t('En cours')}    color={LMX.accent} />
         <DriverKpiTile icon="check"    value={summary?.total_delivered ?? 0} label={t('Livrées')}     color={LMX.emerald} />
       </View>
+      <FinanceLink style={{ marginHorizontal: 16, marginTop: 12 }} />
 
       {/* Tabs — segmented control */}
       <View style={{ flexDirection: 'row', marginHorizontal: 16, marginTop: 16, padding: 4, borderRadius: 14, backgroundColor: LMX.ink10 }}>
