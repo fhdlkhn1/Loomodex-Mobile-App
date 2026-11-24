@@ -1,4 +1,5 @@
 import { get, post } from './client';
+import { postForm } from './finance';
 
 /** Store operating modes: A direct purchase · B quotation then online order · C quotation / appointment. */
 export type StoreMode = 'direct' | 'quote_order' | 'quote_appointment';
@@ -28,7 +29,12 @@ export interface OfferStore {
   categories?: { id: number; name: string; slug: string }[];
 }
 
+export interface StoreCase { id: number; ref: string; status: string; status_label: string }
+
 export const storesApi = {
+  /** "Request my total price" (product_id) or "Find a product" (store_id). Logged-in customers. */
+  request: (fields: Record<string, string | number | undefined>, photo?: { uri: string; name?: string; type?: string }) =>
+    postForm<{ success: boolean; case: StoreCase }>('/cases', fields, photo),
   list: () => get<{ stores: OfferStore[] }>('/stores'),
   get: (id: number) => get<OfferStore>(`/stores/${id}`),
   products: (id: number, q: { search?: string; category?: number; orderby?: string; page?: number } = {}) => {

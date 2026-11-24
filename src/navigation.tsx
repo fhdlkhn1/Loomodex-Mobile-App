@@ -20,7 +20,7 @@ import { ScreenOrderSuccess, ScreenTracking, ScreenTrackEntry, ScreenOrdersList,
 import { ScreenWishlist, ScreenListeSouhaits, ScreenAccount, ScreenAccountDetails, ScreenAddresses, ScreenAddressForm } from './screens/account';
 import { ScreenPartner, ScreenPartnerIncidents, ScreenPartnerLedger, ScreenLogisticsIncidents, ScreenLogisticsPartners } from './screens/partner';
 import { ScreenFinance } from './screens/finance';
-import { ScreenOfferStores, ScreenOfferStore } from './screens/stores';
+import { ScreenOfferStores, ScreenOfferStore, ScreenStoreRequest } from './screens/stores';
 import { ScreenWallet, ScreenWalletTopup } from './screens/wallet';
 import { ScreenHelp } from './screens/support';
 import { ScreenDriverNavigate } from './screens/driverNav';
@@ -167,6 +167,7 @@ export function RootNavigator() {
       <Stack.Screen name="Finance" component={ScreenFinance} />
       <Stack.Screen name="OfferStores" component={ScreenOfferStores} />
       <Stack.Screen name="OfferStore" component={ScreenOfferStore} />
+      <Stack.Screen name="StoreRequest" component={ScreenStoreRequest} />
       <Stack.Screen name="PartnerDriversMap" component={ScreenDriversMap} initialParams={{ scope: 'partner' }} />
     </Stack.Navigator>
     </>

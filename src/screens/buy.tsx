@@ -202,7 +202,7 @@ export function ScreenProductDetail() {
   return (
     <Screen
       padTop={false}
-      footer={p.purchasable === false && p.store ? <StoreRequestFooter store={p.store} /> : (
+      footer={p.purchasable === false && p.store ? <StoreRequestFooter store={p.store} productId={p.id} /> : (
         <View style={{ gap: 8 }}>
           <Button full variant="accent" size="lg" icon="bag" onPress={handleAddToCart} disabled={addingCart || buyingNow || !inStock}>
             {!inStock ? t('Indisponible') : addingCart ? t('Ajout...') : t('Ajouter au panier')}

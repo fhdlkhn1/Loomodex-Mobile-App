@@ -58,7 +58,7 @@ export interface FinanceMe {
 }
 
 /** Multipart POST with text fields and an optional local file (proof photo / PDF). */
-async function postForm<T>(path: string, fields: Record<string, string | number | undefined>, file?: { uri: string; name?: string; type?: string }): Promise<T> {
+export async function postForm<T>(path: string, fields: Record<string, string | number | undefined>, file?: { uri: string; name?: string; type?: string }): Promise<T> {
   const token = await AsyncStorage.getItem('lmx_token');
   const form = new FormData();
   Object.entries(fields).forEach(([k, v]) => { if (v !== undefined && v !== '') form.append(k, String(v)); });

@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, ActivityIndicator, Pressable, TextInput, ScrollView, Image } from 'react-native';
+import { View, Text, ActivityIndicator, Pressable, TextInput, ScrollView, Image, Alert } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { useAuth } from '../context/AuthContext';
+import { friendlyError } from '../api/client';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
 import { LMX, FONT, sans, decodeEntities } from '../theme';
@@ -44,7 +47,7 @@ export function toCardProduct(p: ApiProduct): any {
 }
 
 /** Product page footer for a store in quotation mode: no Add to Cart / Buy Now. */
-export function StoreRequestFooter({ store }: { store: StoreInfo }) {
+export function StoreRequestFooter({ store, productId }: { store: StoreInfo; productId: number }) {
   const nav = useNavigation<any>();
   if (store.status !== 'active') {
     return <Text style={{ textAlign: 'center', color: LMX.ink50, fontSize: 13, paddingVertical: 8 }}>{t("Cette boutique n'est pas disponible pour le moment.")}</Text>;
@@ -57,7 +60,7 @@ export function StoreRequestFooter({ store }: { store: StoreInfo }) {
           : t('Produit vendu sur devis ou sur rendez-vous. Le service client vous contactera.')}
       </Text>
       <Text style={{ fontSize: 10.5, color: LMX.ink50, textAlign: 'center' }}>{t("Aucun paiement en ligne n'est requis à cette étape.")}</Text>
-      <Button full variant="accent" size="lg" icon="msg" onPress={() => nav.navigate('Help')}>{t('Demander un devis')}</Button>
+      <Button full variant="accent" size="lg" icon="msg" onPress={() => nav.navigate('StoreRequest', { type: 'price_request', productId, storeName: store.name })}>{t('Demander mon prix total')}</Button>
     </View>
   );
 }
@@ -150,6 +153,15 @@ export function ScreenOfferStore() {
         </View>
       )}
 
+      {store && (
+        <Pressable onPress={() => nav.navigate('StoreRequest', { type: 'find_product', storeId: store.id, storeName: store.name })}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, marginTop: 12, backgroundColor: LMX.brandSoft, borderRadius: 12, padding: 12 }}>
+          <Icon name="search" size={16} color={LMX.brand} />
+          <Text style={{ flex: 1, fontSize: 12.5, color: LMX.ink, fontFamily: sans(600) }}>{t('Vous ne trouvez pas ? Trouver un produit')}</Text>
+          <Icon name="chevR" size={14} color={LMX.brand} />
+        </Pressable>
+      )}
+
       {/* Search inside this store only */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginTop: 12, backgroundColor: LMX.surface, borderRadius: 12, borderWidth: 1, borderColor: LMX.border, paddingHorizontal: 12 }}>
         <Icon name="search" size={16} color={LMX.ink50} />
@@ -184,6 +196,122 @@ export function ScreenOfferStore() {
               <ProductCard product={toCardProduct(p)} onPress={() => nav.navigate('ProductDetail', { productId: p.id })} />
             </View>
           ))}
+        </View>
+      )}
+    </Screen>
+  );
+}
+
+/**
+ * Request form — "Demander mon prix total" (from a product) or "Trouver un produit" (from a store).
+ * Name and phone come from the account. No online payment; the request is not an order.
+ */
+export function ScreenStoreRequest() {
+  const nav = useNavigation<any>();
+  const route = useRoute<any>();
+  const { user, isLoggedIn } = useAuth();
+  const type: 'price_request' | 'find_product' = route.params?.type ?? 'price_request';
+  const isPrice = type === 'price_request';
+  const [name, setName]   = useState(`${user?.first_name ?? ''} ${user?.last_name ?? ''}`.trim());
+  const [phone, setPhone] = useState(user?.phone ?? '');
+  const [qty, setQty]     = useState('1');
+  const [fulfillment, setFulfillment] = useState<'delivery' | 'collection'>('delivery');
+  const [city, setCity]   = useState('');
+  const [hood, setHood]   = useState('');
+  const [variation, setVariation] = useState('');
+  const [itemName, setItemName] = useState('');
+  const [description, setDescription] = useState('');
+  const [link, setLink]   = useState('');
+  const [comment, setComment] = useState('');
+  const [photo, setPhoto] = useState<{ uri: string; name?: string; type?: string } | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [done, setDone]   = useState<string | null>(null);
+
+  const pick = async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) { Alert.alert(t('Permission requise'), t("Autorisez l'accès aux photos.")); return; }
+    const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.6 });
+    if (!r.canceled && r.assets?.[0]) setPhoto({ uri: r.assets[0].uri, name: r.assets[0].fileName || undefined, type: r.assets[0].mimeType || undefined });
+  };
+
+  const submit = async () => {
+    if (!isLoggedIn) { nav.navigate('SignIn'); return; }
+    if (phone.replace(/\D/g, '').length < 8) { Alert.alert(t('Téléphone requis'), t('Veuillez saisir un numéro de téléphone valide.')); return; }
+    if (fulfillment === 'delivery' && !city.trim()) { Alert.alert(t('Ville requise'), t('Veuillez indiquer la ville ou la commune de livraison.')); return; }
+    if (!isPrice && !itemName.trim() && !description.trim() && !photo) {
+      Alert.alert(t('Produit recherché'), t('Indiquez le nom, une courte description ou une photo du produit recherché.')); return;
+    }
+    setSaving(true);
+    try {
+      const r = await storesApi.request({
+        type, product_id: route.params?.productId, store_id: route.params?.storeId, name: name.trim(), phone: phone.trim(),
+        qty: Math.max(1, parseInt(qty, 10) || 1), fulfillment, city: city.trim(), neighborhood: hood.trim(),
+        variation: variation.trim() || undefined, item_name: itemName.trim() || undefined, description: description.trim() || undefined,
+        link: link.trim() || undefined, comment: comment.trim() || undefined,
+      }, photo || undefined);
+      setDone(r.case.ref);
+    } catch (e) { Alert.alert(t('Erreur'), friendlyError(e)); }
+    finally { setSaving(false); }
+  };
+
+  const input = (label: string, value: string, set: (v: string) => void, opts: any = {}) => (
+    <View style={{ gap: 6 }}>
+      <Text style={{ fontSize: 12, color: LMX.ink70, fontFamily: sans(500) }}>{label}</Text>
+      <TextInput value={value} onChangeText={set} placeholderTextColor={LMX.ink30} {...opts}
+        style={{ backgroundColor: LMX.surface, borderRadius: 12, borderWidth: 1, borderColor: LMX.border, paddingHorizontal: 12, minHeight: 44, fontSize: 14, color: LMX.ink, ...(opts.multiline ? { paddingTop: 10, minHeight: 72, textAlignVertical: 'top' } : {}) }} />
+    </View>
+  );
+
+  return (
+    <Screen footer={done ? (
+      <Button full variant="accent" size="lg" onPress={() => nav.goBack()}>{t('Terminé')}</Button>
+    ) : (
+      <Button full variant="accent" size="lg" icon="arrowR" disabled={saving} onPress={submit}>{saving ? t('Envoi…') : isLoggedIn ? t('Envoyer ma demande') : t('Se connecter pour envoyer')}</Button>
+    )}>
+      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title={isPrice ? t('Demander mon prix total') : t('Trouver un produit')} />
+      {done ? (
+        <View style={{ alignItems: 'center', padding: 32, gap: 10 }}>
+          <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: LMX.emerald + '1A', alignItems: 'center', justifyContent: 'center' }}><Icon name="check" size={28} color={LMX.emerald} /></View>
+          <Text style={{ fontSize: 17, fontFamily: sans(700), color: LMX.ink }}>{t('Demande envoyée')}</Text>
+          <Text style={{ fontSize: 13, color: LMX.ink70, textAlign: 'center' }}>{t('Votre référence : {ref}. Le service client Loomodex vous contactera.', { ref: done })}</Text>
+        </View>
+      ) : (
+        <View style={{ paddingHorizontal: 16, gap: 12, paddingBottom: 24 }}>
+          {!!route.params?.storeName && <Text style={{ fontSize: 13, color: LMX.ink50 }}>{route.params.storeName}</Text>}
+          {!isPrice && (
+            <>
+              {input(t('Nom du produit'), itemName, setItemName)}
+              {input(t('Courte description'), description, setDescription, { multiline: true })}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                {photo && <Image source={{ uri: photo.uri }} style={{ width: 56, height: 56, borderRadius: 8 }} />}
+                <Button size="sm" variant="ghost" icon="image" onPress={pick}>{photo ? t('Changer la photo') : t('Ajouter une photo')}</Button>
+              </View>
+              <Text style={{ fontSize: 11.5, color: LMX.ink50 }}>{t('Un seul des trois suffit : nom, description ou photo.')}</Text>
+              {input(t('Lien (facultatif)'), link, setLink, { autoCapitalize: 'none', keyboardType: 'url' })}
+            </>
+          )}
+          {isPrice && input(t('Variante (couleur, taille, modèle)'), variation, setVariation)}
+          {input(t('Nom'), name, setName)}
+          {input(t('Téléphone'), phone, setPhone, { keyboardType: 'phone-pad' })}
+          {input(t('Quantité'), qty, setQty, { keyboardType: 'number-pad' })}
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            {(['delivery', 'collection'] as const).map(k => (
+              <Pressable key={k} onPress={() => setFulfillment(k)}
+                style={{ flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center', backgroundColor: fulfillment === k ? LMX.brand : LMX.surface, borderWidth: 1, borderColor: fulfillment === k ? 'transparent' : LMX.border }}>
+                <Text style={{ fontSize: 12.5, fontFamily: sans(700), color: fulfillment === k ? '#fff' : LMX.ink70 }}>{k === 'delivery' ? t('Livraison') : t('Retrait')}</Text>
+              </Pressable>
+            ))}
+          </View>
+          {fulfillment === 'delivery' && (
+            <>
+              {input(t('Ville ou commune'), city, setCity)}
+              {input(t('Quartier'), hood, setHood)}
+            </>
+          )}
+          {input(t('Commentaire (facultatif)'), comment, setComment, { multiline: true })}
+          <Text style={{ fontSize: 11.5, color: LMX.ink50, lineHeight: 17 }}>
+            {t("Aucun paiement en ligne n'est requis à cette étape. L'envoi de cette demande ne confirme pas un achat. Vos coordonnées sont partagées uniquement avec le service client Loomodex.")}
+          </Text>
         </View>
       )}
     </Screen>
