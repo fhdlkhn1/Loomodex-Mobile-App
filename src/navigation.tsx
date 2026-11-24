@@ -20,6 +20,7 @@ import { ScreenOrderSuccess, ScreenTracking, ScreenTrackEntry, ScreenOrdersList,
 import { ScreenWishlist, ScreenListeSouhaits, ScreenAccount, ScreenAccountDetails, ScreenAddresses, ScreenAddressForm } from './screens/account';
 import { ScreenPartner, ScreenPartnerIncidents, ScreenPartnerLedger, ScreenLogisticsIncidents, ScreenLogisticsPartners } from './screens/partner';
 import { ScreenFinance } from './screens/finance';
+import { ScreenCsNewOrder } from './screens/csOrder';
 import { ScreenOfferStores, ScreenOfferStore, ScreenStoreRequest, ScreenMyRequests, ScreenMyRequest } from './screens/stores';
 import { ScreenWallet, ScreenWalletTopup } from './screens/wallet';
 import { ScreenHelp } from './screens/support';
@@ -165,6 +166,7 @@ export function RootNavigator() {
       <Stack.Screen name="PartnerIncidents" component={ScreenPartnerIncidents} />
       <Stack.Screen name="PartnerLedger" component={ScreenPartnerLedger} />
       <Stack.Screen name="Finance" component={ScreenFinance} />
+      <Stack.Screen name="CsNewOrder" component={ScreenCsNewOrder} />
       <Stack.Screen name="OfferStores" component={ScreenOfferStores} />
       <Stack.Screen name="OfferStore" component={ScreenOfferStore} />
       <Stack.Screen name="StoreRequest" component={ScreenStoreRequest} />

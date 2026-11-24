@@ -103,6 +103,11 @@ export function ScreenSignIn() {
     setLoading(true);
     try {
       const u = await login(email.replace(/\s+/g, '').toLowerCase(), password);
+      if ((u as any)?.must_change_password) {
+        nav.reset({ index: 1, routes: [{ name: staffHomeRoute(u?.roles) ?? 'Main' }, { name: 'AccountDetails', params: { forcePassword: true } }] });
+        Alert.alert(t('Nouveau mot de passe'), t('Votre compte a été créé par le service client avec un mot de passe temporaire. Choisissez votre mot de passe personnel.'));
+        return;
+      }
       // Staff land on their dashboard as the ROOT (no shop underneath) so they can't
       // swipe/back into the customer shopping screens and get lost. Logout returns to SignIn.
       const dash = staffHomeRoute(u?.roles);

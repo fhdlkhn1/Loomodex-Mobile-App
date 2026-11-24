@@ -67,7 +67,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(res.token);
     setUser(res.user);
     registerForPush();
-    return res.user;
+    // Account created by Customer Service with a temporary password → the sign-in screen asks for a new one.
+    return { ...res.user, must_change_password: !!res.must_change_password };
   }, []);
 
   const register = useCallback(async (data: RegisterData) => {

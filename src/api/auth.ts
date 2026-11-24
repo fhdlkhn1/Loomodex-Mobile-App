@@ -34,7 +34,7 @@ export interface AuthResponse {
 
 export const authApi = {
   login: (email: string, password: string) =>
-    post<AuthResponse>('/auth/login', { email, password }),
+    post<AuthResponse & { must_change_password?: boolean }>('/auth/login', { email, password }),
 
   register: (data: {
     email: string;

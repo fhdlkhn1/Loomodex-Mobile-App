@@ -3,7 +3,7 @@ import { View, Text, Image, Pressable, ScrollView, Alert, ActivityIndicator, Mod
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image as ExpoImage } from 'expo-image';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { LMX, FONT, sans, mono } from '../theme';
 import { IMG, PRODUCTS } from '../data';
@@ -561,6 +561,7 @@ export function ScreenAccount() {
 // ── Account details ────────────────────────────────────────────
 export function ScreenAccountDetails() {
   const nav = useNavigation<any>();
+  const forcePassword = !!useRoute<any>().params?.forcePassword;
   const { user, setUser, refreshUser, isDriver } = useAuth();
 
   const [firstName, setFirstName] = useState(user?.first_name ?? '');
@@ -569,7 +570,7 @@ export function ScreenAccountDetails() {
   const [saving, setSaving]       = useState(false);
 
   // Inline change-password
-  const [showPw, setShowPw]   = useState(false);
+  const [showPw, setShowPw]   = useState(forcePassword);
   const [curPw, setCurPw]     = useState('');
   const [newPw, setNewPw]     = useState('');
   const [pwBusy, setPwBusy]   = useState(false);
@@ -623,6 +624,7 @@ export function ScreenAccountDetails() {
           <SettingRow icon="key" label={t('Changer le mot de passe')} sub={showPw ? t('Masquer') : t('Mettre à jour votre mot de passe')} onPress={() => setShowPw(v => !v)} last={!showPw} />
           {showPw && (
             <View style={{ padding: 16, gap: 12, borderTopWidth: 1, borderTopColor: LMX.hairline }}>
+              {forcePassword && <Text style={{ fontSize: 12.5, color: LMX.accent, fontFamily: sans(600) }}>{t('Mot de passe temporaire : choisissez maintenant votre mot de passe personnel.')}</Text>}
               <Field label={t('Mot de passe actuel')} value={curPw} onChangeText={setCurPw} secure />
               <Field label={t('Nouveau mot de passe')} value={newPw} onChangeText={setNewPw} secure />
               <Button variant="primary" size="md" onPress={changePassword} disabled={pwBusy}>{pwBusy ? t('Mise à jour...') : t('Mettre à jour le mot de passe')}</Button>

@@ -2624,6 +2624,11 @@ export function ScreenCS() {
         <DriverStatCard value={counts.rejected_today} label={t('Rejetées auj.')} color={LMX.rose} />
       </View>
 
+      {/* Order by phone on behalf of a customer (12 Nov doc) */}
+      <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
+        <Button full variant="accent" icon="plus" onPress={() => nav.navigate('CsNewOrder')}>{t('Créer une commande pour un client')}</Button>
+      </View>
+
       {/* Tabs */}
       <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 14 }}>
         {(['pending', 'history'] as const).map(k => {

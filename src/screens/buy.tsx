@@ -11,6 +11,7 @@ import { Screen, AppBar, IconBtn, Button, Price, ProductCard, SummaryRow, Field 
 import { Picker } from '../components/Picker';
 import { productsApi, Product as ApiProduct, ProductTabs } from '../api/products';
 import { StoreRequestFooter, toCardProduct } from './stores';
+import { csApi, CsCustomer } from '../api/cs';
 import { checkoutApi, DeliveryZone, DeliveryQuote } from '../api/checkout';
 import { FeeBreakdown, Notice } from '../components/FeeBreakdown';
 import { configApi } from '../api/config';
@@ -796,20 +797,25 @@ export function ScreenCheckout() {
   // "Commander" from a confirmed quotation (Nos offres, mode B): the approved lines and prices
   // replace the cart; the server rebuilds them from the quotation (quote_id), never from the app.
   const quoteOrder: { id: number; ref?: string; lines: { product_id: number | null; name: string; qty: number; unit_price: number; subtotal: number }[] } | undefined = route.params?.quoteOrder;
-  const cart: Cart = quoteOrder ? {
-    items: quoteOrder.lines.map((l, i): CartItem => ({ key: `q${i}`, product_id: l.product_id ?? 0, name: l.name, image: null, price: l.unit_price, qty: l.qty, line_total: l.subtotal })),
-    item_count: quoteOrder.lines.reduce((n, l) => n + l.qty, 0),
-    subtotal: quoteOrder.lines.reduce((n, l) => n + l.subtotal, 0),
+  // Customer Service order by phone (12 Nov doc): the agent completes the customer's checkout.
+  const csOrder: { customer: CsCustomer; items: { product_id: number; name: string; qty: number; price: number }[] } | undefined = route.params?.csOrder;
+  const overrideLines = quoteOrder?.lines
+    ?? csOrder?.items.map(i => ({ product_id: i.product_id, name: i.name, qty: i.qty, unit_price: i.price, subtotal: i.price * i.qty }));
+  const cart: Cart = overrideLines ? {
+    items: overrideLines.map((l, i): CartItem => ({ key: `q${i}`, product_id: l.product_id ?? 0, name: l.name, image: null, price: l.unit_price, qty: l.qty, line_total: l.subtotal })),
+    item_count: overrideLines.reduce((n, l) => n + l.qty, 0),
+    subtotal: overrideLines.reduce((n, l) => n + l.subtotal, 0),
     total: 0, shipping_total: 0, discount_total: 0, coupons: [] as string[], currency: 'GNF',
   } : realCart;
+  const csName = (csOrder?.customer.name ?? '').trim().split(/\s+/);
   const [coupon, setCoupon]         = useState('');
   const [couponBusy, setCouponBusy] = useState(false);
 
   // Billing
-  const [firstName, setFirstName] = useState(user?.first_name ?? '');
-  const [lastName, setLastName]   = useState(user?.last_name ?? '');
-  const [phone, setPhone]         = useState(toE164(user?.phone));
-  const [whatsapp, setWhatsapp]   = useState(toE164(user?.phone));
+  const [firstName, setFirstName] = useState(csOrder ? (csName[0] ?? '') : (user?.first_name ?? ''));
+  const [lastName, setLastName]   = useState(csOrder ? csName.slice(1).join(' ') : (user?.last_name ?? ''));
+  const [phone, setPhone]         = useState(toE164(csOrder ? csOrder.customer.phone : user?.phone));
+  const [whatsapp, setWhatsapp]   = useState(toE164(csOrder ? csOrder.customer.phone : user?.phone));
   // Guests have no account email — collect it (optional) for the receipt + account offer
   const [email, setEmail]         = useState(user?.email ?? '');
   // Recipient — the person who actually receives the parcel. Customers here often
@@ -818,11 +824,11 @@ export function ScreenCheckout() {
   const [recipientName, setRecipientName]   = useState('');
   const [recipientPhone, setRecipientPhone] = useState('');
   // Delivery
-  const [zoneKey, setZoneKey]         = useState('');
-  const [communeKey, setCommuneKey]   = useState('');
-  const [neighborhood, setNeighborhood] = useState('');
+  const [zoneKey, setZoneKey]         = useState(csOrder?.customer.address?.zone ?? '');
+  const [communeKey, setCommuneKey]   = useState(csOrder?.customer.address?.commune ?? '');
+  const [neighborhood, setNeighborhood] = useState(csOrder?.customer.address?.neighborhood ?? '');
   const [subsector, setSubsector]     = useState('');
-  const [landmark, setLandmark]       = useState('');
+  const [landmark, setLandmark]       = useState(csOrder?.customer.address?.landmark ?? '');
   const [notes, setNotes]             = useState('');
   const [promoCode, setPromoCode]     = useState('');
   const [express, setExpress]         = useState(false);
@@ -855,7 +861,7 @@ export function ScreenCheckout() {
 
   // Prefill from the customer's last checkout (like the website remembers)
   useEffect(() => {
-    if (!isLoggedIn) return;
+    if (!isLoggedIn || csOrder) return; // CS orders use the customer's details, not the agent's
     let alive = true;
     profileApi.checkout().then(d => {
       if (!alive || !d) return;
@@ -970,6 +976,16 @@ export function ScreenCheckout() {
       };
 
       let res;
+      if (csOrder) {
+        res = await csApi.createOrder({
+          customer_id: csOrder.customer.id,
+          items: csOrder.items.map(i => ({ product_id: i.product_id, qty: i.qty })),
+          billing: { ...billing, region }, payment_method: payMethod, notes, region, ...locParams, promo_code: promoCode.trim() || undefined,
+        });
+        Alert.alert(t('Commande créée'), t('Commande #{n} créée pour {c}. Le client a été notifié. Elle attend votre confirmation comme toute commande.', { n: res.order.number, c: csOrder.customer.name }));
+        nav.navigate('CS');
+        return;
+      }
       if (isGuest) {
         // Guest order — send the local cart items (with any variation) directly
         const guestItems = cart.items.map(i => ({
