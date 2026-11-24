@@ -16,6 +16,9 @@ export type Product = {
   /** USA Store: imported goods show an international estimate, not "3h–48h Conakry". */
   is_usa?: boolean;
   delivery_estimate?: string | null;
+  /** Nos offres: product of a configurable store — its price display, and the store name instead of local delivery. */
+  store_name?: string | null;
+  price_display?: 'price' | 'indicative' | 'on_request';
 };
 
 export type Category = {

@@ -16,6 +16,7 @@ import { productsApi, Product as ApiProduct, HomeBanner } from '../api/products'
 import { get, friendlyError } from '../api/client';
 import { BannerCarousel } from '../components/BannerCarousel';
 import { StoreApplicationBanner } from '../components/StoreApplicationBanner';
+import { useOfferStores } from './stores';
 import { ErrorState, SkeletonRail } from '../components/StateViews';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
@@ -199,6 +200,7 @@ function MenuRow({ children, onPress }: { children: React.ReactNode; onPress: ()
 function MenuDrawer({ visible, onClose, cats, nav }: { visible: boolean; onClose: () => void; cats: any[]; nav: any }) {
   const insets = useSafeAreaInsets();
   const { cart } = useCart();
+  const offerStores = useOfferStores().data?.stores ?? [];
   const tx = React.useRef(new Animated.Value(-PANEL_W)).current;
   const fade = React.useRef(new Animated.Value(0)).current;
   const [mounted, setMounted] = useState(visible);
@@ -283,6 +285,31 @@ function MenuDrawer({ visible, onClose, cats, nav }: { visible: boolean; onClose
                 </MenuRow>
               );
             })}
+
+            {/* Nos offres — configurable stores, below the categories and above Services */}
+            {offerStores.length > 0 && (
+              <>
+                <Text style={[sectionLabel, { marginTop: 18 }]}>{t('NOS OFFRES')}</Text>
+                {offerStores.slice(0, 6).map(s => (
+                  <MenuRow key={s.id} onPress={() => go('OfferStore', { storeId: s.id, name: s.name })}>
+                    <View style={{ width: 40, height: 40, borderRadius: 11, backgroundColor: LMX.surfaceAlt, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                      {s.logo ? <Image source={{ uri: s.logo }} style={{ width: 40, height: 40 }} /> : <Icon name="storefront" size={19} color={LMX.brand} />}
+                    </View>
+                    <Text style={{ flex: 1, fontFamily: sans(500), fontSize: 13.5, color: LMX.ink }}>{decodeEntities(s.name)}</Text>
+                    <Icon name="chevR" size={16} color={LMX.ink30} />
+                  </MenuRow>
+                ))}
+                {offerStores.length > 6 && (
+                  <MenuRow onPress={() => go('OfferStores')}>
+                    <View style={{ width: 40, height: 40, borderRadius: 11, backgroundColor: LMX.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
+                      <Icon name="grid" size={19} color={LMX.brand} />
+                    </View>
+                    <Text style={{ flex: 1, fontFamily: sans(500), fontSize: 13.5, color: LMX.ink }}>{t('Toutes les offres')}</Text>
+                    <Icon name="chevR" size={16} color={LMX.ink30} />
+                  </MenuRow>
+                )}
+              </>
+            )}
 
             {/* Services */}
             <Text style={[sectionLabel, { marginTop: 18 }]}>{t('SERVICES')}</Text>

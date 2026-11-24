@@ -250,6 +250,22 @@ export function Discount({ off }: { off: number }) {
 }
 
 // ── ProductCard ────────────────────────────────────────────────
+/** Card price that follows a store's price display: "Prix sur demande" never shows 0 GNF. */
+function CardPrice({ product, size }: { product: Product; size: 'sm' | 'md' }) {
+  if (product.store_name && (product.price_display === 'on_request' || !(product.price > 0))) {
+    return <Text style={{ fontSize: size === 'sm' ? 12.5 : 13.5, fontFamily: sans(700), color: LMX.brand }}>{t('Prix sur demande')}</Text>;
+  }
+  if (product.store_name && product.price_display === 'indicative') {
+    return (
+      <View>
+        <Text style={{ fontSize: 9.5, color: LMX.ink50, fontFamily: sans(600) }}>{t('Prix indicatif')}</Text>
+        <Price value={product.price} was={product.was} size={size} />
+      </View>
+    );
+  }
+  return <Price value={product.price} was={product.was} size={size} />;
+}
+
 export function ProductCard({
   product, variant = 'grid', onPress,
 }: { product: Product; variant?: 'grid' | 'list'; onPress?: () => void }) {
@@ -265,7 +281,7 @@ export function ProductCard({
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={{ fontSize: 10, color: LMX.ink50, marginBottom: 3, letterSpacing: 0.5, textTransform: 'uppercase', fontFamily: sans(500) }}>{product.seller}</Text>
           <Text numberOfLines={2} style={{ fontSize: 13.5, fontFamily: sans(500), color: LMX.ink, lineHeight: 18, marginBottom: 6 }}>{product.name}</Text>
-          <Price value={product.price} was={product.was} size="sm" />
+          <CardPrice product={product} size="sm" />
         </View>
       </Pressable>
     );
@@ -306,12 +322,12 @@ export function ProductCard({
           )}
         </View>
         <Text numberOfLines={2} style={{ fontSize: 12.5, fontFamily: sans(500), color: LMX.ink, lineHeight: 17, marginBottom: 6, minHeight: 34 }}>{product.name}</Text>
-        <Price value={product.price} was={product.was} size="md" />
-        {/* Delivery info — imported goods must never show the local 3h–48h promise */}
+        <CardPrice product={product} size="md" />
+        {/* Delivery info — imported goods and store (Nos offres) products never show the local 3h–48h promise */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 }}>
-          <Icon name={product.is_usa ? 'package' : 'truck'} size={10} color={product.is_usa ? LMX.navy : '#1E6BFF'} />
-          <Text numberOfLines={1} style={{ fontSize: 9.5, color: product.is_usa ? LMX.navy : '#1E6BFF', fontFamily: sans(500) }}>
-            {product.is_usa ? (product.delivery_estimate || t('10–14 jours ouvrables')) : t('3h–48h Conakry')}
+          <Icon name={product.store_name ? 'storefront' : product.is_usa ? 'package' : 'truck'} size={10} color={product.is_usa || product.store_name ? LMX.navy : '#1E6BFF'} />
+          <Text numberOfLines={1} style={{ fontSize: 9.5, color: product.is_usa || product.store_name ? LMX.navy : '#1E6BFF', fontFamily: sans(500) }}>
+            {product.store_name ? product.store_name : product.is_usa ? (product.delivery_estimate || t('10–14 jours ouvrables')) : t('3h–48h Conakry')}
           </Text>
         </View>
         {/* Buy Now button */}

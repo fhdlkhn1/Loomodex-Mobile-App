@@ -10,6 +10,7 @@ import { Icon } from '../Icon';
 import { Screen, AppBar, IconBtn, Button, Price, ProductCard, SummaryRow, Field } from '../components';
 import { Picker } from '../components/Picker';
 import { productsApi, Product as ApiProduct, ProductTabs } from '../api/products';
+import { StoreRequestFooter, toCardProduct } from './stores';
 import { checkoutApi, DeliveryZone, DeliveryQuote } from '../api/checkout';
 import { FeeBreakdown, Notice } from '../components/FeeBreakdown';
 import { configApi } from '../api/config';
@@ -201,7 +202,7 @@ export function ScreenProductDetail() {
   return (
     <Screen
       padTop={false}
-      footer={
+      footer={p.purchasable === false && p.store ? <StoreRequestFooter store={p.store} /> : (
         <View style={{ gap: 8 }}>
           <Button full variant="accent" size="lg" icon="bag" onPress={handleAddToCart} disabled={addingCart || buyingNow || !inStock}>
             {!inStock ? t('Indisponible') : addingCart ? t('Ajout...') : t('Ajouter au panier')}
@@ -210,7 +211,7 @@ export function ScreenProductDetail() {
             {buyingNow ? '...' : t('Acheter maintenant')}
           </Button>
         </View>
-      }
+      )}
     >
       <AppBar
         overlay
@@ -295,7 +296,22 @@ export function ScreenProductDetail() {
 
         {/* Price */}
         <View style={{ marginTop: 16 }}>
-          <Price value={displayPrice} was={wasPrice} size="xl" color={LMX.accent} />
+          {p.store && (p.store.price_display === 'on_request' || !(displayPrice > 0)) ? (
+            <Text style={{ fontSize: 20, fontFamily: sans(700), color: LMX.brand }}>{t('Prix sur demande')}</Text>
+          ) : (
+            <>
+              {p.store?.price_display === 'indicative' && <Text style={{ fontSize: 11, color: LMX.ink50, fontFamily: sans(600), marginBottom: 2 }}>{t('Prix indicatif')}</Text>}
+              <Price value={displayPrice} was={wasPrice} size="xl" color={LMX.accent} />
+              {p.store?.price_display === 'indicative' && !!p.store.price_note && <Text style={{ fontSize: 11.5, color: LMX.ink70, marginTop: 4 }}>{p.store.price_note}</Text>}
+            </>
+          )}
+          {p.store && (
+            <Pressable onPress={() => nav.navigate('OfferStore', { storeId: p.store!.id, name: p.store!.name })} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 }}>
+              <Icon name="storefront" size={14} color={LMX.brand} />
+              <Text style={{ fontSize: 12.5, color: LMX.brand, fontFamily: sans(600) }}>{p.store.name}</Text>
+              <Icon name="chevR" size={13} color={LMX.brand} />
+            </Pressable>
+          )}
         </View>
 
         {/* Short description */}
@@ -581,7 +597,7 @@ export function ScreenSellerStorefront() {
               : products.map(p => (
                   <View key={p.id} style={{ width: '47.5%' }}>
                     <ProductCard
-                      product={{ id: String(p.id), name: p.name, slug: p.slug, price: p.price, was: p.regular_price > p.price ? p.regular_price : null, off: p.off, cat: '', seller: p.seller, rating: p.rating, reviews: p.reviews, sold: p.sold, image: p.image, is_usa: p.is_usa, delivery_estimate: p.delivery_estimate } as any}
+                      product={toCardProduct(p)}
                       onPress={() => nav.navigate('ProductDetail', { productId: p.id })}
                     />
                   </View>

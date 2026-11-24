@@ -1,5 +1,46 @@
 import { get, post } from './client';
 
+/** Store operating modes: A direct purchase · B quotation then online order · C quotation / appointment. */
+export type StoreMode = 'direct' | 'quote_order' | 'quote_appointment';
+export interface StoreInfo {
+  id: number;
+  name: string;
+  mode: StoreMode;
+  status: 'active' | 'draft' | 'suspended';
+  price_display: 'price' | 'indicative' | 'on_request';
+  price_note: string;
+}
+export interface OfferStore {
+  id: number;
+  name: string;
+  slug: string;
+  url: string;
+  description: string;
+  excerpt: string;
+  logo: string | null;
+  banner: string | null;
+  country: string;
+  city: string;
+  mode: StoreMode;
+  price_display: 'price' | 'indicative' | 'on_request';
+  price_note: string;
+  product_count: number;
+  categories?: { id: number; name: string; slug: string }[];
+}
+
+export const storesApi = {
+  list: () => get<{ stores: OfferStore[] }>('/stores'),
+  get: (id: number) => get<OfferStore>(`/stores/${id}`),
+  products: (id: number, q: { search?: string; category?: number; orderby?: string; page?: number } = {}) => {
+    const p: string[] = ['per_page=24'];
+    if (q.search) p.push(`search=${encodeURIComponent(q.search)}`);
+    if (q.category) p.push(`category=${q.category}`);
+    if (q.orderby) p.push(`orderby=${q.orderby}`);
+    if (q.page) p.push(`page=${q.page}`);
+    return get<{ products: Product[]; total: number; pages: number }>(`/stores/${id}/products?${p.join('&')}`);
+  },
+};
+
 export interface Product {
   id: number;
   name: string;
@@ -29,6 +70,10 @@ export interface Product {
   /** e.g. "10–14 jours ouvrables". Null for local products. */
   delivery_estimate: string | null;
   related?: Product[];
+  /** False for products of a store in quotation mode (Nos offres B/C): no Add to Cart / Buy Now. */
+  purchasable?: boolean;
+  /** Configurable store ("Nos offres") the product belongs to; null for the main catalog. */
+  store?: StoreInfo | null;
   /** Product video: an uploaded MP4 URL or a YouTube/Vimeo link. Null when none. */
   video?: string | null;
   /** Bulky parcel: adds the admin's bulky surcharge to delivery. */
