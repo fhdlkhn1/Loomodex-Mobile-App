@@ -17,7 +17,7 @@ import { configApi } from '../api/config';
 import { LocationPicker, LatLng } from '../components/LocationPicker';
 import { get } from '../api/client';
 import { profileApi } from '../api/profile';
-import { useCart } from '../context/CartContext';
+import { useCart, Cart, CartItem } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { ordersApi } from '../api/orders';
 import { friendlyError } from '../api/client';
@@ -790,8 +790,18 @@ const PAYMENT_METHODS = [
 
 export function ScreenCheckout() {
   const nav = useNavigation<any>();
+  const route = useRoute<any>();
   const { user, isLoggedIn } = useAuth();
-  const { cart, clearCart, applyCoupon, removeCoupon, isGuest } = useCart();
+  const { cart: realCart, clearCart, applyCoupon, removeCoupon, isGuest } = useCart();
+  // "Commander" from a confirmed quotation (Nos offres, mode B): the approved lines and prices
+  // replace the cart; the server rebuilds them from the quotation (quote_id), never from the app.
+  const quoteOrder: { id: number; ref?: string; lines: { product_id: number | null; name: string; qty: number; unit_price: number; subtotal: number }[] } | undefined = route.params?.quoteOrder;
+  const cart: Cart = quoteOrder ? {
+    items: quoteOrder.lines.map((l, i): CartItem => ({ key: `q${i}`, product_id: l.product_id ?? 0, name: l.name, image: null, price: l.unit_price, qty: l.qty, line_total: l.subtotal })),
+    item_count: quoteOrder.lines.reduce((n, l) => n + l.qty, 0),
+    subtotal: quoteOrder.lines.reduce((n, l) => n + l.subtotal, 0),
+    total: 0, shipping_total: 0, discount_total: 0, coupons: [] as string[], currency: 'GNF',
+  } : realCart;
   const [coupon, setCoupon]         = useState('');
   const [couponBusy, setCouponBusy] = useState(false);
 
@@ -886,7 +896,7 @@ export function ScreenCheckout() {
     setQuoteError(null);
     const timer = setTimeout(() => {
       checkoutApi.quote({
-        items: cart.items.map(i => ({ product_id: i.product_id, qty: i.qty })),
+        items: cart.items.filter(i => i.product_id > 0).map(i => ({ product_id: i.product_id, qty: i.qty })),
         zone: zoneKey, commune: communeKey, neighborhood,
         ...(subsector ? { subsector } : {}),
         ...(pickedLoc ? { dest_lat: pickedLoc.lat, dest_lng: pickedLoc.lng } : {}),
@@ -970,13 +980,14 @@ export function ScreenCheckout() {
           items: guestItems, billing: { ...billing, region }, payment_method: payMethod, notes, region, ...locParams, promo_code: promoCode.trim() || undefined,
         });
       } else {
-        const orderItems = cart.items.map(i => ({ product_id: i.product_id, qty: i.qty }));
+        const orderItems = quoteOrder ? [] : cart.items.map(i => ({ product_id: i.product_id, qty: i.qty }));
         res = await ordersApi.create({
+          quote_id: quoteOrder?.id,
           items: orderItems, billing: { ...billing, region }, payment_method: payMethod, notes, region, ...locParams, promo_code: promoCode.trim() || undefined,
         });
       }
 
-      await clearCart();
+      if (!quoteOrder) await clearCart();
       if (res.pay_url) {
         // Card / online payment — complete via the website gateway in a WebView
         setPaidOrder({ id: res.order.id, number: res.order.number });
@@ -1189,7 +1200,7 @@ export function ScreenCheckout() {
             </View>
           )}
           <Field label={t('Notes de commande (optionnel)')} value={notes} onChangeText={setNotes} placeholder={t('Instructions spéciales pour la livraison')} />
-          <Field label={t('Code promo (optionnel)')} value={promoCode} onChangeText={v => setPromoCode(v.toUpperCase())} autoCapitalize="characters" placeholder={t("Code d'un influenceur")} />
+          <Field label={t('Code influenceur (optionnel)')} value={promoCode} onChangeText={v => setPromoCode(v.toUpperCase())} autoCapitalize="characters" placeholder={t("Code d'un influenceur")} />
         </View>
       </View>
 
@@ -1262,7 +1273,7 @@ export function ScreenCheckout() {
       {/* Coupon — kept last, directly above the order summary, so the customer
           completes their details and delivery address before hunting for a code.
           Hidden for guests: coupons need server-side cart validation (account only). */}
-      {!isGuest && (
+      {!isGuest && !quoteOrder && (
       <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
         <Text style={{ fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600), marginBottom: 10 }}>{t('Code promo')}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: LMX.surface, borderRadius: 14, borderWidth: 1, borderColor: LMX.border, borderStyle: 'dashed', paddingLeft: 14, paddingRight: 6, height: 52 }}>

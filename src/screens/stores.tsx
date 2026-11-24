@@ -8,7 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { LMX, FONT, sans, decodeEntities } from '../theme';
 import { Icon } from '../Icon';
 import { Screen, AppBar, IconBtn, ProductCard, Button } from '../components';
-import { storesApi, Product as ApiProduct, OfferStore, StoreInfo, StoreMode } from '../api/products';
+import { storesApi, casesApi, Product as ApiProduct, OfferStore, StoreInfo, StoreMode, StoreQuote } from '../api/products';
 import { t } from '../i18n';
 
 /**
@@ -312,6 +312,160 @@ export function ScreenStoreRequest() {
           <Text style={{ fontSize: 11.5, color: LMX.ink50, lineHeight: 17 }}>
             {t("Aucun paiement en ligne n'est requis à cette étape. L'envoi de cette demande ne confirme pas un achat. Vos coordonnées sont partagées uniquement avec le service client Loomodex.")}
           </Text>
+        </View>
+      )}
+    </Screen>
+  );
+}
+
+const fmt = (n: number) => `${Math.round(n || 0).toLocaleString('fr-FR').replace(/ /g, ' ')} GNF`;
+
+const CASE_STATUS_FR: Record<string, string> = {
+  received: 'Reçue', under_review: 'En cours de traitement', info_required: 'Informations demandées',
+  proposal_review: 'En cours de traitement', quote_sent: 'Devis envoyé', closed: 'Clôturée', converted: 'Commandée',
+};
+const QUOTE_STATUS_FR: Record<string, string> = {
+  sent: 'En attente de votre réponse', accepted: 'En attente de confirmation du service client', declined: 'Refusé',
+  confirmed: 'Devis confirmé', superseded: 'Remplacé par une nouvelle version', ordered: 'Commandé',
+};
+
+/** "Mes demandes" — the customer's price requests / product searches and their quotations. */
+export function ScreenMyRequests() {
+  const nav = useNavigation<any>();
+  const { data, isLoading, refetch } = useQuery({ queryKey: ['my-requests'], queryFn: () => casesApi.mine() });
+  const cases = data?.cases ?? [];
+  return (
+    <Screen>
+      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title={t('Mes demandes')} right={<IconBtn icon="refresh" onPress={() => refetch()} />} />
+      {isLoading ? <View style={{ paddingVertical: 48 }}><ActivityIndicator color={LMX.brand} /></View>
+      : cases.length === 0 ? <Text style={{ textAlign: 'center', color: LMX.ink50, padding: 40 }}>{t("Vous n'avez encore envoyé aucune demande.")}</Text>
+      : (
+        <View style={{ paddingHorizontal: 16, gap: 10, paddingBottom: 24 }}>
+          {cases.map(c => (
+            <Pressable key={c.id} onPress={() => nav.navigate('MyRequest', { caseId: c.id })}
+              style={{ backgroundColor: LMX.surface, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.border, padding: 14, gap: 4 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 12, fontFamily: sans(700), color: LMX.brand }}>{c.ref}</Text>
+                <Text style={{ fontSize: 11, fontFamily: sans(700), color: c.status === 'quote_sent' ? LMX.accent : LMX.ink50 }}>{t(CASE_STATUS_FR[c.status] || c.status_label)}</Text>
+              </View>
+              <Text style={{ fontSize: 14, fontFamily: sans(600), color: LMX.ink }}>{c.product?.name || c.item_name || t('Recherche de produit')}</Text>
+              <Text style={{ fontSize: 11.5, color: LMX.ink50 }}>{c.store?.name} · {t('Qté {n}', { n: c.qty })}</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
+    </Screen>
+  );
+}
+
+export function ScreenMyRequest() {
+  const nav = useNavigation<any>();
+  const route = useRoute<any>();
+  const caseId: number = route.params?.caseId;
+  const { data: c, refetch, isLoading } = useQuery({ queryKey: ['my-request', caseId], queryFn: () => casesApi.get(caseId), enabled: !!caseId });
+  const { data: msgs, refetch: refetchMsgs } = useQuery({ queryKey: ['my-request-msgs', caseId], queryFn: () => casesApi.messages(caseId), enabled: !!caseId });
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const answer = (q: StoreQuote, decision: 'accept' | 'decline') => {
+    const go = async (note?: string) => {
+      setBusy(true);
+      try { await casesApi.answer(q.id, decision, note); await refetch(); }
+      catch (e) { Alert.alert(t('Erreur'), friendlyError(e)); }
+      finally { setBusy(false); }
+    };
+    if (decision === 'accept') Alert.alert(t('Accepter le devis'), t('Accepter le devis de {a} ?', { a: fmt(q.total) }), [{ text: t('Annuler'), style: 'cancel' }, { text: t('Accepter'), onPress: () => go() }]);
+    else Alert.alert(t('Refuser le devis'), t('Voulez-vous refuser ce devis ?'), [{ text: t('Annuler'), style: 'cancel' }, { text: t('Refuser'), style: 'destructive', onPress: () => go() }]);
+  };
+
+  const send = async () => {
+    if (!text.trim()) return;
+    setBusy(true);
+    try { await casesApi.send(caseId, text.trim()); setText(''); refetchMsgs(); }
+    catch (e) { Alert.alert(t('Erreur'), friendlyError(e)); }
+    finally { setBusy(false); }
+  };
+
+  const quotes = (c?.quotes ?? []).filter(q => q.kind === 'quote');
+  const current = quotes[0];
+
+  return (
+    <Screen>
+      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title={c?.ref || t('Demande')} right={<IconBtn icon="refresh" onPress={() => { refetch(); refetchMsgs(); }} />} />
+      {isLoading || !c ? <View style={{ paddingVertical: 48 }}><ActivityIndicator color={LMX.brand} /></View> : (
+        <View style={{ paddingHorizontal: 16, gap: 12, paddingBottom: 30 }}>
+          <View style={{ backgroundColor: LMX.surface, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: LMX.border, padding: 14, gap: 4 }}>
+            <Text style={{ fontSize: 11, color: LMX.ink50 }}>{c.store?.name}</Text>
+            <Text style={{ fontSize: 15, fontFamily: sans(700), color: LMX.ink }}>{c.product?.name || c.item_name || t('Recherche de produit')}</Text>
+            <Text style={{ fontSize: 12, color: LMX.ink70 }}>{t('Qté {n}', { n: c.qty })} · {c.fulfillment === 'collection' ? t('Retrait') : t('Livraison')}{c.city ? ` · ${c.city}` : ''}</Text>
+            <Text style={{ fontSize: 11.5, fontFamily: sans(700), color: LMX.brand, marginTop: 4 }}>{t(CASE_STATUS_FR[c.status] || c.status_label)}</Text>
+          </View>
+
+          {current ? (
+            <View style={{ backgroundColor: LMX.surface, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: current.status === 'confirmed' ? LMX.emerald : LMX.border, padding: 14, gap: 8 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 14, fontFamily: sans(700), color: LMX.ink }}>{t('Devis v{v}', { v: current.version })}</Text>
+                <Text style={{ fontSize: 11, fontFamily: sans(700), color: current.status === 'confirmed' ? LMX.emerald : LMX.accent }}>{t(QUOTE_STATUS_FR[current.status] || current.status_label)}</Text>
+              </View>
+              {current.lines.map((l, i) => (
+                <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ flex: 1, fontSize: 12.5, color: LMX.ink70 }}>{l.name} × {l.qty}</Text>
+                  <Text style={{ fontSize: 12.5, fontFamily: sans(600) }}>{fmt(l.subtotal)}</Text>
+                </View>
+              ))}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 12.5, color: LMX.ink70 }}>{t('Livraison')}</Text>
+                <Text style={{ fontSize: 12.5, fontFamily: sans(600) }}>{fmt(current.delivery_fee)}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: LMX.hairline, paddingTop: 8 }}>
+                <Text style={{ fontSize: 14, fontFamily: sans(700) }}>{t('Total')}</Text>
+                <Text style={{ fontSize: 15, fontFamily: sans(800), color: LMX.accent }}>{fmt(current.total)}</Text>
+              </View>
+              {!!current.valid_until && <Text style={{ fontSize: 11, color: LMX.ink50 }}>{t("Valable jusqu'au {d}", { d: current.valid_until })}</Text>}
+              {!!current.timing && <Text style={{ fontSize: 11.5, color: LMX.ink70 }}>{current.timing}</Text>}
+              {!!current.notes && <Text style={{ fontSize: 11.5, color: LMX.ink70 }}>{current.notes}</Text>}
+
+              {current.status === 'sent' && (
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <View style={{ flex: 1 }}><Button full disabled={busy} icon="check" onPress={() => answer(current, 'accept')}>{t('Accepter')}</Button></View>
+                  <View style={{ flex: 1 }}><Button full variant="ghost" disabled={busy} onPress={() => answer(current, 'decline')}>{t('Refuser')}</Button></View>
+                </View>
+              )}
+              {current.status === 'accepted' && <Text style={{ fontSize: 12, color: LMX.ink70 }}>{t('Vous avez accepté ce devis. Le service client doit maintenant le confirmer.')}</Text>}
+              {current.status === 'confirmed' && (
+                <View style={{ gap: 6 }}>
+                  <Text style={{ fontSize: 12, color: LMX.emerald, fontFamily: sans(600) }}>✓ {t('Acceptation client : confirmée')}{'\n'}✓ {t('Confirmation du service client : confirmée')}</Text>
+                  {current.can_order ? (
+                    <>
+                      <Text style={{ fontSize: 11.5, color: LMX.ink70 }}>{t('Les produits et les prix convenus sont repris automatiquement à la commande.')}</Text>
+                      <Button full variant="accent" size="lg" icon="bag" onPress={() => nav.navigate('Checkout', { quoteOrder: { id: current.id, ref: c.ref, lines: current.lines } })}>{t('Commander')}</Button>
+                    </>
+                  ) : current.store_mode === 'quote_appointment' ? (
+                    <Text style={{ fontSize: 12, color: LMX.ink70 }}>{t('Le service client vous contactera pour fixer un rendez-vous.')}</Text>
+                  ) : null}
+                </View>
+              )}
+              {current.status === 'ordered' && current.order_id && (
+                <Button full variant="ghost" onPress={() => nav.navigate('OrderDetails', { orderId: current.order_id })}>{t('Voir la commande')}</Button>
+              )}
+            </View>
+          ) : (
+            <Text style={{ fontSize: 12.5, color: LMX.ink50 }}>{t('Le service client prépare votre devis. Vous serez notifié dès qu\'il sera prêt.')}</Text>
+          )}
+
+          {/* Conversation with Loomodex Customer Service (never with the store directly) */}
+          <Text style={{ fontSize: 11, color: LMX.ink50, textTransform: 'uppercase', fontFamily: sans(600), marginTop: 6 }}>{t('Échanges avec le service client')}</Text>
+          {(msgs?.messages ?? []).map(m => (
+            <View key={m.id} style={{ alignSelf: m.mine ? 'flex-end' : 'flex-start', maxWidth: '85%', backgroundColor: m.mine ? LMX.brand : LMX.surface, borderRadius: 12, padding: 10, borderWidth: m.mine ? 0 : 1, borderColor: LMX.border }}>
+              {!m.mine && <Text style={{ fontSize: 10.5, color: LMX.ink50, fontFamily: sans(600) }}>{m.author}</Text>}
+              <Text style={{ fontSize: 13, color: m.mine ? '#fff' : LMX.ink }}>{m.body}</Text>
+            </View>
+          ))}
+          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+            <TextInput value={text} onChangeText={setText} placeholder={t('Écrire au service client…')} placeholderTextColor={LMX.ink30}
+              style={{ flex: 1, backgroundColor: LMX.surface, borderRadius: 12, borderWidth: 1, borderColor: LMX.border, paddingHorizontal: 12, minHeight: 44, color: LMX.ink }} />
+            <Button disabled={busy || !text.trim()} onPress={send} icon="arrowR">{t('Envoyer')}</Button>
+          </View>
         </View>
       )}
     </Screen>

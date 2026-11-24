@@ -63,6 +63,8 @@ export async function openNotificationTarget(nav: Nav, data: NotificationData, u
 
   // Deposits verified, payments recorded / settled: every beneficiary role opens "Mes finances".
   if (type === 'finance') { nav.navigate('Finance'); return; }
+  // Store requests / quotations: the customer opens the request; staff use the website lists.
+  if (type === 'store_case' && data?.case_id && role === 'customer') { nav.navigate('MyRequest', { caseId: Number(data.case_id) }); return; }
 
   switch (role) {
     case 'customer':

@@ -31,6 +31,30 @@ export interface OfferStore {
 
 export interface StoreCase { id: number; ref: string; status: string; status_label: string }
 
+export interface QuoteLine { product_id: number | null; name: string; qty: number; unit_price: number; subtotal: number }
+export interface StoreQuote {
+  id: number; case_id: number; kind: 'quote' | 'proposal'; version: number; lines: QuoteLine[];
+  delivery_fee: number; total: number; currency: string; valid_until: string | null; timing: string; notes: string;
+  status: 'sent' | 'accepted' | 'declined' | 'confirmed' | 'superseded' | 'ordered' | 'submitted' | 'reviewed';
+  status_label: string; can_order: boolean; order_id: number | null; store_mode: StoreMode | null; answer_note?: string;
+}
+export interface StoreCaseDetail extends StoreCase {
+  type: 'price_request' | 'find_product';
+  store: { id: number; name: string; mode: StoreMode } | null;
+  product: { id: number; name: string; image: string | null } | null;
+  item_name: string; description: string; qty: number; fulfillment: string; city: string; neighborhood: string;
+  comment: string; order_id: number | null; created_at: string; quotes?: StoreQuote[];
+}
+export interface CaseMessage { id: number; mine: boolean; author: string; author_role: string; body: string; attachment: string | null; at: string }
+
+export const casesApi = {
+  mine: () => get<{ cases: StoreCaseDetail[] }>('/cases/mine', true),
+  get: (id: number) => get<StoreCaseDetail>(`/cases/${id}`, true),
+  messages: (id: number) => get<{ messages: CaseMessage[] }>(`/cases/${id}/messages`, true),
+  send: (id: number, body: string) => post<{ messages: CaseMessage[] }>(`/cases/${id}/messages`, { body }, true),
+  answer: (quoteId: number, decision: 'accept' | 'decline', note?: string) => post<StoreCaseDetail>(`/quotes/${quoteId}/answer`, { decision, note }, true),
+};
+
 export const storesApi = {
   /** "Request my total price" (product_id) or "Find a product" (store_id). Logged-in customers. */
   request: (fields: Record<string, string | number | undefined>, photo?: { uri: string; name?: string; type?: string }) =>

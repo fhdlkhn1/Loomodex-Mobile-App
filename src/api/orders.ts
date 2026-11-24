@@ -126,6 +126,8 @@ export const ordersApi = {
     express?: boolean;
     /** Influencer promo code (attribution only, no discount). */
     promo_code?: string;
+    /** Order a confirmed quotation (Nos offres mode B): the server uses its approved lines and prices. */
+    quote_id?: number;
   }) => post<{ order: Order; message: string; pay_url?: string }>('/orders/create', data, true),
 
   /** Guest checkout — order without an account (no auth token). Items come from the local cart. */

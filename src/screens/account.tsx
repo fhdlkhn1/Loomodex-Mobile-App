@@ -472,6 +472,7 @@ export function ScreenAccount() {
             <SettingRow icon="pin"         label={t('Adresses')}         sub={t('Gérer mes adresses')}     onPress={() => nav.navigate('Addresses')} />
             <SettingRow icon="wallet"      label={t('Mon portefeuille')}  sub={walletDisplay}          onPress={() => nav.navigate('Wallet')} />
             <SettingRow icon="package"     label={t('Suivre une commande')}                            onPress={() => nav.navigate('TrackEntry')} />
+            <SettingRow icon="msg"         label={t('Mes demandes et devis')} sub={t('Nos offres')}    onPress={() => nav.navigate('MyRequests')} />
           </>)}
           <SettingRow icon="msg"       label={t('Langue')}           sub={lang === 'en' ? 'English' : 'Français'} onPress={() => setLangSheet(true)} />
           <SettingRow icon="headset"     label={t('Aide')}                                           onPress={() => nav.navigate('Help')} last />
