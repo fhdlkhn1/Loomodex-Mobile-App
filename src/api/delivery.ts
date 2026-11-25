@@ -3,6 +3,12 @@ import { get, post } from './client';
 export interface DeliveryOrder {
   id: number;
   number: string;
+  /** Driver delivery offer: 'awaiting' until the driver accepts or refuses. */
+  offer_status?: 'awaiting' | 'accepted' | 'refused' | null;
+  /** What this driver earns on the delivery (shown on the offer); null for a partner's driver. */
+  net_earnings?: number | null;
+  offer_history?: { action: string; driver: string; reason: string; at: string }[];
+  driver_vehicle?: string;
   status: string;
   status_label: string;
   total: number;
@@ -174,6 +180,9 @@ export const driverApi = {
   /** Driver sets himself Available / Unavailable. */
   setAvailability: (available: boolean) =>
     post<{ success: boolean; available: boolean }>('/driver/availability', { available }, true),
+
+  answerOffer: (order_id: number, decision: 'accept' | 'refuse', reason?: string) =>
+    post<{ success: boolean; order: DeliveryOrder }>(`/driver/orders/${order_id}/offer`, { decision, reason }, true),
 
   updateStatus: (order_id: number, status: 'out-delivery' | 'driver-arrived') =>
     post<{ success: boolean; order: DeliveryOrder }>('/driver/update-status', { order_id, status }, true),

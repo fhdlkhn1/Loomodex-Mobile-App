@@ -17,6 +17,7 @@ import { ordersApi, Order, OrderTracking } from '../api/orders';
 import { LiveMap, RouteStatus } from '../components/LiveMap';
 import { useLivePosition, ensureLocationPermission } from '../hooks/useLivePosition';
 import { FinanceLink } from './finance';
+import { DeliveryOfferCard } from '../components/DeliveryOffer';
 import { OrderLocationMap, OrderMapSheet, MapButton } from '../components/OrderLocationMap';
 import { configApi } from '../api/config';
 import { Product as ApiProduct } from '../api/products';
@@ -1343,6 +1344,11 @@ export function ScreenDriver() {
         <DriverKpiTile icon="check"    value={summary?.total_delivered ?? 0} label={t('Livrées')}     color={LMX.emerald} />
       </View>
       <FinanceLink style={{ marginHorizontal: 16, marginTop: 12 }} />
+
+      {/* New delivery requests awaiting the driver's answer (accept / refuse with reason) */}
+      {orders.filter(o => o.offer_status === 'awaiting').map(o => (
+        <DeliveryOfferCard key={`offer-${o.id}`} order={o} onAnswered={() => { setLoad(true); load(); }} />
+      ))}
 
       {/* Tabs — segmented control */}
       <View style={{ flexDirection: 'row', marginHorizontal: 16, marginTop: 16, padding: 4, borderRadius: 14, backgroundColor: LMX.ink10 }}>
