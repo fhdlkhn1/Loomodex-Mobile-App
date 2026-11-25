@@ -2446,6 +2446,7 @@ export function ScreenLogistics() {
         {[
           { icon: 'truck' as const, label: t('Partenaires'), sub: t('{n} actif(s)', { n: partners.filter(p => p.active).length }), route: 'LogisticsPartners' },
           { icon: 'msg' as const, label: t('Incidents'), sub: t('Signalements partenaires'), route: 'LogisticsIncidents' },
+          { icon: 'pin' as const, label: t('Zones'), sub: t('Zones et quartiers'), route: 'ZonesModule' },
         ].map(e => (
           <Pressable key={e.route} onPress={() => nav.navigate(e.route)} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: LMX.surface, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: LMX.border }}>
             <View style={{ width: 32, height: 32, borderRadius: 9, backgroundColor: LMX.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}><Icon name={e.icon} size={15} color={LMX.ink} /></View>
