@@ -27,6 +27,8 @@ export interface OfferStore {
   price_note: string;
   product_count: number;
   categories?: { id: number; name: string; slug: string }[];
+  appointment_locations?: string[];
+  opening_hours?: string;
 }
 
 export interface StoreCase { id: number; ref: string; status: string; status_label: string }
@@ -44,6 +46,11 @@ export interface StoreCaseDetail extends StoreCase {
   product: { id: number; name: string; image: string | null } | null;
   item_name: string; description: string; qty: number; fulfillment: string; city: string; neighborhood: string;
   comment: string; order_id: number | null; created_at: string; quotes?: StoreQuote[];
+  appointments?: StoreAppointment[]; appointment_locations?: string[]; opening_hours?: string;
+}
+export interface StoreAppointment {
+  id: number; case_id: number; location: string; preferred: string; slot: string | null;
+  status: 'requested' | 'confirmed' | 'cancelled' | 'attended' | 'no_show'; status_label: string; note: string;
 }
 export interface CaseMessage { id: number; mine: boolean; author: string; author_role: string; body: string; attachment: string | null; at: string }
 
@@ -53,6 +60,9 @@ export const casesApi = {
   messages: (id: number) => get<{ messages: CaseMessage[] }>(`/cases/${id}/messages`, true),
   send: (id: number, body: string) => post<{ messages: CaseMessage[] }>(`/cases/${id}/messages`, { body }, true),
   answer: (quoteId: number, decision: 'accept' | 'decline', note?: string) => post<StoreCaseDetail>(`/quotes/${quoteId}/answer`, { decision, note }, true),
+  /** Mode C: on an existing request (case_id) or directly from a product / store. */
+  appointment: (d: { case_id?: number; product_id?: number; store_id?: number; location?: string; date: string; time?: string; comment?: string }) =>
+    post<{ success: boolean; case: StoreCase }>('/appointments', d, true),
 };
 
 export const storesApi = {

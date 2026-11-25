@@ -61,6 +61,9 @@ export function StoreRequestFooter({ store, productId }: { store: StoreInfo; pro
       </Text>
       <Text style={{ fontSize: 10.5, color: LMX.ink50, textAlign: 'center' }}>{t("Aucun paiement en ligne n'est requis à cette étape.")}</Text>
       <Button full variant="accent" size="lg" icon="msg" onPress={() => nav.navigate('StoreRequest', { type: 'price_request', productId, storeName: store.name })}>{t('Demander mon prix total')}</Button>
+      {store.mode === 'quote_appointment' && (
+        <Button full variant="ghost" icon="pin" onPress={() => nav.navigate('StoreRequest', { type: 'appointment', productId, storeId: store.id, storeName: store.name })}>{t('Demander un rendez-vous')}</Button>
+      )}
     </View>
   );
 }
@@ -162,6 +165,12 @@ export function ScreenOfferStore() {
         </Pressable>
       )}
 
+      {store?.mode === 'quote_appointment' && (
+        <View style={{ marginHorizontal: 16, marginTop: 8 }}>
+          <Button full variant="ghost" icon="pin" onPress={() => nav.navigate('StoreRequest', { type: 'appointment', storeId: store.id, storeName: store.name })}>{t('Demander un rendez-vous')}</Button>
+        </View>
+      )}
+
       {/* Search inside this store only */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginTop: 12, backgroundColor: LMX.surface, borderRadius: 12, borderWidth: 1, borderColor: LMX.border, paddingHorizontal: 12 }}>
         <Icon name="search" size={16} color={LMX.ink50} />
@@ -210,8 +219,14 @@ export function ScreenStoreRequest() {
   const nav = useNavigation<any>();
   const route = useRoute<any>();
   const { user, isLoggedIn } = useAuth();
-  const type: 'price_request' | 'find_product' = route.params?.type ?? 'price_request';
+  const type: 'price_request' | 'find_product' | 'appointment' = route.params?.type ?? 'price_request';
   const isPrice = type === 'price_request';
+  const isAppt = type === 'appointment';
+  const [apptDate, setApptDate] = useState('');
+  const [apptTime, setApptTime] = useState('');
+  const [apptLoc, setApptLoc] = useState('');
+  const { data: apptStore } = useQuery({ queryKey: ['offer-store', route.params?.storeId], queryFn: () => storesApi.get(route.params?.storeId), enabled: isAppt && !!route.params?.storeId });
+  const locations = apptStore?.appointment_locations ?? [];
   const [name, setName]   = useState(`${user?.first_name ?? ''} ${user?.last_name ?? ''}`.trim());
   const [phone, setPhone] = useState(user?.phone ?? '');
   const [qty, setQty]     = useState('1');
@@ -236,6 +251,17 @@ export function ScreenStoreRequest() {
 
   const submit = async () => {
     if (!isLoggedIn) { nav.navigate('SignIn'); return; }
+    if (isAppt) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(apptDate.trim())) { Alert.alert(t('Date requise'), t('Indiquez la date souhaitée (AAAA-MM-JJ).')); return; }
+      setSaving(true);
+      try {
+        const r = await casesApi.appointment({ case_id: route.params?.caseId, product_id: route.params?.caseId ? undefined : route.params?.productId,
+          store_id: route.params?.caseId ? undefined : route.params?.storeId, location: apptLoc || locations[0], date: apptDate.trim(), time: apptTime.trim() || undefined, comment: comment.trim() || undefined });
+        setDone(r.case.ref);
+      } catch (e) { Alert.alert(t('Erreur'), friendlyError(e)); }
+      finally { setSaving(false); }
+      return;
+    }
     if (phone.replace(/\D/g, '').length < 8) { Alert.alert(t('Téléphone requis'), t('Veuillez saisir un numéro de téléphone valide.')); return; }
     if (fulfillment === 'delivery' && !city.trim()) { Alert.alert(t('Ville requise'), t('Veuillez indiquer la ville ou la commune de livraison.')); return; }
     if (!isPrice && !itemName.trim() && !description.trim() && !photo) {
@@ -268,7 +294,7 @@ export function ScreenStoreRequest() {
     ) : (
       <Button full variant="accent" size="lg" icon="arrowR" disabled={saving} onPress={submit}>{saving ? t('Envoi…') : isLoggedIn ? t('Envoyer ma demande') : t('Se connecter pour envoyer')}</Button>
     )}>
-      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title={isPrice ? t('Demander mon prix total') : t('Trouver un produit')} />
+      <AppBar left={<IconBtn icon="chevL" onPress={() => nav.goBack()} />} title={isAppt ? t('Demander un rendez-vous') : isPrice ? t('Demander mon prix total') : t('Trouver un produit')} />
       {done ? (
         <View style={{ alignItems: 'center', padding: 32, gap: 10 }}>
           <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: LMX.emerald + '1A', alignItems: 'center', justifyContent: 'center' }}><Icon name="check" size={28} color={LMX.emerald} /></View>
@@ -278,7 +304,27 @@ export function ScreenStoreRequest() {
       ) : (
         <View style={{ paddingHorizontal: 16, gap: 12, paddingBottom: 24 }}>
           {!!route.params?.storeName && <Text style={{ fontSize: 13, color: LMX.ink50 }}>{route.params.storeName}</Text>}
-          {!isPrice && (
+          {isAppt && (
+            <>
+              {locations.length > 1 && (
+                <View style={{ gap: 6 }}>
+                  <Text style={{ fontSize: 12, color: LMX.ink70, fontFamily: sans(500) }}>{t('Lieu')}</Text>
+                  {locations.map(l => (
+                    <Pressable key={l} onPress={() => setApptLoc(l)} style={{ padding: 10, borderRadius: 10, borderWidth: 1, borderColor: (apptLoc || locations[0]) === l ? LMX.brand : LMX.border, backgroundColor: LMX.surface }}>
+                      <Text style={{ fontSize: 13, color: LMX.ink }}>{l}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+              {locations.length === 1 && <Text style={{ fontSize: 12.5, color: LMX.ink70 }}>{t('Lieu : {l}', { l: locations[0] })}</Text>}
+              {input(t('Date souhaitée (AAAA-MM-JJ)'), apptDate, setApptDate, { keyboardType: 'numbers-and-punctuation', placeholder: '2026-12-05' })}
+              {input(t('Heure souhaitée (HH:MM)'), apptTime, setApptTime, { keyboardType: 'numbers-and-punctuation', placeholder: '10:00' })}
+              {!!apptStore?.opening_hours && <Text style={{ fontSize: 11.5, color: LMX.ink50 }}>{apptStore.opening_hours}</Text>}
+              {input(t('Commentaire (facultatif)'), comment, setComment, { multiline: true })}
+              <Text style={{ fontSize: 11.5, color: LMX.ink50 }}>{t('Le service client confirmera la date et le lieu.')}</Text>
+            </>
+          )}
+          {!isAppt && !isPrice && (
             <>
               {input(t('Nom du produit'), itemName, setItemName)}
               {input(t('Courte description'), description, setDescription, { multiline: true })}
@@ -290,25 +336,25 @@ export function ScreenStoreRequest() {
               {input(t('Lien (facultatif)'), link, setLink, { autoCapitalize: 'none', keyboardType: 'url' })}
             </>
           )}
-          {isPrice && input(t('Variante (couleur, taille, modèle)'), variation, setVariation)}
-          {input(t('Nom'), name, setName)}
-          {input(t('Téléphone'), phone, setPhone, { keyboardType: 'phone-pad' })}
-          {input(t('Quantité'), qty, setQty, { keyboardType: 'number-pad' })}
-          <View style={{ flexDirection: 'row', gap: 8 }}>
+          {!isAppt && isPrice && input(t('Variante (couleur, taille, modèle)'), variation, setVariation)}
+          {!isAppt && input(t('Nom'), name, setName)}
+          {!isAppt && input(t('Téléphone'), phone, setPhone, { keyboardType: 'phone-pad' })}
+          {!isAppt && input(t('Quantité'), qty, setQty, { keyboardType: 'number-pad' })}
+          {!isAppt && <View style={{ flexDirection: 'row', gap: 8 }}>
             {(['delivery', 'collection'] as const).map(k => (
               <Pressable key={k} onPress={() => setFulfillment(k)}
                 style={{ flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center', backgroundColor: fulfillment === k ? LMX.brand : LMX.surface, borderWidth: 1, borderColor: fulfillment === k ? 'transparent' : LMX.border }}>
                 <Text style={{ fontSize: 12.5, fontFamily: sans(700), color: fulfillment === k ? '#fff' : LMX.ink70 }}>{k === 'delivery' ? t('Livraison') : t('Retrait')}</Text>
               </Pressable>
             ))}
-          </View>
-          {fulfillment === 'delivery' && (
+          </View>}
+          {!isAppt && fulfillment === 'delivery' && (
             <>
               {input(t('Ville ou commune'), city, setCity)}
               {input(t('Quartier'), hood, setHood)}
             </>
           )}
-          {input(t('Commentaire (facultatif)'), comment, setComment, { multiline: true })}
+          {!isAppt && input(t('Commentaire (facultatif)'), comment, setComment, { multiline: true })}
           <Text style={{ fontSize: 11.5, color: LMX.ink50, lineHeight: 17 }}>
             {t("Aucun paiement en ligne n'est requis à cette étape. L'envoi de cette demande ne confirme pas un achat. Vos coordonnées sont partagées uniquement avec le service client Loomodex.")}
           </Text>
@@ -323,6 +369,9 @@ const fmt = (n: number) => `${Math.round(n || 0).toLocaleString('fr-FR').replace
 const CASE_STATUS_FR: Record<string, string> = {
   received: 'Reçue', under_review: 'En cours de traitement', info_required: 'Informations demandées',
   proposal_review: 'En cours de traitement', quote_sent: 'Devis envoyé', closed: 'Clôturée', converted: 'Commandée',
+};
+const APPT_FR: Record<string, string> = {
+  requested: 'Demandé — en attente de confirmation', confirmed: 'Confirmé', cancelled: 'Annulé', attended: 'Effectué', no_show: 'Manqué',
 };
 const QUOTE_STATUS_FR: Record<string, string> = {
   sent: 'En attente de votre réponse', accepted: 'En attente de confirmation du service client', declined: 'Refusé',
@@ -451,6 +500,16 @@ export function ScreenMyRequest() {
             </View>
           ) : (
             <Text style={{ fontSize: 12.5, color: LMX.ink50 }}>{t('Le service client prépare votre devis. Vous serez notifié dès qu\'il sera prêt.')}</Text>
+          )}
+
+          {(c.appointments ?? []).map(a => (
+            <View key={a.id} style={{ backgroundColor: LMX.surface, borderRadius: LMX.r.lg, borderWidth: 1, borderColor: a.status === 'confirmed' ? LMX.emerald : LMX.border, padding: 12, gap: 3 }}>
+              <Text style={{ fontSize: 13, fontFamily: sans(700), color: LMX.ink }}>{t('Rendez-vous')} · {t(APPT_FR[a.status] || a.status_label)}</Text>
+              <Text style={{ fontSize: 12, color: LMX.ink70 }}>{a.slot ? t('Le {d}', { d: a.slot.substring(0, 16) }) : t('Souhaité : {d}', { d: a.preferred })}{a.location ? ` · ${a.location}` : ''}</Text>
+            </View>
+          ))}
+          {c.store?.mode === 'quote_appointment' && !(c.appointments ?? []).some(a => a.status === 'requested' || a.status === 'confirmed') && c.status !== 'converted' && (
+            <Button full variant="ghost" icon="pin" onPress={() => nav.navigate('StoreRequest', { type: 'appointment', caseId: c.id, storeId: c.store?.id, storeName: c.store?.name })}>{t('Demander un rendez-vous')}</Button>
           )}
 
           {/* Conversation with Loomodex Customer Service (never with the store directly) */}
