@@ -2634,6 +2634,8 @@ export function ScreenCS() {
       {/* Order by phone on behalf of a customer (12 Nov doc) */}
       <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
         <Button full variant="accent" icon="plus" onPress={() => nav.navigate('CsNewOrder')}>{t('Créer une commande pour un client')}</Button>
+        <View style={{ height: 8 }} />
+        <Button full variant="ghost" icon="msg" onPress={() => nav.navigate('CsRequests')}>{t('Demandes boutiques (devis, rendez-vous)')}</Button>
       </View>
 
       {/* Tabs */}

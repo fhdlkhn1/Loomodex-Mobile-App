@@ -22,6 +22,7 @@ import { ScreenPartner, ScreenPartnerIncidents, ScreenPartnerLedger, ScreenLogis
 import { ScreenFinance } from './screens/finance';
 import { ScreenCsNewOrder } from './screens/csOrder';
 import { ScreenZonesModule } from './screens/zones';
+import { ScreenCsRequests, ScreenCsRequest } from './screens/csRequests';
 import { ScreenOfferStores, ScreenOfferStore, ScreenStoreRequest, ScreenMyRequests, ScreenMyRequest } from './screens/stores';
 import { ScreenWallet, ScreenWalletTopup } from './screens/wallet';
 import { ScreenHelp } from './screens/support';
@@ -169,6 +170,8 @@ export function RootNavigator() {
       <Stack.Screen name="Finance" component={ScreenFinance} />
       <Stack.Screen name="CsNewOrder" component={ScreenCsNewOrder} />
       <Stack.Screen name="ZonesModule" component={ScreenZonesModule} />
+      <Stack.Screen name="CsRequests" component={ScreenCsRequests} />
+      <Stack.Screen name="CsRequest" component={ScreenCsRequest} />
       <Stack.Screen name="OfferStores" component={ScreenOfferStores} />
       <Stack.Screen name="OfferStore" component={ScreenOfferStore} />
       <Stack.Screen name="StoreRequest" component={ScreenStoreRequest} />
