@@ -179,6 +179,14 @@ function Ad({ s, nav }: { s: HomeSection; nav: any }) {
       <Text style={{ fontSize: 13, fontFamily: sans(700), color: s.style === 'light' ? '#fff' : LMX.navy }}>{s.button} ›</Text>
     </Pressable>
   );
+  // Image only: the banner already contains its own title and button (no text drawn over it).
+  if (s.style === 'image' && s.image) {
+    return (
+      <Pressable onPress={open} accessibilityLabel={s.title} style={{ marginHorizontal: 16, marginTop: 20, borderRadius: 16, overflow: 'hidden' }}>
+        <ExpoImage source={{ uri: s.image }} style={{ width: '100%', aspectRatio: 3.4 }} contentFit="cover" />
+      </Pressable>
+    );
+  }
   if (s.style === 'dark') {
     return (
       <Pressable onPress={open} style={{ marginHorizontal: 16, marginTop: 20, borderRadius: 16, overflow: 'hidden', flexDirection: 'row', backgroundColor: '#123A7A', minHeight: 150 }}>

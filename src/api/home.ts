@@ -12,7 +12,7 @@ export interface HomeSection {
   image?: string | null;
   text?: string;
   button?: string;
-  style?: 'dark' | 'light' | 'photo';
+  style?: 'dark' | 'light' | 'photo' | 'image';
   ends_at?: string;
   products?: Product[];
   items?: any[];
