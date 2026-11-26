@@ -110,6 +110,8 @@ export interface Product {
   /** e.g. "10–14 jours ouvrables". Null for local products. */
   delivery_estimate: string | null;
   related?: Product[];
+  /** Seller's area for the card, e.g. "Ratoma · Kipé". */
+  seller_area?: string;
   /** False for products of a store in quotation mode (Nos offres B/C): no Add to Cart / Buy Now. */
   purchasable?: boolean;
   /** Configurable store ("Nos offres") the product belongs to; null for the main catalog. */
@@ -153,7 +155,7 @@ export interface HomeBanner {
   /** Print the title on the slide (admin option for plain photos). Off → title is the accessibility label only. */
   show_title?: boolean;
   /** Where a tap goes: nothing, a product (id), a category (id) or an external/website URL. */
-  link_type: 'none' | 'product' | 'category' | 'url';
+  link_type: 'none' | 'product' | 'category' | 'url' | 'store';
   link_value: string;
   /** Resolved website URL for the link (fallback for any link type). */
   url: string;

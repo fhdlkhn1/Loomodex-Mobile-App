@@ -17,6 +17,8 @@ import { get, friendlyError } from '../api/client';
 import { BannerCarousel } from '../components/BannerCarousel';
 import { StoreApplicationBanner } from '../components/StoreApplicationBanner';
 import { useOfferStores } from './stores';
+import { HomeSections } from '../components/HomeSections';
+import { homeApi } from '../api/home';
 import { ErrorState, SkeletonRail } from '../components/StateViews';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
@@ -355,18 +357,22 @@ export function ScreenHome() {
   const { isVendor, isDriver, isLogistics, isSupport } = useAuth();
   const { cats, all, flashDeals, newArrivals, trending, featured, loading, error, partial, refreshing, refetch } = useHomeData();
   const { banners, refetch: refetchBanners } = useHomeBanners();
+  // New home design, fully managed in wp-admin → Loomodex → Home page (no app update needed).
+  // If it cannot be loaded, the previous home sections below are shown instead.
+  const { data: homeLayout, refetch: refetchLayout } = useQuery({ queryKey: ['home-layout'], queryFn: () => homeApi.layout(), staleTime: 60 * 1000 });
   const [menuOpen, setMenuOpen] = useState(false);
   const [pulling, setPulling] = useState(false);
 
   const onRefresh = async () => {
     setPulling(true);
-    try { await Promise.all([refetch(), refetchBanners()]); } finally { setPulling(false); }
+    try { await Promise.all([refetch(), refetchBanners(), refetchLayout()]); } finally { setPulling(false); }
   };
 
   const openBanner = (b: HomeBanner) => {
     const v = String(b.link_value ?? '').trim();
     if (b.link_type === 'product' && Number(v)) nav.navigate('ProductDetail', { productId: Number(v) });
     else if (b.link_type === 'category' && Number(v)) nav.navigate('Category', { categoryId: Number(v), categoryName: b.title || undefined });
+    else if (b.link_type === 'store' && Number(v)) nav.navigate('OfferStore', { storeId: Number(v), name: b.title || undefined });
     else if (b.link_type === 'url' && (v || b.url)) Linking.openURL(v || b.url).catch(() => {});
   };
 
@@ -459,6 +465,20 @@ export function ScreenHome() {
         )}
       </View>
 
+      {homeLayout?.sections?.length ? (
+        <HomeSections layout={homeLayout} nav={nav} header={staffDash ? (
+          <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
+            <Pressable onPress={() => nav.navigate(staffDash.route)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: LMX.navy, borderRadius: 16, padding: 14 }}>
+              <Icon name={staffDash.icon} size={19} color="#fff" />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 14, fontFamily: sans(700), color: '#fff' }}>{staffDash.label}</Text>
+                <Text style={{ fontSize: 11.5, color: '#fff', opacity: 0.7, marginTop: 2 }}>{staffDash.sub}</Text>
+              </View>
+              <Icon name="chevR" size={16} color="#fff" />
+            </Pressable>
+          </View>
+        ) : undefined} />
+      ) : (<>
       {/* Trust tiles — compact 2×2 reassurance grid right under the banner */}
       <View style={{ paddingHorizontal: 16, paddingTop: 8, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 6 }}>
         {[
@@ -756,6 +776,7 @@ export function ScreenHome() {
         </>
       )}
 
+      </>)}
     </Screen>
   );
 }
